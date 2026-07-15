@@ -1,0 +1,20 @@
+{
+  "name": "freshaf",
+  "version": "1.0.0",
+  "description": "FreshAF (Fresh and Fast) — on-demand mobile car wash marketplace",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=23.4"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

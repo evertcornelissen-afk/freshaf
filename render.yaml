@@ -1,0 +1,31 @@
+# Render.com blueprint — creates the FreshAF web service with a persistent disk
+# for the SQLite database. Connect this repo in Render and it auto-detects this file.
+services:
+  - type: web
+    name: freshaf
+    runtime: node
+    plan: starter # needed for the persistent disk; free tier loses the database on restart
+    buildCommand: npm install --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /api/pricing
+    disk:
+      name: freshaf-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "5757"
+      - key: BASE_URL
+        sync: false # set to the public URL Render assigns (or your custom domain)
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false # set a strong one BEFORE first boot — the admin account is seeded once
+      - key: PAYFAST_MERCHANT_ID
+        sync: false
+      - key: PAYFAST_MERCHANT_KEY
+        sync: false
+      - key: PAYFAST_PASSPHRASE
+        sync: false

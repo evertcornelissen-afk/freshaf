@@ -1,0 +1,16 @@
+{
+  "name": "FreshAF — Consider it done.",
+  "short_name": "FreshAF",
+  "description": "On-demand mobile car wash and laundry. Vetted pros come to you.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f7f9",
+  "theme_color": "#1799c2",
+  "icons": [
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

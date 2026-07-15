@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreshAF Admin</title>
+<link rel="icon" href="/img/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="splash">
+  <img src="/img/logo.svg" alt="FreshAF">
+  <div class="dots"><span></span><span></span><span></span></div>
+</div>
+<div class="topbar">
+  <div class="brand">
+    <span class="stack">
+      <img class="logo-img" src="/img/logo.svg" alt="FreshAF">
+      <span class="tag">Admin Dashboard</span>
+    </span>
+  </div>
+  <div class="row">
+    <span class="who" id="who"></span>
+    <button class="ghost small hidden" id="btn-logout">Sign out</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="view-auth">
+    <div class="card" style="max-width:420px;margin:70px auto">
+      <h2 id="h-admin">Admin sign in</h2>
+      <div class="msg error" id="login-error"></div>
+      <label>Email</label><input id="login-email" type="email">
+      <label>Password</label><input id="login-password" type="password">
+      <div class="mt"><button id="btn-login">Sign in</button></div>
+    </div>
+  </div>
+
+  <div id="view-dash" class="hidden">
+    <div class="card">
+      <h2 id="h-overview">Overview</h2>
+      <div class="stat-row" id="stats-box"></div>
+    </div>
+
+    <div class="card">
+      <div class="row spread">
+        <h2 id="h-suppliers">Suppliers</h2>
+        <select id="sup-filter" style="width:auto">
+          <option value="">All</option>
+          <option value="pending" selected>Pending approval</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+      <div class="msg error" id="sup-error"></div>
+      <div class="table-scroll mt" id="suppliers-box"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="h-import">Bulk import suppliers</h2>
+      <p class="muted small-text">One supplier per line, comma-separated:<br>
+      <code style="font-size:.78rem">name, email, phone, business name, ID number, area, services</code><br>
+      Services: <code>carwash</code>, <code>laundry</code> or <code>both</code>. Imported suppliers are pre-approved; a temporary password is generated for each.</p>
+      <div class="msg error" id="import-error"></div>
+      <textarea id="import-text" rows="6" style="margin-top:10px;font-family:monospace;font-size:.82rem" placeholder="Sipho Dlamini, sipho@gmail.com, 0821234567, Sipho Shine, 9001015800087, Sandton, carwash&#10;Palesa Mokoena, palesa@gmail.com, 0739876543, Palesa Laundry, 9202025800083, Rosebank, laundry"></textarea>
+      <div class="row mt">
+        <button class="small" id="btn-import">Import suppliers</button>
+        <button class="secondary small hidden" id="btn-copy-creds">Copy credentials</button>
+      </div>
+      <div class="table-scroll mt" id="import-results"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="h-orderlog">Orders</h2>
+      <div class="table-scroll" id="orders-box"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="h-settings">Marketplace settings</h2>
+      <div class="msg ok" id="settings-ok" style="display:none"></div>
+      <div class="row">
+        <div><label>Commission %</label><input id="set-commission" type="number" min="0" max="50" style="width:130px"></div>
+        <div><label>Dispatch radius (km)</label><input id="set-radius" type="number" min="1" max="200" style="width:130px"></div>
+        <div><label>Offer timeout (sec)</label><input id="set-timeout" type="number" min="10" max="600" style="width:130px"></div>
+        <div><label>Rewards earn %</label><input id="set-points" type="number" min="0" max="50" style="width:130px"></div>
+        <div><label>Free callout (km)</label><input id="set-callout-free" type="number" min="0" max="100" style="width:130px"></div>
+        <div><label>Callout R per km</label><input id="set-callout-rate" type="number" min="0" max="100" style="width:130px"></div>
+        <div><label>Callout cap (R)</label><input id="set-callout-cap" type="number" min="0" max="1000" style="width:130px"></div>
+      </div>
+      <div class="mt"><button class="small" id="btn-save-settings">Save settings</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>
