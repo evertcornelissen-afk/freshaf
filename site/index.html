@@ -25,7 +25,7 @@
     </span>
   </div>
   <div class="row">
-    <a class="btn small app-link" href="#" data-fallback="Launching soon">Open the app</a>
+    <a class="btn small app-link" href="#" data-fallback="Launching soon">Try the demo</a>
   </div>
 </div>
 
@@ -36,7 +36,7 @@
     <h1>Consider it <em>done.</em></h1>
     <p>Vetted professionals come to you — your car washed at your parking spot, your laundry collected, cleaned and delivered back. The nearest available pro is dispatched the moment you book.</p>
     <div class="row mt" style="justify-content:center">
-      <a class="btn app-link" href="#" data-fallback="Launching soon in Johannesburg">Get started</a>
+      <a class="btn app-link" href="#" data-fallback="Launching soon in Johannesburg">Try the demo</a>
       <a class="btn secondary" href="#services" style="color:var(--petrol)">See pricing</a>
     </div>
     <div class="feature-chips">
@@ -76,7 +76,7 @@
   <div class="card" style="text-align:center">
     <h2 style="justify-content:center">Want to earn with FreshAF?</h2>
     <p class="muted small-text" style="margin-bottom:14px">Car wash pros and laundry pros set their own area and hours. Applications open at launch.</p>
-    <a class="btn app-link" href="#" data-path="/supplier" data-fallback="Pro applications open at launch">Become a pro</a>
+    <a class="btn secondary" style="pointer-events:none;color:var(--muted)">Pro applications open at launch</a>
   </div>
 
   <footer class="site-footer">
@@ -87,8 +87,8 @@
 </div>
 
 <script>
-// Set APP_URL to the deployed app (e.g. https://freshaf.onrender.com) to activate all buttons.
-const APP_URL = '';
+// Points at the in-browser demo; switch to the real app URL (e.g. https://freshaf.onrender.com) at launch.
+const APP_URL = '/app/';
 document.querySelectorAll('.app-link').forEach((a) => {
   if (APP_URL) {
     a.href = APP_URL + (a.dataset.path || '');

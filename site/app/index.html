@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreshAF Demo — try the app</title>
+<meta name="description" content="Play with the FreshAF experience: book a simulated car wash or laundry collection at your real location.">
+<meta name="theme-color" content="#1799c2">
+<link rel="icon" href="/img/logo-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/img/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .demo-ribbon {
+    text-align: center; padding: 8px 14px; font-size: .78rem; font-weight: 600;
+    background: rgba(240, 164, 74, .12); color: var(--warn);
+    border-bottom: 1px solid rgba(240, 164, 74, .3);
+  }
+</style>
+</head>
+<body>
+<div id="splash">
+  <img src="/img/logo.svg" alt="FreshAF">
+  <div class="dots"><span></span><span></span><span></span></div>
+</div>
+<div class="topbar">
+  <div class="brand">
+    <a href="/" class="stack" style="text-decoration:none">
+      <img class="logo-img" src="/img/logo.svg" alt="FreshAF">
+      <span class="tag">Interactive demo</span>
+    </a>
+  </div>
+  <div class="row">
+    <button class="secondary small hidden" id="btn-account"></button>
+    <button class="small hidden" id="btn-go-login">Sign in</button>
+    <button class="ghost small hidden" id="btn-logout">Sign out</button>
+  </div>
+</div>
+<div class="demo-ribbon">Demo mode — orders and pros are simulated in your browser. No real bookings, no real payments.</div>
+
+<div class="wrap">
+  <!-- HOME -->
+  <div id="view-home" class="hidden">
+    <div class="hero">
+      <div class="glow"></div>
+      <span class="eyebrow">Interactive demo</span>
+      <h1>Try it. <em>Consider it done.</em></h1>
+      <p>Explore the full FreshAF experience — book a simulated car wash or laundry collection at your real location, watch a pro accept and complete it, and earn demo rewards.</p>
+      <div class="row mt" style="justify-content:center">
+        <button id="btn-guest">Continue as guest</button>
+        <button class="secondary" id="btn-cta-register">Create demo account</button>
+        <button class="ghost" id="btn-cta-login">Sign in</button>
+      </div>
+      <div class="feature-chips">
+        <span class="feature-chip" id="chip-vetted">Vetted professionals</span>
+        <span class="feature-chip" id="chip-track">Live order tracking</span>
+        <span class="feature-chip" id="chip-pay">Card or cash</span>
+        <span class="feature-chip" id="chip-rewards">Money-back rewards</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="view-login" class="hidden">
+    <div class="card" style="max-width:440px;margin:40px auto">
+      <h2 id="h-signin">Sign in</h2>
+      <div class="msg error" id="login-error"></div>
+      <label>Email</label><input id="login-email" type="email" autocomplete="email">
+      <label>Password</label><input id="login-password" type="password" autocomplete="current-password">
+      <div class="mt"><button id="btn-login" style="width:100%">Sign in</button></div>
+      <div class="mt"><button class="secondary" id="btn-guest-login" style="width:100%">Continue as guest</button></div>
+      <p class="mt muted small-text" style="text-align:center">New here? <a href="#" id="link-to-register">Create a demo account</a></p>
+      <p class="muted small-text" style="text-align:center"><a href="#" id="link-back-home">Back</a></p>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="view-register" class="hidden">
+    <div class="card" style="max-width:440px;margin:40px auto">
+      <h2 id="h-create">Create your demo account</h2>
+      <div class="msg error" id="reg-error"></div>
+      <label>Full name</label><input id="reg-name" autocomplete="name">
+      <label>Email</label><input id="reg-email" type="email" autocomplete="email">
+      <label>Mobile number</label><input id="reg-phone" placeholder="e.g. 082 555 1234">
+      <label>Preferred address (home or work)</label><input id="reg-address" placeholder="e.g. 12 Rivonia Rd, Sandton">
+      <label>Password (min 8 characters)</label><input id="reg-password" type="password" autocomplete="new-password">
+      <label class="row" style="margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--muted)">
+        <input type="checkbox" id="reg-terms" style="width:auto">
+        <span>I accept the <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank">Privacy Policy</a></span>
+      </label>
+      <div class="mt"><button id="btn-register" style="width:100%">Create account</button></div>
+      <p class="mt muted small-text" style="text-align:center">Already have an account? <a href="#" id="link-to-login">Sign in</a></p>
+    </div>
+  </div>
+
+  <!-- ORDER VIEW -->
+  <div id="view-order" class="hidden">
+    <div class="card">
+      <div class="service-tabs" id="service-tabs">
+        <div class="service-tab active" data-svc="carwash" id="tab-carwash">Car Wash</div>
+        <div class="service-tab" data-svc="laundry" id="tab-laundry">Laundry</div>
+      </div>
+      <h2 id="h-book">Book a wash</h2>
+      <div class="msg error" id="order-error"></div>
+      <h3><span class="step-num">1</span>Choose your package</h3>
+      <div class="pkg-grid" id="pkg-grid"></div>
+      <h3><span class="step-num">2</span><span id="unit-heading">Vehicle type</span></h3>
+      <div class="pkg-grid" id="veh-grid"></div>
+      <h3><span class="step-num">3</span><span id="where-heading">Where is the car?</span></h3>
+      <p class="muted small-text" style="margin-bottom:10px">Tap the map to drop a pin, or use your current or saved location.</p>
+      <div id="map"></div>
+      <div class="row mt">
+        <button class="secondary small" id="btn-geolocate">Use my location</button>
+        <button class="secondary small hidden" id="btn-saved-address">Use saved address</button>
+        <span id="pin-status" class="muted small-text">No pin set</span>
+      </div>
+      <label>Address / access instructions</label>
+      <input id="order-address" placeholder="e.g. 12 Rivonia Rd, Sandton — basement P2, bay 41">
+      <label id="notes-label">Notes for the pro (optional)</label>
+      <input id="order-notes" placeholder="e.g. White Hilux, keys with security">
+      <h3><span class="step-num">4</span>Payment</h3>
+      <div class="seg" id="pay-seg">
+        <label><input type="radio" name="pay" value="card" checked><span id="seg-card">Card (simulated)</span></label>
+        <label><input type="radio" name="pay" value="cash"><span id="seg-cash">Cash on completion</span></label>
+      </div>
+      <div id="points-row" class="hidden" style="margin-top:14px">
+        <label style="margin:0;cursor:pointer" class="row">
+          <input type="checkbox" id="use-points" style="width:auto">
+          <span id="points-label"></span>
+        </label>
+      </div>
+      <div class="total-bar">
+        <div>
+          <span class="muted">Total due</span>
+          <div id="price-note" class="small-text muted"></div>
+        </div>
+        <span class="amount"><strong id="order-total">—</strong></span>
+        <button id="btn-place-order">Book now</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2 id="h-orders">My orders</h2>
+      <div id="orders-list"><p class="empty">No orders yet.</p></div>
+    </div>
+  </div>
+
+  <!-- TRACK VIEW -->
+  <div id="view-track" class="hidden">
+    <div class="card">
+      <div class="row spread">
+        <h2 id="track-title">Your order</h2>
+        <span class="pill" id="track-pill"></span>
+      </div>
+      <div class="timeline" id="track-timeline"></div>
+      <div id="track-body"></div>
+      <div class="row mt">
+        <button class="ghost small" id="btn-back-orders">Back</button>
+        <button class="secondary small hidden" id="btn-retry-order">Search again</button>
+        <button class="danger small hidden" id="btn-cancel-order">Cancel order</button>
+      </div>
+      <div id="rate-box" class="hidden mt">
+        <hr class="divider">
+        <h3 style="margin-top:0">Rate your pro</h3>
+        <div class="stars" id="rate-stars"></div>
+        <label>Comment (optional)</label><input id="rate-comment">
+        <div class="mt"><button class="small" id="btn-submit-rating">Submit rating</button></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <a href="/">About FreshAF</a>
+    <a href="/terms">Terms &amp; Conditions</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="mailto:support@freshaf.co.za">Support</a>
+  </footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/app/js/demo-backend.js"></script>
+<script src="/app/js/common.js"></script>
+<script src="/app/js/app.js"></script>
+</body>
+</html>
