@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { db, getSetting } = require('../db');
 const { authRequired } = require('../auth');
 const dispatch = require('../dispatch');
@@ -6,6 +9,47 @@ const realtime = require('../realtime');
 
 const router = express.Router();
 router.use(authRequired('supplier'));
+
+// ---------- onboarding documents (allowed while pending — that's when they're needed) ----------
+const UPLOAD_DIR = path.join(__dirname, '..', '..', 'data', 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.pdf'];
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${req.user.id}-${req.body.kind || 'doc'}-${Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, ALLOWED_EXT.includes(path.extname(file.originalname).toLowerCase()));
+  },
+});
+
+router.post('/documents', upload.single('file'), (req, res) => {
+  const kind = req.body.kind;
+  if (!['id_copy', 'proof_address', 'work_photo'].includes(kind)) {
+    return res.status(400).json({ error: 'Invalid document type' });
+  }
+  if (!req.file) return res.status(400).json({ error: 'Attach a JPG, PNG or PDF up to 5 MB' });
+  // Replace any previous upload of the same kind.
+  const old = db.prepare('SELECT * FROM supplier_docs WHERE user_id = ? AND kind = ?').get(req.user.id, kind);
+  if (old) {
+    try { fs.unlinkSync(path.join(UPLOAD_DIR, old.stored_name)); } catch {}
+    db.prepare('DELETE FROM supplier_docs WHERE id = ?').run(old.id);
+  }
+  db.prepare('INSERT INTO supplier_docs (user_id, kind, original_name, stored_name) VALUES (?, ?, ?, ?)')
+    .run(req.user.id, kind, req.file.originalname, req.file.filename);
+  res.json({ ok: true });
+});
+
+router.get('/documents', (req, res) => {
+  const docs = db.prepare('SELECT kind, original_name, uploaded_at FROM supplier_docs WHERE user_id = ?').all(req.user.id);
+  res.json({ documents: docs });
+});
 
 function requireApproved(req, res, next) {
   const s = db.prepare('SELECT status FROM suppliers WHERE user_id = ?').get(req.user.id);

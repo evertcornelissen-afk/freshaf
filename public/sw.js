@@ -1,5 +1,30 @@
 // FreshAF service worker — network-first for pages/assets, API always live.
-const CACHE = 'freshaf-v1';
+// Also delivers provider job-alert push notifications.
+const CACHE = 'freshaf-v2';
+
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data.json(); } catch {}
+  e.waitUntil(self.registration.showNotification(data.title || 'FreshAF', {
+    body: data.body || 'You have a new notification',
+    icon: '/img/icon-192.png',
+    badge: '/img/icon-192.png',
+    tag: data.tag || 'freshaf',
+    data: { url: data.url || '/supplier' },
+    vibrate: [200, 100, 200],
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || '/supplier';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) {
+      if (c.url.includes(url)) return c.focus();
+    }
+    return clients.openWindow(url);
+  }));
+});
 const PRECACHE = ['/', '/css/style.css', '/js/common.js', '/js/app.js', '/img/logo.svg', '/img/logo-mark.svg'];
 
 self.addEventListener('install', (e) => {

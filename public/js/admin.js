@@ -99,7 +99,11 @@ async function refreshSuppliers() {
         <span class="muted small-text">${s.service_area || ''}</span><br>
         ${(s.services || []).map((x) => `<span class="pill ${x === 'laundry' ? 'ok' : 'warn'}" style="margin-top:4px">${serviceName(x)}</span>`).join(' ')}</td>
       <td>${s.name}<br><span class="muted small-text">${s.email}<br>${s.phone || ''}</span></td>
-      <td class="muted small-text">ID: ${s.id_number}<br>Reg: ${s.vehicle_reg || '—'}<br>${s.equipment_notes || ''}</td>
+      <td class="muted small-text">ID: ${s.id_number}<br>Reg: ${s.vehicle_reg || '—'}<br>${s.equipment_notes || ''}
+        ${s.bank_name ? `<br>Bank: ${s.bank_name} · ${s.bank_account || ''} · ${s.bank_branch || ''}` : '<br>Bank: not provided'}
+        ${(s.documents || []).length
+          ? '<br>' + s.documents.map((d) => `<a href="/api/admin/docs/${d.id}" target="_blank">${d.kind.replace(/_/g, ' ')}</a>`).join(' · ')
+          : '<br><span style="color:var(--warn)">No documents uploaded</span>'}</td>
       <td><span class="pill ${s.status === 'approved' ? 'ok' : s.status === 'pending' ? 'warn' : 'bad'}">${s.status}</span>
         ${s.online ? '<br><span class="pill ok live" style="margin-top:5px">online</span>' : ''}
         ${s.rating ? `<br><span class="muted small-text">${starInline} ${s.rating} (${s.rating_count})</span>` : ''}</td>

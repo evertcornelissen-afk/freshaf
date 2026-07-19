@@ -11,6 +11,8 @@ const show = (view) => switchView(VIEWS, view);
 function decorate() {
   el('h-signin').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-apply').insertAdjacentHTML('afterbegin', icon('briefcase'));
+  el('h-docs').insertAdjacentHTML('afterbegin', icon('shield'));
+  el('btn-enable-alerts').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-avail').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-offers').insertAdjacentHTML('afterbegin', icon('spark'));
   el('h-active').insertAdjacentHTML('afterbegin', icon('droplet'));
@@ -40,10 +42,81 @@ async function boot() {
   }
 }
 
+/* ---------- onboarding documents ---------- */
+const DOC_KINDS = [
+  ['id_copy', 'SA ID copy (required)'],
+  ['proof_address', 'Proof of address'],
+  ['work_photo', 'Photo of your setup / equipment'],
+];
+
+async function renderDocs() {
+  el('docs-card').classList.remove('hidden');
+  const { documents } = await api('/api/supplier/documents');
+  el('docs-rows').innerHTML = DOC_KINDS.map(([kind, label]) => {
+    const doc = documents.find((d) => d.kind === kind);
+    return `
+    <div class="row spread" style="padding:11px 0;border-bottom:1px solid var(--border-soft)">
+      <div>
+        <strong style="font-size:.9rem">${label}</strong>
+        <div class="muted small-text">${doc ? `${icon('check')} ${doc.original_name}` : 'Not uploaded yet'}</div>
+      </div>
+      <div>
+        <input type="file" id="file-${kind}" accept=".jpg,.jpeg,.png,.pdf" class="hidden">
+        <button class="secondary small" onclick="document.getElementById('file-${kind}').click()">${doc ? 'Replace' : 'Upload'}</button>
+      </div>
+    </div>`;
+  }).join('');
+  DOC_KINDS.forEach(([kind]) => {
+    el(`file-${kind}`).onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const fd = new FormData();
+        fd.append('kind', kind);
+        fd.append('file', file);
+        const res = await fetch('/api/supplier/documents', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        toast('Document uploaded', 'ok');
+        renderDocs();
+      } catch (err) { showError('docs-error', err.message); }
+    };
+  });
+}
+
+/* ---------- push job alerts ---------- */
+async function subscribePush() {
+  const reg = await navigator.serviceWorker.ready;
+  const { key } = await api('/api/push/key');
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  await api('/api/push/subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
+}
+
+async function refreshAlertsButton() {
+  const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+  el('btn-enable-alerts').classList.toggle('hidden', !supported || Notification.permission === 'granted');
+  el('alerts-hint').classList.toggle('hidden', !supported || Notification.permission === 'granted');
+  if (supported && Notification.permission === 'granted') {
+    subscribePush().catch(() => {}); // keep the subscription fresh
+  }
+}
+
+el('btn-enable-alerts').onclick = async () => {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('Notifications were not allowed — enable them in your browser settings');
+    await subscribePush();
+    toast('Job alerts enabled — you will be notified even when the app is closed', 'ok');
+    refreshAlertsButton();
+  } catch (e) { showError('dash-error', e.message); }
+};
+
 async function route() {
   const s = me.supplier;
   if (!s || s.status === 'approved') { await enterDash(); return; }
   show('view-status');
+  if (s.status === 'pending') renderDocs().catch(() => {});
+  else el('docs-card').classList.add('hidden');
   const heading = el('status-heading'); const detail = el('status-detail'); const ic = el('status-icon');
   if (s.status === 'pending') {
     ic.innerHTML = icon('clock', 'xl');
@@ -80,12 +153,26 @@ async function enterDash() {
   online = !!me.supplier?.online;
   if (me.supplier?.lat != null) loc = { lat: me.supplier.lat, lng: me.supplier.lng };
   renderOnline();
+  refreshAlertsButton();
   await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings()]); // content first, then reveal
   show('view-dash');
   initMap();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
-    offer: () => { ping(); toast('New job offer nearby', 'info'); refreshOffers(); },
+    offer: (data) => {
+      ping();
+      toast('New job offer nearby', 'info');
+      refreshOffers();
+      // System notification when the tab is in the background.
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(`New job — ${rand(data.order?.price_cents || 0)}`, {
+            body: `${data.distance_km} km away · tap to view`,
+            icon: '/img/icon-192.png', tag: `offer-${data.offer_id}`,
+          });
+        } catch {}
+      }
+    },
     offer_expired: () => refreshOffers(),
     job_cancelled: () => { toast('A job was cancelled by the customer', 'error'); refreshJobs(); refreshOffers(); },
     account_update: async () => { const { user } = await api('/api/auth/me'); me = user; route(); },
@@ -251,6 +338,7 @@ el('btn-register').onclick = async () => {
         business_name: el('reg-business').value, id_number: el('reg-idnum').value,
         vehicle_reg: el('reg-vehreg').value, service_area: el('reg-area').value,
         equipment_notes: el('reg-equipment').value, services, accept_terms: true,
+        bank_name: el('reg-bank').value, bank_account: el('reg-account').value, bank_branch: el('reg-branch').value,
       },
     });
     me = user; setWho(); route();

@@ -106,6 +106,27 @@ addColumn('users', 'home_address TEXT');
 addColumn('users', 'home_lat REAL');
 addColumn('users', 'home_lng REAL');
 addColumn('suppliers', "services TEXT NOT NULL DEFAULT 'carwash'");
+addColumn('suppliers', 'bank_name TEXT');
+addColumn('suppliers', 'bank_account TEXT');
+addColumn('suppliers', 'bank_branch TEXT');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  endpoint TEXT NOT NULL UNIQUE,
+  subscription TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS supplier_docs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK (kind IN ('id_copy','proof_address','work_photo')),
+  original_name TEXT NOT NULL,
+  stored_name TEXT NOT NULL,
+  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
 addColumn('orders', 'callout_fee_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'points_used_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'points_earned_cents INTEGER NOT NULL DEFAULT 0');

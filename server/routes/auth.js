@@ -34,7 +34,8 @@ const VALID_SERVICES = ['carwash', 'laundry'];
 
 router.post('/register', (req, res) => {
   const { role, name, email, phone, password, home_address, accept_terms,
-    business_name, id_number, vehicle_reg, service_area, equipment_notes, services } = req.body || {};
+    business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
+    bank_name, bank_account, bank_branch } = req.body || {};
 
   if (!['customer', 'supplier'].includes(role)) return res.status(400).json({ error: 'Invalid account type' });
   if (accept_terms !== true) return res.status(400).json({ error: 'You must accept the Terms & Conditions to create an account' });
@@ -63,10 +64,12 @@ router.post('/register', (req, res) => {
   const userId = Number(info.lastInsertRowid);
 
   if (role === 'supplier') {
-    db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
+                bank_name, bank_account, bank_branch)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(userId, business_name.trim(), id_number.trim(), vehicle_reg?.trim() || null,
-        service_area?.trim() || null, equipment_notes?.trim() || null, supplierServices.join(','));
+        service_area?.trim() || null, equipment_notes?.trim() || null, supplierServices.join(','),
+        bank_name?.trim() || null, bank_account?.trim() || null, bank_branch?.trim() || null);
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);

@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const { db, getSetting, setSetting } = require('../db');
 const { authRequired } = require('../auth');
@@ -56,6 +57,8 @@ router.get('/suppliers', (req, res) => {
       business_name: r.business_name, id_number: r.id_number, vehicle_reg: r.vehicle_reg,
       service_area: r.service_area, equipment_notes: r.equipment_notes,
       services: (r.services || 'carwash').split(','),
+      bank_name: r.bank_name, bank_account: r.bank_account, bank_branch: r.bank_branch,
+      documents: db.prepare('SELECT id, kind, original_name FROM supplier_docs WHERE user_id = ?').all(r.user_id),
       status: r.status, status_reason: r.status_reason, online: !!r.online,
       rating: r.rating_count ? +(r.rating_sum / r.rating_count).toFixed(1) : null,
       rating_count: r.rating_count, created_at: r.created_at,
@@ -73,6 +76,13 @@ function setSupplierStatus(req, res, status) {
   realtime.send(s.user_id, 'account_update', { status, reason });
   res.json({ ok: true });
 }
+
+// Stream an onboarding document to the reviewing admin.
+router.get('/docs/:docId', (req, res) => {
+  const doc = db.prepare('SELECT * FROM supplier_docs WHERE id = ?').get(req.params.docId);
+  if (!doc) return res.status(404).json({ error: 'Document not found' });
+  res.sendFile(path.join(__dirname, '..', '..', 'data', 'uploads', doc.stored_name));
+});
 
 router.post('/suppliers/:id/approve', (req, res) => setSupplierStatus(req, res, 'approved'));
 router.post('/suppliers/:id/reject', (req, res) => setSupplierStatus(req, res, 'rejected'));

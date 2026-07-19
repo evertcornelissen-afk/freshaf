@@ -1,0 +1,16 @@
+{
+  "name": "FreshAF Pro — jobs near you",
+  "short_name": "FreshAF Pro",
+  "description": "Provider app for FreshAF pros: go online, get job alerts, earn.",
+  "start_url": "/supplier",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f7f9",
+  "theme_color": "#10424f",
+  "icons": [
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

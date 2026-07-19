@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FreshAF Supplier Portal</title>
-<meta name="theme-color" content="#1799c2">
-<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#10424f">
+<link rel="manifest" href="/manifest-pro.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FreshAF Pro">
 <link rel="icon" href="/img/logo-mark.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/img/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -65,6 +67,10 @@
         <label>Vehicle registration (if mobile unit)</label><input id="reg-vehreg">
         <label>Service area</label><input id="reg-area" placeholder="e.g. Sandton, Rosebank, Midrand">
         <label>Equipment (water tank, generator, machines, products)</label><input id="reg-equipment">
+        <h3>Payout details (where we pay your earnings)</h3>
+        <label>Bank</label><input id="reg-bank" placeholder="e.g. Capitec, FNB, Standard Bank">
+        <label>Account number</label><input id="reg-account">
+        <label>Branch code</label><input id="reg-branch">
         <label>Password (min 8 characters)</label><input id="reg-password" type="password">
         <label class="row" style="margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--muted)">
           <input type="checkbox" id="reg-terms" style="width:auto">
@@ -78,10 +84,16 @@
 
   <!-- PENDING / REJECTED -->
   <div id="view-status" class="hidden">
-    <div class="card" style="text-align:center;padding:52px 30px;max-width:520px;margin:40px auto">
+    <div class="card" style="text-align:center;padding:52px 30px;max-width:520px;margin:40px auto 20px">
       <div id="status-icon" style="color:var(--warn);margin-bottom:14px"></div>
       <h2 id="status-heading" style="justify-content:center">Application under review</h2>
       <p class="muted" id="status-detail" style="line-height:1.6"></p>
+    </div>
+    <div class="card hidden" id="docs-card" style="max-width:520px;margin:0 auto">
+      <h2 id="h-docs">Your documents</h2>
+      <p class="muted small-text">Uploading these speeds up your approval. JPG, PNG or PDF, max 5 MB each.</p>
+      <div class="msg error" id="docs-error"></div>
+      <div id="docs-rows"></div>
     </div>
   </div>
 
@@ -101,7 +113,9 @@
       <div class="msg error" id="dash-error"></div>
       <div class="row mt">
         <button id="btn-toggle-online">Go online</button>
+        <button class="secondary" id="btn-enable-alerts">Enable job alerts</button>
       </div>
+      <p class="muted small-text mt" id="alerts-hint">Job alerts notify you of new offers even when this app is closed. On iPhone, first add FreshAF Pro to your home screen.</p>
     </div>
 
     <div class="card">

@@ -6,6 +6,7 @@ const path = require('path');
 const { authRequired } = require('./auth');
 const realtime = require('./realtime');
 const dispatch = require('./dispatch');
+const push = require('./push');
 
 const app = express();
 if (process.env.NODE_ENV === 'production') {
@@ -27,6 +28,17 @@ app.use('/api/supplier', require('./routes/supplier'));
 app.use('/api/admin', require('./routes/admin'));
 
 app.get('/api/events', authRequired(), realtime.sseHandler);
+
+// Web Push (provider job alerts)
+app.get('/api/push/key', (req, res) => res.json({ key: push.publicKey() }));
+app.post('/api/push/subscribe', authRequired(), (req, res) => {
+  try {
+    push.subscribe(req.user.id, req.body?.subscription);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 app.use(express.static(PUBLIC_DIR));

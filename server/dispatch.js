@@ -1,5 +1,6 @@
 const { db, getSetting } = require('./db');
 const realtime = require('./realtime');
+const push = require('./push');
 
 const offerTimers = new Map(); // offerId -> timeout
 
@@ -76,6 +77,14 @@ function offerToNext(orderId) {
     distance_km: +next.distance.toFixed(1),
     expires_in_sec: Number(getSetting('offer_timeout_sec', '60')),
   });
+
+  // Reach the provider even when the app is closed.
+  push.sendToUser(next.user_id, {
+    title: `New ${order.service === 'laundry' ? 'laundry' : 'car wash'} job — R${Math.round(order.price_cents / 100)}`,
+    body: `${next.distance.toFixed(1)} km away · ${order.address}\nOpen FreshAF Pro to accept before it expires.`,
+    url: '/supplier',
+    tag: `offer-${offerId}`,
+  }).catch(() => {});
 
   const timeoutMs = Number(getSetting('offer_timeout_sec', '60')) * 1000;
   offerTimers.set(offerId, setTimeout(() => expireOffer(offerId), timeoutMs));
