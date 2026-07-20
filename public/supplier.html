@@ -64,9 +64,14 @@
         <label>SA ID number</label><input id="reg-idnum">
         <label>Email</label><input id="reg-email" type="email">
         <label>Mobile number</label><input id="reg-phone">
-        <label>Vehicle registration (if mobile unit)</label><input id="reg-vehreg">
         <label>Service area</label><input id="reg-area" placeholder="e.g. Sandton, Rosebank, Midrand">
-        <label>Equipment (water tank, generator, machines, products)</label><input id="reg-equipment">
+        <h3>Work vehicles — add every vehicle you use</h3>
+        <div id="vehicles-rows"></div>
+        <button type="button" class="secondary small" id="btn-add-vehicle">Add a vehicle</button>
+        <h3>Equipment — tick what you have</h3>
+        <p class="muted small-text" style="margin-top:-2px">The list matches the services you selected above.</p>
+        <div id="equipment-list"></div>
+        <label>Other equipment not listed</label><input id="reg-equipment-other" placeholder="e.g. foam cannon, steam cleaner">
         <h3>Payout details (where we pay your earnings)</h3>
         <label>Bank</label><input id="reg-bank" placeholder="e.g. Capitec, FNB, Standard Bank">
         <label>Account number</label><input id="reg-account">

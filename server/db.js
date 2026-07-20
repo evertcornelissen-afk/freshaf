@@ -106,6 +106,8 @@ addColumn('users', 'home_address TEXT');
 addColumn('users', 'home_lat REAL');
 addColumn('users', 'home_lng REAL');
 addColumn('suppliers', "services TEXT NOT NULL DEFAULT 'carwash'");
+addColumn('suppliers', 'vehicles_json TEXT');
+addColumn('suppliers', 'equipment_json TEXT');
 addColumn('suppliers', 'bank_name TEXT');
 addColumn('suppliers', 'bank_account TEXT');
 addColumn('suppliers', 'bank_branch TEXT');

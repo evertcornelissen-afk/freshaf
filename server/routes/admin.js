@@ -57,6 +57,8 @@ router.get('/suppliers', (req, res) => {
       business_name: r.business_name, id_number: r.id_number, vehicle_reg: r.vehicle_reg,
       service_area: r.service_area, equipment_notes: r.equipment_notes,
       services: (r.services || 'carwash').split(','),
+      vehicles: JSON.parse(r.vehicles_json || '[]'),
+      equipment: JSON.parse(r.equipment_json || 'null'),
       bank_name: r.bank_name, bank_account: r.bank_account, bank_branch: r.bank_branch,
       documents: db.prepare('SELECT id, kind, original_name FROM supplier_docs WHERE user_id = ?').all(r.user_id),
       status: r.status, status_reason: r.status_reason, online: !!r.online,

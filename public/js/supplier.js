@@ -8,9 +8,93 @@ let disconnectSse = null;
 const VIEWS = ['view-auth', 'view-status', 'view-dash'];
 const show = (view) => switchView(VIEWS, view);
 
+/* ---------- structured boarding inputs: vehicles + equipment ---------- */
+const VEHICLE_TYPES = ['Car', 'Bakkie', 'Van / Kombi', 'Trailer rig', 'Motorbike'];
+const EQUIPMENT = {
+  carwash: [
+    { key: 'pressure_washer', label: 'Pressure washer' },
+    { key: 'water_tank', label: 'Water tank', qty: 'Litres' },
+    { key: 'generator', label: 'Generator' },
+    { key: 'vacuum', label: 'Vacuum cleaner' },
+    { key: 'gazebo', label: 'Gazebo / shade cover' },
+    { key: 'products', label: 'Own cleaning products' },
+  ],
+  laundry: [
+    { key: 'washing_machines', label: 'Washing machines', qty: 'How many' },
+    { key: 'tumble_dryers', label: 'Tumble dryers', qty: 'How many' },
+    { key: 'industrial', label: 'Industrial machines', qty: 'How many' },
+    { key: 'iron_station', label: 'Ironing station' },
+    { key: 'packaging', label: 'Packaging / garment bags' },
+  ],
+};
+
+function addVehicleRow(prefill = {}) {
+  const row = document.createElement('div');
+  row.className = 'row vehicle-row';
+  row.style.cssText = 'gap:8px;margin-bottom:9px;flex-wrap:nowrap;align-items:stretch';
+  row.innerHTML = `
+    <select class="v-type" style="width:130px;flex:none">${VEHICLE_TYPES.map((t) => `<option${t === prefill.type ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    <input class="v-model" placeholder="Make & model, e.g. Toyota Hilux" value="${prefill.model || ''}" style="flex:1">
+    <input class="v-reg" placeholder="Registration" value="${prefill.reg || ''}" style="width:120px;flex:none">
+    <button type="button" class="ghost small v-remove" style="flex:none;color:var(--danger)">${icon('x')}</button>`;
+  row.querySelector('.v-remove').onclick = () => row.remove();
+  el('vehicles-rows').appendChild(row);
+}
+
+function collectVehicles() {
+  return [...document.querySelectorAll('.vehicle-row')].map((r) => ({
+    type: r.querySelector('.v-type').value,
+    model: r.querySelector('.v-model').value.trim(),
+    reg: r.querySelector('.v-reg').value.trim(),
+  })).filter((v) => v.reg || v.model);
+}
+
+function renderEquipmentList() {
+  // Preserve current state across re-renders when services change.
+  const prev = collectEquipmentState();
+  const active = [];
+  if (el('svc-carwash').checked) active.push(...EQUIPMENT.carwash);
+  if (el('svc-laundry').checked) active.push(...EQUIPMENT.laundry);
+  el('equipment-list').innerHTML = active.map((item) => {
+    const p = prev[item.key] || {};
+    return `
+    <div class="row" style="padding:7px 0;border-bottom:1px solid var(--border-soft);gap:10px">
+      <label style="margin:0;cursor:pointer;flex:1" class="row">
+        <input type="checkbox" class="eq-check" data-key="${item.key}" data-label="${item.label}" ${p.checked ? 'checked' : ''} style="width:auto">
+        <span style="font-size:.9rem">${item.label}</span>
+      </label>
+      ${item.qty ? `<input type="number" min="1" class="eq-qty" data-for="${item.key}" placeholder="${item.qty}" value="${p.qty || ''}" style="width:110px;flex:none">` : ''}
+    </div>`;
+  }).join('') || '<p class="empty">Select at least one service above.</p>';
+}
+
+function collectEquipmentState() {
+  const state = {};
+  document.querySelectorAll('.eq-check').forEach((c) => {
+    state[c.dataset.key] = {
+      checked: c.checked,
+      label: c.dataset.label,
+      qty: document.querySelector(`.eq-qty[data-for="${c.dataset.key}"]`)?.value || null,
+    };
+  });
+  return state;
+}
+
+function collectEquipment() {
+  const items = Object.entries(collectEquipmentState())
+    .filter(([, v]) => v.checked)
+    .map(([key, v]) => ({ key, label: v.label, qty: v.qty ? Number(v.qty) : null }));
+  return { items, other: el('reg-equipment-other').value.trim() };
+}
+
 function decorate() {
   el('h-signin').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-apply').insertAdjacentHTML('afterbegin', icon('briefcase'));
+  addVehicleRow();
+  renderEquipmentList();
+  el('btn-add-vehicle').onclick = () => addVehicleRow();
+  el('svc-carwash').addEventListener('change', renderEquipmentList);
+  el('svc-laundry').addEventListener('change', renderEquipmentList);
   el('h-docs').insertAdjacentHTML('afterbegin', icon('shield'));
   el('btn-enable-alerts').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-avail').insertAdjacentHTML('afterbegin', icon('signal'));
@@ -336,8 +420,9 @@ el('btn-register').onclick = async () => {
         role: 'supplier', name: el('reg-name').value, email: el('reg-email').value,
         phone: el('reg-phone').value, password: el('reg-password').value,
         business_name: el('reg-business').value, id_number: el('reg-idnum').value,
-        vehicle_reg: el('reg-vehreg').value, service_area: el('reg-area').value,
-        equipment_notes: el('reg-equipment').value, services, accept_terms: true,
+        service_area: el('reg-area').value,
+        vehicles: collectVehicles(), equipment: collectEquipment(),
+        services, accept_terms: true,
         bank_name: el('reg-bank').value, bank_account: el('reg-account').value, bank_branch: el('reg-branch').value,
       },
     });

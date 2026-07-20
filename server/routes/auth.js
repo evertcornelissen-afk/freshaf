@@ -35,7 +35,26 @@ const VALID_SERVICES = ['carwash', 'laundry'];
 router.post('/register', (req, res) => {
   const { role, name, email, phone, password, home_address, accept_terms,
     business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
-    bank_name, bank_account, bank_branch } = req.body || {};
+    bank_name, bank_account, bank_branch, vehicles, equipment } = req.body || {};
+
+  // Structured onboarding data: multiple vehicles + itemised equipment.
+  const cleanVehicles = (Array.isArray(vehicles) ? vehicles : []).slice(0, 10)
+    .map((v) => ({
+      type: String(v?.type || '').slice(0, 30),
+      reg: String(v?.reg || '').trim().slice(0, 20),
+      model: String(v?.model || '').trim().slice(0, 60),
+    }))
+    .filter((v) => v.reg || v.model);
+  const cleanEquipment = {
+    items: (Array.isArray(equipment?.items) ? equipment.items : []).slice(0, 30)
+      .map((i) => ({
+        key: String(i?.key || '').slice(0, 40),
+        label: String(i?.label || '').slice(0, 60),
+        qty: i?.qty ? Number(i.qty) || null : null,
+      }))
+      .filter((i) => i.label),
+    other: String(equipment?.other || '').trim().slice(0, 300),
+  };
 
   if (!['customer', 'supplier'].includes(role)) return res.status(400).json({ error: 'Invalid account type' });
   if (accept_terms !== true) return res.status(400).json({ error: 'You must accept the Terms & Conditions to create an account' });
@@ -64,12 +83,20 @@ router.post('/register', (req, res) => {
   const userId = Number(info.lastInsertRowid);
 
   if (role === 'supplier') {
+    // Legacy text summaries keep older views working; structured JSON is the source of truth.
+    const vehicleSummary = cleanVehicles.map((v) => [v.type, v.model, v.reg].filter(Boolean).join(' ')).join('; ')
+      || vehicle_reg?.trim() || null;
+    const equipmentSummary = [
+      ...cleanEquipment.items.map((i) => i.qty ? `${i.label} ×${i.qty}` : i.label),
+      cleanEquipment.other,
+    ].filter(Boolean).join(', ') || equipment_notes?.trim() || null;
     db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
-                bank_name, bank_account, bank_branch)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(userId, business_name.trim(), id_number.trim(), vehicle_reg?.trim() || null,
-        service_area?.trim() || null, equipment_notes?.trim() || null, supplierServices.join(','),
-        bank_name?.trim() || null, bank_account?.trim() || null, bank_branch?.trim() || null);
+                bank_name, bank_account, bank_branch, vehicles_json, equipment_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(userId, business_name.trim(), id_number.trim(), vehicleSummary,
+        service_area?.trim() || null, equipmentSummary, supplierServices.join(','),
+        bank_name?.trim() || null, bank_account?.trim() || null, bank_branch?.trim() || null,
+        JSON.stringify(cleanVehicles), JSON.stringify(cleanEquipment));
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);

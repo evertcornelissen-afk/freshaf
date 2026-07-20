@@ -99,7 +99,13 @@ async function refreshSuppliers() {
         <span class="muted small-text">${s.service_area || ''}</span><br>
         ${(s.services || []).map((x) => `<span class="pill ${x === 'laundry' ? 'ok' : 'warn'}" style="margin-top:4px">${serviceName(x)}</span>`).join(' ')}</td>
       <td>${s.name}<br><span class="muted small-text">${s.email}<br>${s.phone || ''}</span></td>
-      <td class="muted small-text">ID: ${s.id_number}<br>Reg: ${s.vehicle_reg || '—'}<br>${s.equipment_notes || ''}
+      <td class="muted small-text">ID: ${s.id_number}
+        ${(s.vehicles || []).length
+          ? '<br><strong>Vehicles:</strong> ' + s.vehicles.map((v) => [v.type, v.model, v.reg].filter(Boolean).join(' ')).join(' · ')
+          : `<br>Vehicles: ${s.vehicle_reg || 'none listed'}`}
+        ${s.equipment?.items?.length
+          ? '<br><strong>Equipment:</strong> ' + s.equipment.items.map((i) => i.qty ? `${i.label} ×${i.qty}` : i.label).join(', ') + (s.equipment.other ? `, ${s.equipment.other}` : '')
+          : `<br>Equipment: ${s.equipment_notes || 'none listed'}`}
         ${s.bank_name ? `<br>Bank: ${s.bank_name} · ${s.bank_account || ''} · ${s.bank_branch || ''}` : '<br>Bank: not provided'}
         ${(s.documents || []).length
           ? '<br>' + s.documents.map((d) => `<a href="/api/admin/docs/${d.id}" target="_blank">${d.kind.replace(/_/g, ' ')}</a>`).join(' · ')
