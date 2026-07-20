@@ -25,7 +25,7 @@
     </span>
   </div>
   <div class="row">
-    <a class="btn small app-link" href="#" data-fallback="Launching soon">Try the demo</a>
+    <a class="btn small app-link" href="#" data-fallback="Launching soon">Open the app</a>
   </div>
 </div>
 
@@ -36,7 +36,7 @@
     <h1>Consider it <em>done.</em></h1>
     <p>Vetted professionals come to you — your car washed at your parking spot, your laundry collected, cleaned and delivered back. The nearest available pro is dispatched the moment you book.</p>
     <div class="row mt" style="justify-content:center">
-      <a class="btn app-link" href="#" data-fallback="Launching soon in Johannesburg">Try the demo</a>
+      <a class="btn app-link" href="#" data-fallback="Launching soon in Johannesburg">Get started</a>
       <a class="btn secondary" href="#services" style="color:var(--petrol)">See pricing</a>
     </div>
     <div class="feature-chips">
@@ -76,21 +76,20 @@
   <div class="card" style="text-align:center">
     <h2 style="justify-content:center">Want to earn with FreshAF?</h2>
     <p class="muted small-text" style="margin-bottom:14px">Car wash pros and laundry pros set their own area and hours. Applications open at launch.</p>
-    <a class="btn secondary" style="pointer-events:none;color:var(--muted)">Pro applications open at launch</a>
+    <a class="btn" href="https://freshaf.onrender.com/supplier">Become a pro</a>
   </div>
 
   <footer class="site-footer">
     <a href="/terms">Terms &amp; Conditions</a>
     <a href="/privacy">Privacy Policy</a>
     <a href="mailto:support@freshaf.co.za">Support</a>
-    <a href="https://freshaf.onrender.com">Live app (staging)</a>
-    <a href="https://freshaf.onrender.com/supplier">Pro registration (staging)</a>
+    <a href="/app/">Interactive demo</a>
   </footer>
 </div>
 
 <script>
-// Points at the in-browser demo; switch to the real app URL (e.g. https://freshaf.onrender.com) at launch.
-const APP_URL = '/app/';
+// The real app. (The in-browser demo remains at /app/, linked in the footer.)
+const APP_URL = 'https://freshaf.onrender.com';
 document.querySelectorAll('.app-link').forEach((a) => {
   if (APP_URL) {
     a.href = APP_URL + (a.dataset.path || '');
