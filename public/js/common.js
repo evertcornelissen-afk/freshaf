@@ -148,6 +148,18 @@ function connectEvents(handlers) {
   return () => es && es.close();
 }
 
+// Light / dark theme slider (theme is applied pre-paint by the inline head script).
+document.addEventListener('DOMContentLoaded', () => {
+  const sw = document.getElementById('theme-switch');
+  if (!sw) return;
+  sw.checked = document.documentElement.dataset.theme === 'dark';
+  sw.onchange = () => {
+    const t = sw.checked ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem('freshaf_theme', t);
+  };
+});
+
 // Installable-app support.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));

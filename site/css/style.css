@@ -25,6 +25,59 @@
   font-size: 16px;
 }
 
+/* ---------- dark mode (logo swaps to the dark variant — petrol never sits on dark) ---------- */
+[data-theme="dark"] {
+  --bg: #0c151b;
+  --panel: #13202a;
+  --panel-2: #1a2b36;
+  --panel-3: #223644;
+  --border: #2d4553;
+  --border-soft: #22333f;
+  --text: #e6eef4;
+  --petrol: #e2edf4;
+  --muted: #94aab9;
+  --faint: #65798a;
+  --accent: #21b1d8;
+  --accent-strong: #3ec4e6;
+  --accent-dim: #1799c2;
+  --accent-ink: #04222d;
+  --danger: #f4586b;
+  --warn: #e9a63f;
+  --shadow: 0 10px 28px -14px rgba(0, 0, 0, .55);
+  --shadow-lift: 0 20px 44px -16px rgba(0, 0, 0, .65);
+}
+[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 480px at 88% -12%, rgba(33, 177, 216, .10), transparent 60%),
+    radial-gradient(700px 420px at -8% 8%, rgba(33, 177, 216, .04), transparent 60%),
+    var(--bg);
+}
+[data-theme="dark"] .topbar { background: rgba(12, 21, 27, .85); }
+[data-theme="dark"] .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.5); }
+[data-theme="dark"] .leaflet-control-attribution { background: rgba(12, 21, 27, .75); color: var(--faint); }
+[data-theme="dark"] .seg input:checked + span { box-shadow: inset 0 0 0 1px var(--border); }
+
+/* themed logo variants (importants outrank .brand .logo-img layout rules) */
+.logo-dark-v { display: none !important; }
+[data-theme="dark"] .logo-light-v { display: none !important; }
+[data-theme="dark"] .logo-dark-v { display: inline-block !important; }
+
+/* ---------- theme slider ---------- */
+.theme-toggle { display: inline-flex; align-items: center; cursor: pointer; }
+.theme-toggle input { display: none; }
+.theme-toggle .track {
+  width: 46px; height: 24px; border-radius: 99px; position: relative;
+  background: var(--panel-3); border: 1px solid var(--border);
+  transition: background .25s;
+}
+.theme-toggle .thumb {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent-dim));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .3);
+  transition: transform .25s var(--ease);
+}
+.theme-toggle input:checked + .track .thumb { transform: translateX(22px); }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }

@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'light';</script>
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .demo-ribbon {
@@ -23,17 +24,18 @@
 </head>
 <body>
 <div id="splash">
-  <img src="/img/logo.svg" alt="FreshAF">
+  <img class="logo-light-v" src="/img/logo.svg" alt="FreshAF"><img class="logo-dark-v" src="/img/logo-dark.svg" alt="FreshAF">
   <div class="dots"><span></span><span></span><span></span></div>
 </div>
 <div class="topbar">
   <div class="brand">
     <a href="/" class="stack" style="text-decoration:none">
-      <img class="logo-img" src="/img/logo.svg" alt="FreshAF">
+      <img class="logo-img logo-light-v" src="/img/logo.svg" alt="FreshAF"><img class="logo-img logo-dark-v" src="/img/logo-dark.svg" alt="FreshAF">
       <span class="tag">Interactive demo</span>
     </a>
   </div>
   <div class="row">
+    <label class="theme-toggle" title="Light / dark mode"><input type="checkbox" id="theme-switch"><span class="track"><span class="thumb"></span></span></label>
     <button class="secondary small hidden" id="btn-account"></button>
     <button class="small hidden" id="btn-go-login">Sign in</button>
     <button class="ghost small hidden" id="btn-logout">Sign out</button>

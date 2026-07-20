@@ -14,17 +14,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'light';</script>
 <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 <div class="topbar">
   <div class="brand">
     <span class="stack">
-      <img class="logo-img" src="/img/logo.svg" alt="FreshAF">
+      <img class="logo-img logo-light-v" src="/img/logo.svg" alt="FreshAF"><img class="logo-img logo-dark-v" src="/img/logo-dark.svg" alt="FreshAF">
       <span class="tag">Fresh and Fast</span>
     </span>
   </div>
   <div class="row">
+    <label class="theme-toggle" title="Light / dark mode"><input type="checkbox" id="theme-switch"><span class="track"><span class="thumb"></span></span></label>
     <a class="btn small app-link" href="#" data-fallback="Launching soon">Open the app</a>
   </div>
 </div>
@@ -90,6 +92,14 @@
 <script>
 // The real app. (The in-browser demo remains at /app/, linked in the footer.)
 const APP_URL = 'https://freshaf.onrender.com';
+// Theme slider
+const sw = document.getElementById('theme-switch');
+sw.checked = document.documentElement.dataset.theme === 'dark';
+sw.onchange = () => {
+  const t = sw.checked ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem('freshaf_theme', t);
+};
 document.querySelectorAll('.app-link').forEach((a) => {
   if (APP_URL) {
     a.href = APP_URL + (a.dataset.path || '');
