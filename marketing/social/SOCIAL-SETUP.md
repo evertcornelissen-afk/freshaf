@@ -19,7 +19,7 @@ and store both passwords in your password manager.
    - **Profile photo:** `avatar.png` (in this folder)
    - **Bio:**
      `Car wash & laundry, on demand.`
-     `Vetted pros come to you. Johannesburg.`
+     `Vetted pros come to you. South Africa.`
      `Consider it done.`
    - **Website:** `https://freshaf.io` (add once the domain is live)
 5. Post the 3 teasers (below) once the domain is live — not before.
@@ -32,15 +32,15 @@ and store both passwords in your password manager.
 4. Profile:
    - **Name:** `FreshAF`
    - **Photo:** `avatar.png`
-   - **Bio:** `Car wash & laundry, on demand. Joburg. Consider it done.`
+   - **Bio:** `Car wash & laundry, on demand. South Africa. Consider it done.`
    - **Website:** `https://freshaf.io` (business accounts can add a link)
 
 ---
 
 ## First three posts (queue these the day the domain is live)
 
-1. **post-4.png** — `Something clean is coming to Joburg. Consider it done. #FreshAF #Joburg`
-2. **post-3.png** — `Your car. Your laundry. Handled where you stand. Launching soon. #FreshAF #OnDemand #Johannesburg`
+1. **post-4.png** — `Something clean is coming to South Africa. Consider it done. #FreshAF #SouthAfrica`
+2. **post-3.png** — `Your car. Your laundry. Handled where you stand. Launching soon. #FreshAF #OnDemand #SouthAfrica`
 3. **story-1.png** as a story with a countdown sticker set to launch day.
 
 Full calendar, captions and ad copy: `../CAMPAIGN.md`. Images: `../images/`. Videos: `../video/`
