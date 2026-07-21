@@ -51,8 +51,8 @@ Targeting to start: 5 km radius around launch suburb, 25-55, interests: car care
 `You wash cars / do laundry. We bring you customers. FreshAF sends job alerts straight to your phone — you set your area and your hours, and you keep 85% of every job. Free to join. Apply: freshaf.io → Become a pro`
 
 ## Asset index (in marketing/images & marketing/video)
-- `post-1..6.png` — 1080x1080 Instagram/Facebook posts
-- `story-1..3.png` — 1080x1920 stories/reels covers
+- `post-1..8.png` — 1080x1080 Instagram/Facebook posts (post-7 duvets & bedding, post-8 wash-dry-iron)
+- `story-1..4.png` — 1080x1920 stories/reels covers (story-4 laundry)
 - `banner-1..2.png` — 1200x628 link/ad banners
 - `promo-square.mp4` — 15s feed video (add trending audio in-app when posting; silent by design)
 - `promo-story.mp4` — 9:16 story/reel video
