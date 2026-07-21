@@ -62,3 +62,7 @@ Targeting to start: 5 km radius around launch suburb, 25-55, interests: car care
 - No emojis in brand-owned surfaces.
 - Partner must clear any promo with a price or reward claim (CPA).
 - Nothing goes out before freshaf.io is registered and live.
+
+## Photo licensing
+- post-1, banner-1 and post-3 use real CC0 (public domain) photographs sourced via Openverse - free for commercial use, no attribution required (details in raw/candidates/stock-manifest.json).
+- Remaining photography is AI-generated and owned outright. Replace with real pro footage as it comes in.
