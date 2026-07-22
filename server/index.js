@@ -29,6 +29,34 @@ app.use('/api/admin', require('./routes/admin'));
 
 app.get('/api/events', authRequired(), realtime.sseHandler);
 
+// Address autocomplete — proxies Photon (OpenStreetMap), biased to South Africa. No API key.
+const geoCache = new Map();
+app.get('/api/geocode', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 3) return res.json({ results: [] });
+  const key = q.toLowerCase();
+  if (geoCache.has(key)) return res.json({ results: geoCache.get(key) });
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=en&bbox=16.2,-35.0,33.1,-22.0`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'FreshAF/1.0 (support@freshaf.co.za)' }, signal: AbortSignal.timeout(8000) });
+    const data = await r.json();
+    const results = (data.features || []).map((f) => {
+      const p = f.properties || {};
+      const label = [
+        [p.name, p.housenumber].filter(Boolean).join(' ') || p.street,
+        p.street && p.name !== p.street ? p.street : null,
+        p.district, p.city || p.town || p.village, p.state,
+      ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+      return { label, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+    }).filter((x) => x.label);
+    if (geoCache.size > 500) geoCache.clear();
+    geoCache.set(key, results);
+    res.json({ results });
+  } catch {
+    res.json({ results: [] }); // autocomplete is best-effort; typing still works
+  }
+});
+
 // Web Push (provider job alerts)
 app.get('/api/push/key', (req, res) => res.json({ key: push.publicKey() }));
 app.post('/api/push/subscribe', authRequired(), (req, res) => {

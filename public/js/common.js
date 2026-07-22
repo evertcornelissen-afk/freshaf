@@ -1,15 +1,35 @@
 // Shared helpers for all FreshAF frontends.
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
-    credentials: 'same-origin',
-    ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+      credentials: 'same-origin',
+      signal: AbortSignal.timeout(75000),
+      ...opts,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch (e) {
+    // Free-tier hosting sleeps when idle — surface that instead of a cryptic failure.
+    throw new Error('The server is waking up — please wait a few seconds and try again.');
+  }
   let data = {};
   try { data = await res.json(); } catch { /* empty body */ }
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
+}
+
+// Disable a button and show progress text while an async action runs.
+async function withBusy(btn, busyLabel, fn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    return await fn();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
 }
 
 function rand(cents) {
@@ -44,7 +64,78 @@ const ICONS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/>',
   shirt: '<path d="M20.4 7 16 3h-1.9a2.5 2.5 0 0 1-4.2 0H8L3.6 7l2.2 3L7 9.4V21h10V9.4l1.2.6 2.2-3Z"/>',
   home: '<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>',
 };
+
+/* ---------- show/hide password toggle ---------- */
+function pwToggle(input) {
+  if (!input || input.dataset.pwWrapped) return;
+  input.dataset.pwWrapped = '1';
+  const wrap = document.createElement('div');
+  wrap.className = 'pw-wrap';
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pw-eye';
+  btn.setAttribute('aria-label', 'Show password');
+  btn.innerHTML = icon('eye');
+  wrap.appendChild(btn);
+  btn.onclick = () => {
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.innerHTML = icon(show ? 'eyeOff' : 'eye');
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    input.focus();
+  };
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[type="password"]').forEach(pwToggle);
+});
+
+/* ---------- address autocomplete (South Africa, via /api/geocode) ---------- */
+function attachAutocomplete(input, onPick) {
+  if (!input || input.dataset.acWrapped) return;
+  input.dataset.acWrapped = '1';
+  const wrap = document.createElement('div');
+  wrap.className = 'ac-wrap';
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const list = document.createElement('div');
+  list.className = 'ac-list hidden';
+  wrap.appendChild(list);
+
+  let timer = null, lastQuery = '';
+  function hide() { list.classList.add('hidden'); }
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 3) { hide(); return; }
+    timer = setTimeout(async () => {
+      lastQuery = q;
+      try {
+        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q));
+        if (input.value.trim() !== lastQuery || !results.length) { hide(); return; }
+        list.innerHTML = results.map((r, i) =>
+          `<div class="ac-item" data-i="${i}">${icon('pin')} ${r.label}</div>`).join('');
+        list.classList.remove('hidden');
+        list.querySelectorAll('.ac-item').forEach((n) => {
+          n.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const r = results[Number(n.dataset.i)];
+            input.value = r.label;
+            hide();
+            if (onPick) onPick(r);
+          });
+        });
+      } catch { hide(); }
+    }, 300);
+  });
+  input.addEventListener('blur', () => setTimeout(hide, 150));
+  input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+}
 
 function icon(name, cls = '') {
   return `<span class="icon ${cls}"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${ICONS[name] || ''}</svg></span>`;

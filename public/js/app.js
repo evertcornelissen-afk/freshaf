@@ -262,17 +262,29 @@ el('btn-saved-address').onclick = () => {
   if (me.home_address) el('order-address').value = me.home_address;
 };
 
+// Booking address suggestions: picking one drops the pin and quotes the callout fee.
+attachAutocomplete(el('order-address'), (r) => {
+  if (!map) return;
+  setPin(r.lat, r.lng);
+  map.setView([r.lat, r.lng], 15);
+});
+
 /* ---------- auth actions ---------- */
-el('btn-login').onclick = async () => {
+// Address suggestions: registration stores the picked coordinates as the home pin.
+let regGeo = null;
+attachAutocomplete(el('reg-address'), (r) => { regGeo = { lat: r.lat, lng: r.lng }; });
+el('reg-address').addEventListener('input', () => { regGeo = null; }); // typed edits invalidate the pick
+
+el('btn-login').onclick = () => withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
     if (user.role !== 'customer') { window.location.href = user.role === 'supplier' ? '/supplier' : '/admin'; return; }
     me = user; setTopbar(); await enterApp();
     toast(`Welcome back, ${user.name.split(' ')[0]}`, 'ok');
   } catch (e) { showError('login-error', e.message); }
-};
+});
 
-el('btn-register').onclick = async () => {
+el('btn-register').onclick = () => withBusy(el('btn-register'), 'Creating your account…', async () => {
   try {
     if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
     const { user } = await api('/api/auth/register', {
@@ -281,12 +293,13 @@ el('btn-register').onclick = async () => {
         role: 'customer', name: el('reg-name').value, email: el('reg-email').value,
         phone: el('reg-phone').value, password: el('reg-password').value,
         home_address: el('reg-address').value, accept_terms: true,
+        home_lat: regGeo?.lat, home_lng: regGeo?.lng,
       },
     });
     me = user; setTopbar(); await enterApp();
     toast('Account created — welcome to FreshAF', 'ok');
   } catch (e) { showError('reg-error', e.message); }
-};
+});
 
 el('btn-logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); window.location.reload(); };
 
@@ -312,6 +325,7 @@ function openAccount() {
       </div>
     </div>`;
   document.body.appendChild(backdrop);
+  attachAutocomplete(backdrop.querySelector('#acc-address'));
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
   backdrop.querySelector('[data-act=close]').onclick = () => backdrop.remove();
   backdrop.querySelector('[data-act=save]').onclick = async () => {

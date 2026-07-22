@@ -260,6 +260,14 @@ el('btn-saved-address').onclick = () => {
   if (me.home_address) el('order-address').value = me.home_address;
 };
 
+// Address suggestions: booking picks drop the pin; registration picks are stored as text.
+attachAutocomplete(el('order-address'), (r) => {
+  if (!map) return;
+  setPin(r.lat, r.lng);
+  map.setView([r.lat, r.lng], 15);
+});
+attachAutocomplete(el('reg-address'));
+
 /* ---------- auth actions ---------- */
 el('btn-login').onclick = async () => {
   try {

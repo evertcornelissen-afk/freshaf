@@ -400,15 +400,15 @@ async function refreshEarnings() {
     <div class="stat"><div class="v">${rand(e.net_cents)}</div><div class="l">Your earnings (after ${e.commission_pct}% fee)</div></div>`;
 }
 
-el('btn-login').onclick = async () => {
+el('btn-login').onclick = () => withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
     if (user.role !== 'supplier') { window.location.href = user.role === 'admin' ? '/admin' : '/'; return; }
     me = user; setWho(); route();
   } catch (e) { showError('login-error', e.message); }
-};
+});
 
-el('btn-register').onclick = async () => {
+el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting application…', async () => {
   try {
     if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
     const services = [];
@@ -429,7 +429,7 @@ el('btn-register').onclick = async () => {
     me = user; setWho(); route();
     toast('Application submitted for review', 'ok');
   } catch (e) { showError('reg-error', e.message); }
-};
+});
 
 el('btn-logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); window.location.reload(); };
 

@@ -33,7 +33,7 @@ function mePayload(user) {
 const VALID_SERVICES = ['carwash', 'laundry'];
 
 router.post('/register', (req, res) => {
-  const { role, name, email, phone, password, home_address, accept_terms,
+  const { role, name, email, phone, password, home_address, home_lat, home_lng, accept_terms,
     business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
     bank_name, bank_account, bank_branch, vehicles, equipment } = req.body || {};
 
@@ -76,10 +76,12 @@ router.post('/register', (req, res) => {
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
   if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
-  const info = db.prepare(`INSERT INTO users (role, name, email, phone, password_hash, home_address, terms_accepted_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`)
+  const info = db.prepare(`INSERT INTO users (role, name, email, phone, password_hash, home_address, home_lat, home_lng, terms_accepted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
     .run(role, name.trim(), email.trim(), phone?.trim() || null, bcrypt.hashSync(password, 10),
-      home_address?.trim() || null);
+      home_address?.trim() || null,
+      typeof home_lat === 'number' ? home_lat : null,
+      typeof home_lng === 'number' ? home_lng : null);
   const userId = Number(info.lastInsertRowid);
 
   if (role === 'supplier') {

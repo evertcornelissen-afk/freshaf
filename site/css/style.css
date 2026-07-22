@@ -525,6 +525,35 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 .total-bar .amount { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; }
 .total-bar .amount strong { color: var(--accent-dim); }
 
+/* ---------- password eye + address autocomplete ---------- */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 46px; }
+.pw-eye {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; box-shadow: none; padding: 7px;
+  color: var(--muted); cursor: pointer;
+}
+.pw-eye:hover { color: var(--accent-dim); transform: translateY(-50%); box-shadow: none; background: none; }
+.pw-eye .icon svg { width: 19px; height: 19px; }
+
+.ac-wrap { position: relative; }
+.ac-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 750;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 11px; margin-top: 5px; overflow: hidden;
+  max-height: 264px; overflow-y: auto;
+  box-shadow: var(--shadow-lift);
+  animation: viewIn .18s var(--ease);
+}
+.ac-item {
+  padding: 11px 14px; font-size: .85rem; cursor: pointer; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover { background: var(--panel-2); }
+.ac-item .icon { color: var(--accent); flex: none; }
+
 /* ---------- footer ---------- */
 .site-footer {
   display: flex; gap: 22px; flex-wrap: wrap; justify-content: center;
