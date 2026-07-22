@@ -1,0 +1,6 @@
+# Netlify config for the freshaf site (marketing + demo + scheduled keep-warm).
+[build]
+  publish = "site"
+
+[functions]
+  directory = "netlify/functions"
