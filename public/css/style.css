@@ -80,7 +80,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
+/* Global guard against sideways scroll on mobile (clip preserves sticky headers). */
+body { overflow-x: clip; max-width: 100%; }
 
 body {
   background:
@@ -463,7 +465,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 .hero { text-align: center; padding: 58px 16px 40px; position: relative; }
 .hero .glow {
   position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
-  width: 560px; height: 300px; border-radius: 50%;
+  width: min(560px, 88vw); height: 300px; border-radius: 50%;
   background: radial-gradient(closest-side, rgba(33, 172, 207, .13), transparent);
   pointer-events: none;
   animation: heroGlow 7s ease-in-out infinite;
