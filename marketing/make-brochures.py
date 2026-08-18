@@ -14,7 +14,8 @@ HERO_WASH = b64("marketing/raw/candidates/stock-8.jpg", "image/jpeg")
 HERO_LAUNDRY = b64("marketing/raw/candidates/laundry-iron-s5.jpg", "image/jpeg")
 
 # WhatsApp number placeholder — replaced when Evert supplies the real one
-WA = "&#95;&#95;&#95;&nbsp;&#95;&#95;&#95;&nbsp;&#95;&#95;&#95;&#95;"
+WA = "078&nbsp;299&nbsp;1050"
+WA_INTL = "27782991050"
 
 ICONS = {
  "pin":'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
@@ -87,7 +88,7 @@ h1 em { font-style:italic; color:#35c3e8; }
 .cta .lead { color:#5fd4f2; font-size:9pt; font-weight:800; letter-spacing:.16em; text-transform:uppercase; margin-bottom:2.6mm; }
 .cta .head { color:#fff; font-size:16.5pt; font-weight:800; font-style:italic; line-height:1.12; margin-bottom:2.6mm; }
 .cta .p { color:#c9e2ec; font-size:9.4pt; line-height:1.42; margin-bottom:4mm; max-width:118mm; }
-.wa { display:inline-flex; align-items:center; gap:3.4mm; background:#25D366; color:#053b1c;
+.wa { text-decoration:none; display:inline-flex; align-items:center; gap:3.4mm; background:#25D366; color:#053b1c;
   padding:3.6mm 6.5mm; border-radius:99px; font-weight:800; font-size:12pt; }
 .wa .ic { background:rgba(255,255,255,.35); color:#053b1c; width:7.6mm; height:7.6mm; border-radius:50%; }
 .wa .ic svg { width:4.4mm; height:4.4mm; }
@@ -147,6 +148,9 @@ def brochure(kind):
                 "Claim your area now and you keep it when we go live.")
         icon_tag = "shirt"
 
+    kw = "WASH" if wash else "LAUNDRY"
+    prefill = (kw + " - I want to reserve my area.%0A%0AName:%20%0ABusiness:%20%0ASuburb:%20").replace(" ", "%20")
+
     featdivs = "".join(
         f'<div class="f">{ico(i)}<div><div class="t">{t}</div><div class="d">{d}</div></div></div>'
         for i, t, d in feats)
@@ -186,7 +190,7 @@ def brochure(kind):
       <div class="lead">Going live soon</div>
       <div class="head">{ctahead}</div>
       <div class="p">{ctap}</div>
-      <span class="wa">{ico('phone')}WhatsApp &ldquo;{'WASH' if wash else 'LAUNDRY'}&rdquo; to {WA}</span>
+      <a class="wa" href="https://wa.me/{WA_INTL}?text={prefill}">{ico('phone')}WhatsApp &ldquo;{'WASH' if wash else 'LAUNDRY'}&rdquo; to {WA}</a>
       <div class="walabel">Send your name, your business and your suburb. We'll reserve your area and set you up free.</div>
     </div>
   </div>
