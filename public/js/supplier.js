@@ -168,6 +168,56 @@ async function renderDocs() {
   });
 }
 
+/* ---------- your prices (pro sets them; our fee goes on top) ---------- */
+let priceCat = null;
+
+async function renderPrices() {
+  const data = await api('/api/supplier/prices');
+  priceCat = data.services;
+  el('fee-pct-label').textContent = data.fee_pct + '%';
+  const svcKeys = Object.keys(priceCat);
+  if (!svcKeys.length) { el('prices-box').innerHTML = '<p class="empty">No services on your account.</p>'; return; }
+  el('prices-box').innerHTML = svcKeys.map((k) => {
+    const s = priceCat[k];
+    return `
+    <h3 style="margin-top:14px">${s.name}</h3>
+    ${s.packages.map((p) => `
+      <div class="row spread" style="padding:10px 0;border-bottom:1px solid var(--border-soft);gap:14px">
+        <div style="flex:1;min-width:150px">
+          <strong style="font-size:.92rem">${p.name}</strong>
+          <div class="muted small-text">${p.desc}</div>
+        </div>
+        <div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">
+          <span class="muted small-text">R</span>
+          <input type="number" min="20" max="20000" step="10" style="width:110px"
+                 data-svc="${k}" data-pkg="${p.key}"
+                 value="${p.price_cents != null ? Math.round(p.price_cents / 100) : ''}"
+                 placeholder="${Math.round(p.suggested_cents / 100)}">
+        </div>
+      </div>`).join('')}
+    <p class="muted small-text mt">${s.unitLabel} adjusts this automatically:
+      ${s.units.map((u) => `${u.name} ×${u.mult}`).join(' · ')}</p>`;
+  }).join('');
+}
+
+el('btn-save-prices').onclick = () => withBusy(el('btn-save-prices'), 'Saving…', async () => {
+  try {
+    const prices = [...document.querySelectorAll('#prices-box input[data-pkg]')]
+      .filter((i) => i.value !== '')
+      .map((i) => ({ service: i.dataset.svc, package: i.dataset.pkg, price_cents: Math.round(Number(i.value) * 100) }));
+    if (!prices.length) throw new Error('Enter at least one price so customers can book you');
+    await api('/api/supplier/prices', { method: 'POST', body: { prices } });
+    const okBox = el('prices-ok');
+    okBox.textContent = 'Prices saved — this is exactly what you get paid.';
+    okBox.style.display = 'block';
+    setTimeout(() => { okBox.style.display = 'none'; }, 4000);
+    toast('Your prices are saved', 'ok');
+    renderPrices();
+  } catch (e) { showError('prices-error', e.message); }
+});
+
+el('radius-km').oninput = () => { el('radius-label').textContent = el('radius-km').value + ' km'; };
+
 /* ---------- push job alerts ---------- */
 async function subscribePush() {
   const reg = await navigator.serviceWorker.ready;
@@ -238,7 +288,11 @@ async function enterDash() {
   if (me.supplier?.lat != null) loc = { lat: me.supplier.lat, lng: me.supplier.lng };
   renderOnline();
   refreshAlertsButton();
-  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings()]); // content first, then reveal
+  if (me.supplier?.radius_km) {
+    el('radius-km').value = me.supplier.radius_km;
+    el('radius-label').textContent = me.supplier.radius_km + ' km';
+  }
+  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices()]); // content first, then reveal
   show('view-dash');
   initMap();
   if (disconnectSse) disconnectSse();
@@ -311,7 +365,8 @@ function renderOnline() {
 el('btn-toggle-online').onclick = async () => {
   try {
     if (!online && (loc.lat == null)) throw new Error('Set your location first (tap the map or use your location)');
-    await api('/api/supplier/online', { method: 'POST', body: { online: !online, lat: loc.lat, lng: loc.lng } });
+    await api('/api/supplier/online', { method: 'POST', body: {
+      online: !online, lat: loc.lat, lng: loc.lng, radius_km: Number(el('radius-km').value) } });
     online = !online;
     renderOnline();
     toast(online ? 'You are online — jobs will come to you' : 'You are offline', online ? 'ok' : 'info');

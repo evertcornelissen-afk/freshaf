@@ -57,12 +57,65 @@ function requireApproved(req, res, next) {
   next();
 }
 
+/* ---------- pro-set pricing ---------- */
+const { SERVICES, SERVICE_KEYS, quote } = require('../pricing');
+
+router.get('/prices', (req, res) => {
+  const s = db.prepare('SELECT services FROM suppliers WHERE user_id = ?').get(req.user.id);
+  const mine = db.prepare('SELECT service, package, price_cents FROM supplier_prices WHERE user_id = ?').all(req.user.id);
+  const set = {};
+  for (const r of mine) set[`${r.service}:${r.package}`] = r.price_cents;
+  const out = {};
+  for (const svcKey of (s?.services || 'carwash').split(',')) {
+    const svc = SERVICES[svcKey];
+    if (!svc) continue;
+    out[svcKey] = {
+      name: svc.name,
+      unitLabel: svc.unitLabel,
+      units: Object.values(svc.units),
+      packages: Object.values(svc.packages).map((p) => ({
+        key: p.key, name: p.name, desc: p.desc, eta: p.eta,
+        suggested_cents: p.base,
+        price_cents: set[`${svcKey}:${p.key}`] ?? null,
+      })),
+    };
+  }
+  res.json({ services: out, fee_pct: Number(getSetting('platform_fee_pct', '10')) });
+});
+
+router.post('/prices', (req, res) => {
+  const prices = req.body?.prices;
+  if (!Array.isArray(prices)) return res.status(400).json({ error: 'Send a prices array' });
+  const allowed = (db.prepare('SELECT services FROM suppliers WHERE user_id = ?').get(req.user.id)?.services || 'carwash').split(',');
+  for (const p of prices) {
+    if (!SERVICE_KEYS.includes(p.service) || !allowed.includes(p.service)) {
+      return res.status(400).json({ error: 'You do not offer that service' });
+    }
+    if (!SERVICES[p.service].packages[p.package]) return res.status(400).json({ error: 'Unknown package' });
+    const cents = Math.round(Number(p.price_cents));
+    if (!Number.isFinite(cents) || cents < 2000 || cents > 2000000) {
+      return res.status(400).json({ error: 'Prices must be between R20 and R20 000' });
+    }
+    db.prepare(`INSERT INTO supplier_prices (user_id, service, package, price_cents) VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, service, package) DO UPDATE SET price_cents = excluded.price_cents`)
+      .run(req.user.id, p.service, p.package, cents);
+  }
+  res.json({ ok: true });
+});
+
 router.post('/online', requireApproved, (req, res) => {
-  const { online, lat, lng } = req.body || {};
+  const { online, lat, lng, radius_km } = req.body || {};
+  if (typeof radius_km === 'number' && radius_km > 0) {
+    db.prepare('UPDATE suppliers SET radius_km = ? WHERE user_id = ?')
+      .run(Math.min(200, Math.max(1, radius_km)), req.user.id);
+  }
   if (online) {
     if (typeof lat !== 'number' || typeof lng !== 'number') {
       return res.status(400).json({ error: 'Set your current location to go online' });
     }
+    // No prices, no jobs — otherwise a customer sees a pro with nothing to charge.
+    const priced = db.prepare('SELECT COUNT(*) c FROM supplier_prices WHERE user_id = ?').get(req.user.id).c;
+    if (!priced) return res.status(400).json({ error: 'Set your prices before going online' });
     db.prepare('UPDATE suppliers SET online = 1, lat = ?, lng = ? WHERE user_id = ?').run(lat, lng, req.user.id);
     // A new supplier coming online may unlock stuck orders.
     const stuck = db.prepare("SELECT id FROM orders WHERE status = 'searching'").all();
@@ -127,8 +180,8 @@ router.post('/jobs/:orderId/advance', requireApproved, (req, res) => {
   if (!next) return res.status(400).json({ error: 'Job cannot be advanced from its current status' });
 
   if (next === 'completed') {
-    const pct = Number(getSetting('commission_pct', '15'));
-    const commission = Math.round(order.price_cents * pct / 100);
+    // Our fee was already added on top at booking — record it as the platform's revenue.
+    const commission = order.platform_fee_cents || 0;
     const payment = order.payment_method === 'cash' ? 'collected' : order.payment_status;
     // Money-back rewards: customer earns a % of the full order value on completion.
     const earnPct = Number(getSetting('points_earn_pct', '5'));
@@ -159,15 +212,22 @@ router.get('/jobs', (req, res) => {
 });
 
 router.get('/earnings', (req, res) => {
-  const row = db.prepare(`SELECT COUNT(*) AS jobs, COALESCE(SUM(price_cents),0) AS gross,
-    COALESCE(SUM(commission_cents),0) AS commission
+  // Pros keep 100% of their own price plus the callout. Our fee was charged on top,
+  // to the customer — it never comes out of their money.
+  const row = db.prepare(`SELECT COUNT(*) AS jobs,
+      COALESCE(SUM(supplier_price_cents + callout_fee_cents),0) AS earned,
+      COALESCE(SUM(platform_fee_cents),0) AS fees
     FROM orders WHERE supplier_id = ? AND status = 'completed'`).get(req.user.id);
+  // Cash jobs: the pro collected our fee at the door, so it is owed back to us.
+  const owed = db.prepare(`SELECT COALESCE(SUM(platform_fee_cents),0) AS c
+    FROM orders WHERE supplier_id = ? AND status = 'completed'
+      AND payment_method = 'cash' AND fee_settled = 0`).get(req.user.id).c;
   res.json({
     jobs: row.jobs,
-    gross_cents: row.gross,
-    commission_cents: row.commission,
-    net_cents: row.gross - row.commission,
-    commission_pct: Number(getSetting('commission_pct', '15')),
+    earned_cents: row.earned,
+    fees_cents: row.fees,
+    fee_owed_cents: owed,
+    fee_pct: Number(getSetting('platform_fee_pct', '10')),
   });
 });
 

@@ -36,6 +36,7 @@ const SERVICES = {
 
 const SERVICE_KEYS = Object.keys(SERVICES);
 
+// Suggested price only — every pro sets their own. Used to pre-fill the pricing form.
 function quote(serviceKey, packageKey, unitKey) {
   const svc = SERVICES[serviceKey];
   if (!svc) return null;
@@ -43,6 +44,19 @@ function quote(serviceKey, packageKey, unitKey) {
   const unit = svc.units[unitKey];
   if (!pkg || !unit) return null;
   return Math.round(pkg.base * unit.mult / 100) * 100; // round to whole rand
+}
+
+// A pro's own price for a package, scaled by the vehicle/load multiplier.
+function priceFor(serviceKey, packageKey, unitKey, supplierBaseCents) {
+  const svc = SERVICES[serviceKey];
+  const unit = svc?.units[unitKey];
+  if (!svc || !svc.packages[packageKey] || !unit || !supplierBaseCents) return null;
+  return Math.round(supplierBaseCents * unit.mult / 100) * 100;
+}
+
+// Our fee, charged ON TOP of the pro's price and paid by the customer.
+function platformFee(supplierPriceCents, pct) {
+  return Math.round(supplierPriceCents * pct / 100 / 100) * 100;
 }
 
 // Public catalog shape for the frontend.
@@ -58,4 +72,4 @@ function catalog() {
   return out;
 }
 
-module.exports = { SERVICES, SERVICE_KEYS, quote, catalog };
+module.exports = { SERVICES, SERVICE_KEYS, quote, catalog, priceFor, platformFee };

@@ -556,6 +556,44 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 .ac-item:hover { background: var(--panel-2); }
 .ac-item .icon { color: var(--accent); flex: none; }
 
+/* ---------- category cards ---------- */
+.cat-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 26px; cursor: pointer; box-shadow: var(--shadow);
+  transition: transform .2s var(--ease), border-color .2s, box-shadow .2s;
+}
+.cat-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: var(--shadow-lift); }
+.cat-card .cat-ico {
+  width: 54px; height: 54px; border-radius: 15px; margin-bottom: 15px;
+  background: rgba(23,153,194,.1); color: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+}
+.cat-card .cat-ico svg { width: 27px; height: 27px; }
+.cat-card h2 { font-size: 1.3rem; margin-bottom: 7px; }
+.cat-card > p { color: var(--muted); font-size: .9rem; line-height: 1.5; margin-bottom: 13px; }
+.cat-card ul { list-style: none; margin-bottom: 17px; }
+.cat-card li { color: var(--muted); font-size: .84rem; padding: 5px 0; display: flex; gap: 8px; align-items: center; }
+.cat-card li .icon { color: var(--accent); }
+.cat-go {
+  display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent-dim)); color: #fff;
+  font-weight: 700; font-size: .9rem;
+}
+
+/* ---------- provider picker ---------- */
+.pro-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--border); border-radius: 13px; padding: 14px 16px; margin-bottom: 9px;
+  cursor: pointer; background: var(--panel); transition: border-color .2s, background .2s, transform .18s var(--ease);
+}
+.pro-opt:hover { border-color: var(--accent); transform: translateX(2px); }
+.pro-opt.selected { border-color: var(--accent); background: rgba(33,172,207,.06); box-shadow: 0 0 0 1px var(--accent); }
+.pro-opt .who { font-weight: 700; color: var(--petrol); font-size: .93rem; }
+.pro-opt .meta { color: var(--muted); font-size: .78rem; margin-top: 3px; }
+.pro-opt .amt { text-align: right; white-space: nowrap; }
+.pro-opt .amt strong { color: var(--accent-dim); font-size: 1.12rem; }
+.pro-opt .amt .brk { display: block; color: var(--faint); font-size: .7rem; margin-top: 2px; }
+
 /* ---------- footer ---------- */
 .site-footer {
   display: flex; gap: 22px; flex-wrap: wrap; justify-content: center;

@@ -117,12 +117,25 @@
         <button class="secondary small" id="btn-sup-geolocate">Use my location</button>
         <span id="sup-pin-status" class="muted small-text">No location set</span>
       </div>
+      <label for="radius-km">How far will you travel? <strong id="radius-label">15 km</strong></label>
+      <input type="range" id="radius-km" min="1" max="50" step="1" value="15" style="padding:0">
+      <p class="muted small-text">You will only be shown to customers inside this radius.</p>
       <div class="msg error" id="dash-error"></div>
       <div class="row mt">
         <button id="btn-toggle-online">Go online</button>
         <button class="secondary" id="btn-enable-alerts">Enable job alerts</button>
       </div>
       <p class="muted small-text mt" id="alerts-hint">Job alerts notify you of new offers even when this app is closed. On iPhone, first add FreshAF Pro to your home screen.</p>
+    </div>
+
+    <div class="card">
+      <h2 id="h-prices">Your prices</h2>
+      <p class="muted small-text">You set what you charge — this is exactly what you get paid.
+        FreshAF adds <strong id="fee-pct-label">10%</strong> on top for the customer, so our fee never comes out of your money.</p>
+      <div class="msg error" id="prices-error"></div>
+      <div class="msg ok" id="prices-ok" style="display:none"></div>
+      <div id="prices-box"><p class="empty">Loading your price list…</p></div>
+      <div class="row mt"><button id="btn-save-prices">Save my prices</button></div>
     </div>
 
     <div class="card">

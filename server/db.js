@@ -132,8 +132,26 @@ CREATE TABLE IF NOT EXISTS supplier_docs (
 addColumn('orders', 'callout_fee_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'points_used_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'points_earned_cents INTEGER NOT NULL DEFAULT 0');
+// Pro-set pricing: the pro's own price, and our fee charged ON TOP of it.
+addColumn('orders', 'supplier_price_cents INTEGER NOT NULL DEFAULT 0');
+addColumn('orders', 'platform_fee_cents INTEGER NOT NULL DEFAULT 0');
+addColumn('orders', 'fee_settled INTEGER NOT NULL DEFAULT 0');
+addColumn('orders', 'requested_supplier_id INTEGER');
+addColumn('suppliers', 'radius_km REAL');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS supplier_prices (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  service TEXT NOT NULL,
+  package TEXT NOT NULL,
+  price_cents INTEGER NOT NULL,
+  PRIMARY KEY (user_id, service, package)
+);
+`);
 
 if (!getSetting('commission_pct')) setSetting('commission_pct', '15');
+// Pros set their own prices; this fee is added ON TOP and paid by the customer.
+if (!getSetting('platform_fee_pct')) setSetting('platform_fee_pct', '10');
 if (!getSetting('dispatch_radius_km')) setSetting('dispatch_radius_km', '25');
 if (!getSetting('offer_timeout_sec')) setSetting('offer_timeout_sec', '60');
 if (!getSetting('points_earn_pct')) setSetting('points_earn_pct', '5');

@@ -4,12 +4,14 @@ let pricing = null;
 let svc = 'carwash';
 let sel = { package: null, unit: null, lat: null, lng: null };
 let callout = null;
+let providers = [];
+let chosenPro = null;
 let map, pin;
 let currentOrder = null;
 let rateStars = 0;
 let disconnectSse = null;
 
-const VIEWS = ['view-home', 'view-login', 'view-register', 'view-order', 'view-track'];
+const VIEWS = ['view-home', 'view-login', 'view-register', 'view-service', 'view-order', 'view-track'];
 const STEPS = ['searching', 'accepted', 'en_route', 'in_progress', 'completed'];
 const STEP_LABELS = {
   carwash: { searching: 'Searching', accepted: 'Accepted', en_route: 'En route', in_progress: 'Washing', completed: 'Done' },
@@ -39,8 +41,8 @@ function decorate() {
   el('h-orders').insertAdjacentHTML('afterbegin', icon('clock'));
   el('btn-geolocate').insertAdjacentHTML('afterbegin', icon('navigate'));
   el('btn-saved-address').insertAdjacentHTML('afterbegin', icon('home'));
-  el('tab-carwash').insertAdjacentHTML('afterbegin', icon('car'));
-  el('tab-laundry').insertAdjacentHTML('afterbegin', icon('shirt'));
+  el('h-orders-2').insertAdjacentHTML('afterbegin', icon('clock'));
+  el('btn-change-service').insertAdjacentHTML('afterbegin', icon('back'));
   el('seg-card').insertAdjacentHTML('afterbegin', icon('card'));
   el('seg-cash').insertAdjacentHTML('afterbegin', icon('cash'));
   el('btn-back-orders').insertAdjacentHTML('afterbegin', icon('back'));
@@ -119,7 +121,8 @@ async function enterApp() {
   refreshSavedAddress();
   el('use-points').onchange = updateTotal;
   await refreshOrders();
-  show('view-order');
+  renderCategoryCards();
+  show('view-service');
   initMap();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
@@ -147,7 +150,6 @@ function setService(key) {
   svc = key;
   sel.package = null; sel.unit = null;
   callout = null;
-  document.querySelectorAll('.service-tab').forEach((t) => t.classList.toggle('active', t.dataset.svc === key));
   const copy = SVC_COPY[key];
   el('h-book').innerHTML = `${icon(key === 'laundry' ? 'shirt' : 'droplet')} ${copy.book}`;
   el('unit-heading').textContent = pricing.services[key].unitLabel;
@@ -157,7 +159,26 @@ function setService(key) {
   if (sel.lat != null) refreshCallout();
   updateTotal();
 }
-document.querySelectorAll('.service-tab').forEach((t) => t.onclick = () => setService(t.dataset.svc));
+document.querySelectorAll('.cat-card').forEach((c) => c.onclick = () => {
+  setService(c.dataset.svc);
+  show('view-order');
+});
+el('btn-change-service').onclick = () => { renderCategoryCards(); show('view-service'); refreshOrders(); };
+
+// The two categories, each with its own look and copy.
+function renderCategoryCards() {
+  if (!pricing) return;
+  el('cat-ico-wash').innerHTML = icon('car', 'lg');
+  el('cat-ico-laundry').innerHTML = icon('shirt', 'lg');
+  const bullets = {
+    carwash: ['Washed where it stands', 'Vetted, rated washers', 'Card or cash'],
+    laundry: ['Collected and delivered back', 'Wash, iron, duvets & bedding', 'Card or cash'],
+  };
+  for (const k of ['carwash', 'laundry']) {
+    const listId = k === 'carwash' ? 'cat-list-wash' : 'cat-list-laundry';
+    el(listId).innerHTML = bullets[k].map((b) => `<li>${icon('check')}${b}</li>`).join('');
+  }
+}
 
 function renderPickers() {
   const cat = pricing.services[svc];
@@ -185,6 +206,50 @@ function renderPickers() {
 function refreshSel() {
   document.querySelectorAll('#pkg-grid .pkg').forEach((n) => n.classList.toggle('selected', n.dataset.pkg === sel.package));
   document.querySelectorAll('#veh-grid .pkg').forEach((n) => n.classList.toggle('selected', n.dataset.unit === sel.unit));
+  refreshProviders();
+  updateTotal();
+}
+
+/* ---------- choose your pro (each sets their own price) ---------- */
+async function refreshProviders() {
+  const box = el('pro-list');
+  if (!sel.package || !sel.unit || sel.lat == null) {
+    providers = []; chosenPro = null;
+    box.innerHTML = '<p class="empty">Choose a package and drop your pin to see available pros.</p>';
+    updateTotal();
+    return;
+  }
+  box.innerHTML = '<p class="empty">Finding pros near you…</p>';
+  try {
+    const q = await api(`/api/quote/providers?service=${svc}&package=${sel.package}&vehicle=${sel.unit}&lat=${sel.lat}&lng=${sel.lng}`);
+    providers = q.providers || [];
+    if (!providers.length) {
+      chosenPro = null;
+      box.innerHTML = '<p class="empty">No pros are available at this address right now. Try again shortly or move your pin.</p>';
+      updateTotal();
+      return;
+    }
+    if (!providers.some((p) => p.supplier_id === chosenPro)) chosenPro = providers[0].supplier_id;
+    box.innerHTML = providers.map((p) => `
+      <div class="pro-opt ${p.supplier_id === chosenPro ? 'selected' : ''}" data-id="${p.supplier_id}">
+        <div>
+          <div class="who">${p.business_name}</div>
+          <div class="meta">${p.distance_km} km away${p.rating ? ` · ★ ${p.rating} (${p.rating_count})` : ' · New pro'}</div>
+        </div>
+        <div class="amt">
+          <strong>${rand(p.total_cents)}</strong>
+          <span class="brk">${rand(p.supplier_price_cents)} pro${p.callout_fee_cents ? ' + ' + rand(p.callout_fee_cents) + ' callout' : ''} + ${rand(p.platform_fee_cents)} fee</span>
+        </div>
+      </div>`).join('');
+    box.querySelectorAll('.pro-opt').forEach((n) => n.onclick = () => {
+      chosenPro = Number(n.dataset.id);
+      box.querySelectorAll('.pro-opt').forEach((x) => x.classList.toggle('selected', x === n));
+      updateTotal();
+    });
+  } catch (e) {
+    providers = []; chosenPro = null;
+    box.innerHTML = '<p class="empty">Could not load pros right now.</p>';
+  }
   updateTotal();
 }
 
@@ -200,28 +265,24 @@ function refreshSavedAddress() {
 }
 
 function updateTotal() {
-  const cat = pricing.services[svc];
-  const pkg = cat.packages.find((p) => p.key === sel.package);
-  const unit = cat.units.find((u) => u.key === sel.unit);
+  const pro = providers.find((p) => p.supplier_id === chosenPro);
   const notes = [];
-  if (!pkg || !unit) {
+  if (!pro) {
     el('order-total').textContent = '—';
-    if (callout?.available && callout.fee_cents > 0) notes.push(`Callout fee ${rand(callout.fee_cents)} (nearest pro ${callout.distance_km} km)`);
-    el('price-note').textContent = notes.join(' · ');
+    el('price-note').textContent = sel.package && sel.unit && sel.lat != null
+      ? 'Choose a pro above to see your total.' : '';
     return;
   }
-  const base = Math.round(pkg.base * unit.mult / 100) * 100;
-  const fee = callout?.available ? callout.fee_cents : 0;
-  const subtotal = base + fee;
   const usePoints = el('use-points').checked;
-  const discount = usePoints ? Math.min(me?.points_cents || 0, subtotal) : 0;
-  el('order-total').textContent = rand(subtotal - discount);
-  if (fee > 0) notes.push(`Includes ${rand(fee)} callout fee — nearest pro ${callout.distance_km} km`);
-  else if (callout?.available) notes.push('No callout fee — a pro is nearby');
-  else if (sel.lat != null) notes.push('Callout fee confirmed when a pro is online');
-  if (discount > 0) notes.push(`Rewards applied −${rand(discount)}`);
+  const discount = usePoints ? Math.min(me?.points_cents || 0, pro.total_cents) : 0;
+  el('order-total').textContent = rand(pro.total_cents - discount);
+  notes.push(`${pro.business_name}: ${rand(pro.supplier_price_cents)}`);
+  if (pro.callout_fee_cents) notes.push(`callout ${rand(pro.callout_fee_cents)}`);
+  notes.push(`service fee ${rand(pro.platform_fee_cents)}`);
+  if (discount > 0) notes.push(`rewards −${rand(discount)}`);
   el('price-note').textContent = notes.join(' · ');
 }
+
 
 /* ---------- map ---------- */
 function initMap() {
@@ -246,6 +307,7 @@ function setPin(lat, lng) {
   if (pin) pin.setLatLng([lat, lng]); else pin = L.marker([lat, lng]).addTo(map);
   el('pin-status').innerHTML = `${icon('pin')} Pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   refreshCallout();
+  refreshProviders();
 }
 
 el('btn-geolocate').onclick = () => {
@@ -363,11 +425,12 @@ function openAccount() {
 el('btn-place-order').onclick = async () => {
   try {
     if (!sel.package || !sel.unit) throw new Error('Choose a package and an option first');
+    if (!chosenPro) throw new Error('Choose a pro before booking');
     const payment_method = document.querySelector('input[name=pay]:checked').value;
     const data = await api('/api/orders', {
       method: 'POST',
       body: {
-        service: svc, package: sel.package, vehicle: sel.unit,
+        service: svc, package: sel.package, vehicle: sel.unit, supplier_id: chosenPro,
         address: el('order-address').value, lat: sel.lat, lng: sel.lng,
         notes: el('order-notes').value, payment_method,
         use_points: el('use-points').checked,
@@ -384,8 +447,12 @@ el('btn-place-order').onclick = async () => {
 
 async function refreshOrders() {
   const { orders } = await api('/api/orders');
-  if (!orders.length) { el('orders-list').innerHTML = '<p class="empty">No orders yet.</p>'; return; }
-  el('orders-list').innerHTML = orders.map((o) => {
+  if (!orders.length) {
+    el('orders-list').innerHTML = '<p class="empty">No orders yet.</p>';
+    if (el('orders-list-2')) el('orders-list-2').innerHTML = '<p class="empty">No orders yet.</p>';
+    return;
+  }
+  const render = (o) => {
     const cat = pricing.services[o.service] || pricing.services.carwash;
     const pkgName = (cat.packages.find((p) => p.key === o.package) || {}).name || o.package;
     return `
@@ -400,7 +467,10 @@ async function refreshOrders() {
         <button class="secondary small" onclick="openTrack(${o.id})">View</button>
       </div>
     </div>`;
-  }).join('');
+  };
+  const html = orders.map(render).join('');
+  el('orders-list').innerHTML = html;
+  if (el('orders-list-2')) el('orders-list-2').innerHTML = html;
 }
 
 async function openTrack(orderId) {
@@ -474,7 +544,7 @@ function renderTrack(order) {
   }
 }
 
-el('btn-back-orders').onclick = () => { currentOrder = null; show('view-order'); refreshOrders(); };
+el('btn-back-orders').onclick = () => { currentOrder = null; renderCategoryCards(); show('view-service'); refreshOrders(); };
 
 el('btn-cancel-order').onclick = async () => {
   const yes = await modal({

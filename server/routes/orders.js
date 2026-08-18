@@ -1,7 +1,7 @@
 const express = require('express');
 const { db, getSetting } = require('../db');
 const { authRequired } = require('../auth');
-const { SERVICE_KEYS, quote, catalog } = require('../pricing');
+const { SERVICE_KEYS, quote, catalog, priceFor, platformFee } = require('../pricing');
 const payments = require('../payments');
 const dispatch = require('../dispatch');
 const realtime = require('../realtime');
@@ -36,6 +36,58 @@ function computeCallout(lat, lng, service) {
   return { available: true, fee_cents: fee, distance_km: +dist.toFixed(1) };
 }
 
+// Available pros near a pin, each with THEIR price for the chosen package + our fee on top.
+router.get('/quote/providers', authRequired('customer'), (req, res) => {
+  const lat = Number(req.query.lat), lng = Number(req.query.lng);
+  const { service, package: pkg, vehicle: unit } = req.query;
+  if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'Pick a location first' });
+
+  const feePct = Number(getSetting('platform_fee_pct', '10'));
+  const maxRadius = Number(getSetting('dispatch_radius_km', '25'));
+  const freeKm = Number(getSetting('callout_free_km', '5'));
+  const perKm = Number(getSetting('callout_per_km_cents', '1000'));
+  const cap = Number(getSetting('callout_cap_cents', '15000'));
+
+  const rows = db.prepare(`
+    SELECT s.user_id, s.business_name, s.lat, s.lng, s.radius_km, s.rating_sum, s.rating_count,
+           u.name AS pro_name, sp.price_cents
+    FROM suppliers s
+    JOIN users u ON u.id = s.user_id
+    JOIN supplier_prices sp ON sp.user_id = s.user_id AND sp.service = ? AND sp.package = ?
+    WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
+      AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+      AND s.user_id NOT IN (
+        SELECT supplier_id FROM orders
+        WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
+  `).all(service, pkg, service);
+
+  const providers = rows.map((r) => {
+    const distance = dispatch.haversineKm(lat, lng, r.lat, r.lng);
+    const supplierPrice = priceFor(service, pkg, unit, r.price_cents);
+    if (supplierPrice == null) return null;
+    // A pro only appears if the customer is inside the radius THEY chose.
+    const limit = Math.min(r.radius_km || maxRadius, maxRadius);
+    if (distance > limit) return null;
+    const callout = Math.min(cap, Math.round(Math.max(0, distance - freeKm) * perKm / 100) * 100);
+    const fee = platformFee(supplierPrice + callout, feePct);
+    return {
+      supplier_id: r.user_id,
+      business_name: r.business_name,
+      name: r.pro_name,
+      rating: r.rating_count ? +(r.rating_sum / r.rating_count).toFixed(1) : null,
+      rating_count: r.rating_count,
+      distance_km: +distance.toFixed(1),
+      supplier_price_cents: supplierPrice,
+      callout_fee_cents: callout,
+      platform_fee_cents: fee,
+      total_cents: supplierPrice + callout + fee,
+    };
+  }).filter(Boolean).sort((a, b) => a.total_cents - b.total_cents);
+
+  res.json({ providers, fee_pct: feePct });
+});
+
 router.get('/quote/callout', authRequired('customer'), (req, res) => {
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   const service = SERVICE_KEYS.includes(req.query.service) ? req.query.service : 'carwash';
@@ -44,10 +96,9 @@ router.get('/quote/callout', authRequired('customer'), (req, res) => {
 });
 
 router.post('/orders', authRequired('customer'), (req, res) => {
-  const { service, package: pkg, vehicle, address, lat, lng, notes, payment_method, use_points } = req.body || {};
+  const { service, package: pkg, vehicle, address, lat, lng, notes, payment_method, use_points,
+    supplier_id } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
-  const base = quote(service, pkg, vehicle);
-  if (base == null) return res.status(400).json({ error: 'Invalid package or size selection' });
   if (!address?.trim() || typeof lat !== 'number' || typeof lng !== 'number') {
     return res.status(400).json({ error: 'Pick your location on the map and enter an address' });
   }
@@ -58,8 +109,24 @@ router.post('/orders', authRequired('customer'), (req, res) => {
     AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, service);
   if (active) return res.status(409).json({ error: 'You already have an active order for this service. Complete or cancel it first.' });
 
+  // The customer picks a pro; that pro's own price is what they earn.
+  const chosen = db.prepare(`
+    SELECT s.user_id, s.lat, s.lng, s.radius_km, sp.price_cents
+    FROM suppliers s
+    JOIN supplier_prices sp ON sp.user_id = s.user_id AND sp.service = ? AND sp.package = ?
+    WHERE s.user_id = ? AND s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
+      AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+  `).get(service, pkg, supplier_id, service);
+  if (!chosen) return res.status(409).json({ error: 'That pro is no longer available. Please choose another.' });
+
+  const supplierPrice = priceFor(service, pkg, vehicle, chosen.price_cents);
+  if (supplierPrice == null) return res.status(400).json({ error: 'Invalid package or size selection' });
+
   const callout = computeCallout(lat, lng, service);
-  const price = base + callout.fee_cents; // full order value (provider earns on this)
+  const feePct = Number(getSetting('platform_fee_pct', '10'));
+  const fee = platformFee(supplierPrice + callout.fee_cents, feePct);
+  // Customer pays the pro's price + callout + our fee on top. The pro keeps their price + callout.
+  const price = supplierPrice + callout.fee_cents + fee;
 
   // Rewards redemption — platform-funded, deducted from what the customer pays.
   const customer = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
@@ -83,9 +150,11 @@ router.post('/orders', authRequired('customer'), (req, res) => {
 
   const info = db.prepare(`INSERT INTO orders
     (customer_id, service, package, vehicle, price_cents, callout_fee_cents, points_used_cents,
+     supplier_price_cents, platform_fee_cents, requested_supplier_id,
      address, lat, lng, notes, payment_method, payment_status, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(req.user.id, service, pkg, vehicle, price, callout.fee_cents, pointsUsed,
+      supplierPrice, fee, chosen.user_id,
       address.trim(), lat, lng, notes?.trim() || null, payment_method, paymentStatus, status);
   const orderId = Number(info.lastInsertRowid);
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);

@@ -17,7 +17,8 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 function orderPublic(order) {
   const { id, service, package: pkg, vehicle, price_cents, address, lat, lng, notes,
     payment_method, payment_status, status, created_at, accepted_at, completed_at, supplier_id,
-    callout_fee_cents, points_used_cents, points_earned_cents } = order;
+    callout_fee_cents, points_used_cents, points_earned_cents,
+    supplier_price_cents, platform_fee_cents } = order;
   let supplier = null;
   if (supplier_id) {
     const s = db.prepare(`
@@ -34,6 +35,9 @@ function orderPublic(order) {
     callout_fee_cents: callout_fee_cents || 0,
     points_used_cents: points_used_cents || 0,
     points_earned_cents: points_earned_cents || 0,
+    supplier_price_cents: supplier_price_cents || 0,
+    platform_fee_cents: platform_fee_cents || 0,
+    supplier_earns_cents: (supplier_price_cents || 0) + (callout_fee_cents || 0),
     amount_due_cents: price_cents - (points_used_cents || 0) };
 }
 
@@ -47,15 +51,16 @@ function offerToNext(orderId) {
   if (!order || order.status !== 'searching') return;
 
   const radiusKm = Number(getSetting('dispatch_radius_km', '25'));
+  // The customer chose this pro at this pro's price — never substitute someone else,
+  // because their price (and therefore the customer's total) would be different.
   const candidates = db.prepare(`
     SELECT s.user_id, s.lat, s.lng FROM suppliers s
-    WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
-      AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+    WHERE s.user_id = ? AND s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
       AND s.user_id NOT IN (SELECT supplier_id FROM offers WHERE order_id = ?)
       AND s.user_id NOT IN (
         SELECT supplier_id FROM orders
         WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
-  `).all(order.service, orderId)
+  `).all(order.requested_supplier_id, orderId)
     .map((s) => ({ ...s, distance: haversineKm(order.lat, order.lng, s.lat, s.lng) }))
     .filter((s) => s.distance <= radiusKm)
     .sort((a, b) => a.distance - b.distance);
@@ -80,7 +85,7 @@ function offerToNext(orderId) {
 
   // Reach the provider even when the app is closed.
   push.sendToUser(next.user_id, {
-    title: `New ${order.service === 'laundry' ? 'laundry' : 'car wash'} job — R${Math.round(order.price_cents / 100)}`,
+    title: `New ${order.service === 'laundry' ? 'laundry' : 'car wash'} job — you earn R${Math.round((order.supplier_price_cents + order.callout_fee_cents) / 100)}`,
     body: `${next.distance.toFixed(1)} km away · ${order.address}\nOpen FreshAF Pro to accept before it expires.`,
     url: '/supplier',
     tag: `offer-${offerId}`,
