@@ -21,6 +21,18 @@ collection**. Customers book, the pro they choose comes to them. Built as a web 
   - ⚠️ **No persistent disk — the database is wiped on every restart/redeploy.** This is the
     single most important outstanding item. Fix: add a card at dashboard.render.com/billing,
     then upgrade to Starter + attach a 1 GB disk at `/opt/render/project/src/data`.
+  - **`JWT_SECRET` is now set as a Render environment variable (19 Aug).** Before that, the
+    signing secret lived in `data/jwt.secret` on the ephemeral disk, regenerated on every
+    deploy, and silently invalidated every login cookie. Env vars survive restarts, so that
+    cause of being signed out is gone. **This is only half the fix** — see the disk item above:
+    if the database itself is reset, the user account is gone regardless of a valid cookie.
+  - **ROOT CAUSE of the broken auto-deploy, found in the build log 19 Aug:**
+    `==> It looks like we don't have access to your repo, but we'll try to clone it anyway.`
+    Render's GitHub connection has lost access to the repository. It can still *clone* because
+    the repo is public, which is why manual deploys work — but with no repo access there is no
+    webhook, so pushes never trigger a build. Fix: Render → the service → **Connect** → reconnect
+    the GitHub account and re-authorise the `freshaf` repo. Until then every push needs a manual
+    Manual Deploy → Deploy latest commit.
   - Render does **not** auto-deploy on git push — **even though its Settings page says
     Auto-Deploy: "On Commit"**. Verified twice on 19 Aug: pushed, waited 4+ minutes, no deploy
     event appeared; the same commit deployed instantly when triggered by hand. The GitHub
