@@ -419,9 +419,21 @@ function connectEvents(handlers) {
 }
 
 // Light / dark theme slider (theme is applied pre-paint by the inline head script).
+// The track carries a sun and a moon so the switch says what it does — an unmarked
+// pill next to the wordmark reads as a stray control.
+const THEME_MARKS = {
+  sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/>',
+  moon: '<path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z"/>',
+};
 document.addEventListener('DOMContentLoaded', () => {
   const sw = document.getElementById('theme-switch');
   if (!sw) return;
+  const track = sw.parentElement.querySelector('.track');
+  if (track && !track.querySelector('.tt-mark')) {
+    const mark = (name) => `<span class="tt-mark tt-${name}"><svg viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${THEME_MARKS[name]}</svg></span>`;
+    track.insertAdjacentHTML('afterbegin', mark('sun') + mark('moon'));
+  }
   sw.checked = document.documentElement.dataset.theme === 'dark';
   sw.onchange = () => {
     const t = sw.checked ? 'dark' : 'light';

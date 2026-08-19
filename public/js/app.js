@@ -29,12 +29,6 @@ const SVC_COPY = {
 const show = (view) => switchView(VIEWS, view);
 
 function decorate() {
-  el('chip-vetted').insertAdjacentHTML('afterbegin', icon('shield'));
-  el('chip-track').insertAdjacentHTML('afterbegin', icon('navigate'));
-  el('chip-pay').insertAdjacentHTML('afterbegin', icon('card'));
-  el('chip-rewards').insertAdjacentHTML('afterbegin', icon('wallet'));
-  el('h-how').insertAdjacentHTML('afterbegin', icon('spark'));
-  el('h-pro').insertAdjacentHTML('afterbegin', icon('briefcase'));
   el('h-signin').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-create').insertAdjacentHTML('afterbegin', icon('spark'));
   el('h-book').insertAdjacentHTML('afterbegin', icon('droplet'));
@@ -62,7 +56,7 @@ function setTopbar() {
   el('btn-account').classList.toggle('hidden', !me);
   el('btn-logout').classList.toggle('hidden', !me);
   el('btn-go-login').classList.toggle('hidden', !!me);
-  if (me) el('btn-account').innerHTML = `${icon('user')} ${me.name.split(' ')[0]}`;
+  if (me) el('btn-account').innerHTML = `${icon('user')}<span class="acct-name">${me.name.split(' ')[0]}</span>`;
 }
 
 async function boot() {
@@ -86,32 +80,26 @@ async function boot() {
   }
 }
 
-/* ---------- home showcase ---------- */
+/* ---------- home ----------
+   The logged-out home is deliberately just the two service blocks. Nothing below them. */
 function renderHomeServices() {
   if (!pricing) return;
   renderCategoryCards();
-  el('home-services').innerHTML = ['carwash', 'laundry'].map((key) => {
-    const cat = pricing.services[key];
-    return `
-    <div class="card" style="margin-bottom:0">
-      <h2>${icon(key === 'laundry' ? 'shirt' : 'car')} ${cat.name}</h2>
-      ${cat.packages.map((p) => `
-        <div class="row spread" style="padding:9px 0;border-bottom:1px solid var(--border-soft)">
-          <div>
-            <strong style="font-size:.92rem">${p.name}</strong>
-            <div class="muted small-text">${p.desc}</div>
-          </div>
-          <strong style="color:var(--accent-dim);white-space:nowrap">from ${rand(p.base)}</strong>
-        </div>`).join('')}
-      <p class="muted small-text mt">${key === 'carwash' ? 'Washed at your parking spot — home, office or gym.' : 'Collected, professionally cleaned, delivered back to you.'}</p>
-    </div>`;
-  }).join('');
 }
 
 /* ---------- auth navigation ---------- */
-el('btn-cta-register').onclick = (e) => { e.preventDefault(); show('view-register'); };
-el('btn-cta-login').onclick = (e) => { e.preventDefault(); show('view-login'); };
 el('btn-go-login').onclick = () => show('view-login');
+
+// The wordmark is always the way back to the main page. Route in-app rather than
+// reloading, so a signed-in customer lands on the service chooser, not the marketing home.
+el('brand-home').onclick = (e) => {
+  e.preventDefault();
+  if (!me) { show('view-home'); return; }
+  currentOrder = null;
+  renderCategoryCards();
+  show('view-service');
+  refreshOrders();
+};
 el('link-to-register').onclick = (e) => { e.preventDefault(); show('view-register'); };
 el('link-to-login').onclick = (e) => { e.preventDefault(); show('view-login'); };
 el('link-back-home').onclick = (e) => { e.preventDefault(); show('view-home'); };

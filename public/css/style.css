@@ -77,6 +77,19 @@
   transition: transform .25s var(--ease);
 }
 .theme-toggle input:checked + .track .thumb { transform: translateX(22px); }
+/* Sun on the left, moon on the right; the thumb parks over whichever is active. */
+.theme-toggle .tt-mark {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 12px; height: 12px; display: flex; align-items: center; justify-content: center;
+  color: var(--faint); transition: color .25s, opacity .25s; pointer-events: none;
+}
+.theme-toggle .tt-mark svg { width: 100%; height: 100%; }
+.theme-toggle .tt-sun { left: 5px; }
+.theme-toggle .tt-moon { right: 5px; }
+.theme-toggle input:not(:checked) + .track .tt-sun { opacity: 0; }
+.theme-toggle input:checked + .track .tt-moon { opacity: 0; }
+.theme-toggle input:not(:checked) + .track .tt-moon { color: var(--muted); }
+.theme-toggle input:checked + .track .tt-sun { color: var(--accent-strong); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -146,7 +159,12 @@ a:hover { color: var(--accent); }
 .brand .tag {
   color: var(--faint); font-size: .66rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .16em; font-style: normal;
+  white-space: nowrap; display: block;
 }
+/* The wordmark is the way home from anywhere in the app. */
+.brand-home { display: block; text-decoration: none; cursor: pointer; border-radius: 8px; }
+.brand-home:hover .tag { color: var(--accent-dim); }
+.brand-home:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .topbar .who { color: var(--muted); font-size: .84rem; margin-right: 12px; font-weight: 500; }
 
 /* ---------- layout ---------- */
@@ -673,8 +691,8 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 [data-theme="dark"] .topbar.is-scrolled { background: rgba(12, 21, 27, .93); }
 .topbar .brand .logo-img { transition: height .32s var(--ease); }
 .topbar.is-scrolled .brand .logo-img { height: 18px; }
-.topbar .brand .tag { transition: opacity .28s var(--ease), max-height .32s var(--ease); overflow: hidden; }
-.topbar.is-scrolled .brand .tag { opacity: 0; max-height: 0; }
+/* "Fresh and Fast" says what the name stands for, so it stays put — on every screen
+   size and while scrolling. It is the whole reason the tagline is there. */
 
 /* thin cyan progress line showing how far down the page you are */
 .scroll-progress {
@@ -774,9 +792,13 @@ button:active { transform: translateY(0) scale(.975); }
   .topbar .brand { min-width: 0; }
   .topbar .brand .stack { display: block; min-width: 0; }
   .topbar .brand .logo-img { height: 19px; }
-  .topbar .brand .tag { display: none; }
+  .topbar .brand .tag { font-size: .6rem; letter-spacing: .12em; }
   .topbar > .row { flex-wrap: nowrap; gap: 6px; flex: none; }
   .topbar button.small { padding: 7px 11px; font-size: .75rem; }
+  /* The account button keeps the tagline company on a 375px bar by dropping the
+     first name and showing just its icon. */
+  #btn-account .acct-name { display: none; }
+  #btn-account { padding: 7px 9px; }
   .topbar .theme-toggle .track { width: 40px; height: 21px; }
   .topbar .theme-toggle .thumb { width: 15px; height: 15px; }
   .topbar input:checked + .track .thumb { transform: translateX(19px); }
