@@ -104,7 +104,9 @@ el('link-back-home').onclick = (e) => { e.preventDefault(); show('view-home'); }
 
 async function enterApp() {
   if (!pricing) pricing = await api('/api/pricing');
-  // If they picked Car Wash or Laundry before signing up, honour it — don't make them choose twice.
+  // A service picked before signing up only preselects the booking form. Signing in or
+  // registering always lands on the main chooser — being dropped straight into a wash
+  // booking is disorienting when you have just typed in your details.
   const wanted = pendingService();
   setService(wanted || 'carwash');
   refreshPointsRow();
@@ -112,12 +114,8 @@ async function enterApp() {
   el('use-points').onchange = updateTotal;
   await refreshOrders();
   renderCategoryCards();
-  if (wanted) {
-    try { localStorage.removeItem(SVC_KEY); } catch {}
-    show('view-order');
-  } else {
-    show('view-service');
-  }
+  if (wanted) { try { localStorage.removeItem(SVC_KEY); } catch {} }
+  show('view-service');
   initMap();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
@@ -162,8 +160,8 @@ function setService(key) {
   if (sel.lat != null) refreshCallout();
   updateTotal();
 }
-// Picking a service is the first thing anyone does, logged in or not. Logged out, we
-// remember the choice through registration and drop them straight into that booking.
+// Picking a service is the first thing anyone does. Logged out it sends them to sign up,
+// and the choice is remembered only to preselect the booking form afterwards.
 const SVC_KEY = 'freshaf_pending_svc';
 function pendingService() {
   try { const v = localStorage.getItem(SVC_KEY); return v === 'laundry' || v === 'carwash' ? v : null; } catch { return null; }

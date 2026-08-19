@@ -129,6 +129,91 @@ router.get('/customers.csv', (req, res) => {
   res.send('﻿' + csv); // BOM so Excel opens the accented characters correctly
 });
 
+/* ---------- backup / restore ----------
+   Attaching a persistent disk mounts it EMPTY, so the plan upgrade would otherwise throw
+   away production. Download before, upload after, redeploy, done. */
+const fs = require('fs');
+const multer = require('multer');
+const { checkpoint, DB_FILE, RESTORE_FILE, DATA_DIR } = require('../db');
+
+router.get('/backup', (req, res) => {
+  checkpoint(); // fold the write-ahead log in, or the file is missing recent writes
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  res.download(DB_FILE, `freshaf-backup-${stamp}.db`);
+});
+
+const restoreUpload = multer({
+  storage: multer.diskStorage({
+    destination: DATA_DIR,
+    filename: (req, file, cb) => cb(null, `restore-upload-${Date.now()}.tmp`),
+  }),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+router.post('/restore', restoreUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Attach a .db backup file' });
+  const tmp = req.file.path;
+  try {
+    // Every SQLite file starts with this. Refuse anything else rather than boot into a brick.
+    const head = Buffer.alloc(16);
+    const fd = fs.openSync(tmp, 'r');
+    fs.readSync(fd, head, 0, 16, 0);
+    fs.closeSync(fd);
+    if (head.toString('utf8', 0, 15) !== 'SQLite format 3') {
+      fs.unlinkSync(tmp);
+      return res.status(400).json({ error: 'That is not a SQLite backup file' });
+    }
+    fs.renameSync(tmp, RESTORE_FILE);
+    res.json({
+      ok: true,
+      bytes: req.file.size,
+      next: 'Backup staged. Redeploy or restart the service and it will be restored on boot.',
+    });
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    res.status(500).json({ error: `Could not stage the restore: ${e.message}` });
+  }
+});
+
+/* ---------- launch readiness ----------
+   One place that answers "is this thing actually ready to take real customers". */
+router.get('/readiness', (req, res) => {
+  const payments = require('../payments');
+  const whatsapp = require('../whatsapp');
+  const onDisk = (p) => { try { return fs.existsSync(p); } catch { return false; } };
+
+  // A persistent disk shows up as a real mount, not a folder inside the build.
+  let diskLooksPersistent = false;
+  try {
+    const st = fs.statSync(DATA_DIR);
+    const parent = fs.statSync(require('path').join(DATA_DIR, '..'));
+    diskLooksPersistent = st.dev !== parent.dev; // different device = separate volume
+  } catch { /* leave false */ }
+
+  const approvedPros = db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved'").get().c;
+  res.json({
+    checks: [
+      { key: 'persistent_disk', label: 'Persistent disk attached', ok: diskLooksPersistent,
+        detail: diskLooksPersistent ? 'Data survives restarts.'
+          : 'Data is wiped on every restart and deploy. Upgrade to Starter and mount a disk at /opt/render/project/src/data.' },
+      { key: 'jwt_secret', label: 'Login secret pinned', ok: !!process.env.JWT_SECRET,
+        detail: process.env.JWT_SECRET ? 'Sessions survive deploys.'
+          : 'JWT_SECRET is not set, so every deploy signs everyone out.' },
+      { key: 'card_payments', label: 'Card payments live', ok: payments.LIVE,
+        detail: payments.LIVE ? 'PayFast keys are set.' : 'Running in sandbox. Cash orders work fully.' },
+      { key: 'whatsapp', label: 'WhatsApp job alerts live', ok: whatsapp.configured(),
+        detail: whatsapp.configured() ? 'Alerts are being sent.' : 'Dry run — see WHATSAPP-SETUP.md.' },
+      { key: 'suppliers', label: 'Approved pros on the platform', ok: approvedPros > 0,
+        detail: `${approvedPros} approved. Nothing else matters without supply.` },
+      { key: 'admin_password', label: 'Admin password changed from default', ok: !!process.env.ADMIN_PASSWORD,
+        detail: process.env.ADMIN_PASSWORD ? 'Set from the environment.' : 'Using the built-in default.' },
+    ],
+    approved_pros: approvedPros,
+    online_pros: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved' AND online = 1").get().c,
+    uploads_present: onDisk(require('path').join(DATA_DIR, 'uploads')),
+  });
+});
+
 router.get('/stats', (req, res) => {
   const stats = {
     customers: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer'").get().c,

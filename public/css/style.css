@@ -154,12 +154,13 @@ a:hover { color: var(--accent); }
   backdrop-filter: blur(14px);
 }
 .brand { display: flex; align-items: center; }
-.brand .stack { line-height: 1.05; }
-.brand .logo-img { height: 27px; display: block; margin-bottom: 5px; }
+.brand .stack { line-height: 1; }
+.brand .logo-img { height: 27px; display: block; margin-bottom: 0; }
 .brand .tag {
-  color: var(--faint); font-size: .66rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .16em; font-style: normal;
+  color: var(--faint); font-size: .62rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .145em; font-style: normal;
   white-space: nowrap; display: block;
+  margin-top: -3px; /* the wordmark SVG has its own bottom whitespace — close the gap */
 }
 /* The wordmark is the way home from anywhere in the app. */
 .brand-home { display: block; text-decoration: none; cursor: pointer; border-radius: 8px; }

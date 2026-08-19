@@ -150,6 +150,15 @@ cookie becomes invalid** — so all users are silently signed out. The cookie it
 so this works on the free plan too). Same applies to `data/vapid.json` — losing it kills every
 Web Push subscription.
 
+## GO-LIVE (the disk cutover) — see `GO-LIVE.md`
+Attaching a persistent disk mounts it **empty**, so the cutover destroys production unless it
+is backed up first. Admin → Launch readiness now has **Download backup** and **Upload a backup
+to restore**; `db.js` applies a staged `data/restore.db` on the next boot and logs
+`Restored the database from an uploaded backup.` Tested end to end 19 Aug: wiped the database
+completely, uploaded the backup, restarted — 19 customers, 15 orders and 10 approved pros all
+came back. Non-SQLite uploads are rejected. **The backup covers the database only** — files in
+`data/uploads/` (pro ID copies) need their own copy once pros start uploading.
+
 ## OUTSTANDING — in priority order
 1. **Render card → Starter plan + persistent disk.** Until then production data can vanish.
    Evert chose this route (19 Aug) over migrating to Postgres, because Postgres would *not*

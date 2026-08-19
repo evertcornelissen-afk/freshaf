@@ -6,7 +6,26 @@ const bcrypt = require('bcryptjs');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new DatabaseSync(path.join(DATA_DIR, 'freshaf.db'));
+// Restore-on-boot. Attaching a persistent disk mounts it EMPTY, so the cutover would
+// otherwise throw away whatever production held. Admin uploads a backup to data/restore.db;
+// the next boot swaps it in before anything opens the database.
+const DB_FILE = path.join(DATA_DIR, 'freshaf.db');
+const RESTORE_FILE = path.join(DATA_DIR, 'restore.db');
+if (fs.existsSync(RESTORE_FILE)) {
+  try {
+    for (const suffix of ['', '-wal', '-shm']) {
+      const f = DB_FILE + suffix;
+      if (fs.existsSync(f)) fs.renameSync(f, `${f}.replaced-${Date.now()}`);
+    }
+    fs.renameSync(RESTORE_FILE, DB_FILE);
+    console.log('[FreshAF] Restored the database from an uploaded backup.');
+  } catch (e) {
+    console.error('[FreshAF] Restore failed, keeping the existing database:', e.message);
+    try { fs.unlinkSync(RESTORE_FILE); } catch {}
+  }
+}
+
+const db = new DatabaseSync(DB_FILE);
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
@@ -251,4 +270,4 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 process.on('exit', checkpoint);
 checkpoint(); // fold in whatever the last run left behind
 
-module.exports = { db, getSetting, setSetting, checkpoint };
+module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE };

@@ -43,6 +43,23 @@
 
   <div id="view-dash" class="hidden">
     <div class="card">
+      <h2 id="h-launch">Launch readiness</h2>
+      <p class="muted small-text">What still stands between FreshAF and real customers.</p>
+      <div id="readiness-box"><p class="empty">Checking…</p></div>
+      <hr class="divider">
+      <h3 style="margin-top:0">Database backup</h3>
+      <p class="muted small-text">Attaching a persistent disk mounts it <strong>empty</strong>.
+        Download a backup first, attach the disk, then upload it back and redeploy — nothing is lost.</p>
+      <div class="msg error" id="backup-error"></div>
+      <div class="msg ok" id="backup-ok" style="display:none"></div>
+      <div class="row mt">
+        <a class="btn secondary small" id="btn-backup" href="/api/admin/backup">Download backup</a>
+        <input type="file" id="restore-file" accept=".db" class="hidden">
+        <button class="ghost small" id="btn-restore">Upload a backup to restore</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2 id="h-overview">Overview</h2>
       <div class="stat-row" id="stats-box"></div>
     </div>

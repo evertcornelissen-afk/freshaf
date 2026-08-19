@@ -7,6 +7,7 @@ const show = (view) => switchView(VIEWS, view);
 function decorate() {
   el('h-admin').insertAdjacentHTML('afterbegin', icon('lock'));
   el('h-overview').insertAdjacentHTML('afterbegin', icon('signal'));
+  el('h-launch').insertAdjacentHTML('afterbegin', icon('spark'));
   el('h-suppliers').insertAdjacentHTML('afterbegin', icon('briefcase'));
   el('h-import').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-orderlog').insertAdjacentHTML('afterbegin', icon('clock'));
@@ -69,10 +70,46 @@ async function boot() {
 }
 
 async function enterDash() {
-  await Promise.all([refreshStats(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings()]); // content first
+  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings()]); // content first
   show('view-dash');
   setInterval(() => { refreshStats(); refreshOrders(); }, 15000);
 }
+
+/* ---------- launch readiness + backup ---------- */
+async function refreshReadiness() {
+  const r = await api('/api/admin/readiness');
+  el('readiness-box').innerHTML = r.checks.map((c) => `
+    <div class="row spread" style="padding:9px 0;border-bottom:1px solid var(--border-soft);gap:12px">
+      <div style="flex:1;min-width:180px">
+        <strong style="font-size:.9rem">${escapeHtml(c.label)}</strong>
+        <div class="muted small-text">${escapeHtml(c.detail)}</div>
+      </div>
+      <span class="pill ${c.ok ? 'ok' : 'warn'}">${c.ok ? 'ready' : 'not yet'}</span>
+    </div>`).join('');
+}
+
+el('btn-restore').onclick = () => el('restore-file').click();
+el('restore-file').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const ok = await modal({
+      title: 'Restore this backup?',
+      body: `${file.name} will replace the live database on the next restart. Anything currently in production is discarded.`,
+      confirmText: 'Stage restore', danger: true,
+    });
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/admin/restore', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Restore failed');
+    el('backup-ok').textContent = data.next;
+    el('backup-ok').style.display = 'block';
+    toast('Backup staged — redeploy to apply it', 'ok');
+  } catch (err) { showError('backup-error', err.message); }
+  finally { e.target.value = ''; }
+};
 
 async function refreshStats() {
   const s = await api('/api/admin/stats');
