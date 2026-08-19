@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const crypto = require('crypto');
 const { db, getSetting } = require('../db');
 const { authRequired } = require('../auth');
 const dispatch = require('../dispatch');
@@ -209,6 +210,69 @@ router.get('/jobs', (req, res) => {
     active: active.map(dispatch.orderPublic),
     history: history.map(dispatch.orderPublic),
   });
+});
+
+/* ---------- job alert channels ---------- */
+const whatsapp = require('../whatsapp');
+
+router.get('/alerts', (req, res) => {
+  const row = db.prepare(`SELECT u.phone, u.phone_verified_at, s.alert_whatsapp
+    FROM users u JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(req.user.id);
+  res.json({
+    phone: row?.phone || null,
+    phone_verified: !!row?.phone_verified_at,
+    whatsapp_enabled: !!row?.alert_whatsapp,
+    whatsapp_available: getSetting('whatsapp_alerts_enabled', '1') === '1',
+  });
+});
+
+router.post('/alerts', (req, res) => {
+  const { whatsapp_enabled } = req.body || {};
+  db.prepare('UPDATE suppliers SET alert_whatsapp = ? WHERE user_id = ?')
+    .run(whatsapp_enabled ? 1 : 0, req.user.id);
+  res.json({ ok: true, whatsapp_enabled: !!whatsapp_enabled });
+});
+
+// Step 1: send a code to the number the pro says is theirs.
+router.post('/phone/verify/send', async (req, res) => {
+  const raw = String(req.body?.phone || '').trim();
+  const normalised = whatsapp.toE164(raw);
+  if (!normalised) return res.status(400).json({ error: 'Enter a valid South African mobile number' });
+
+  // One send per minute — a resend button should not become an SMS bill.
+  const prev = db.prepare('SELECT sent_at FROM phone_verifications WHERE user_id = ?').get(req.user.id);
+  if (prev) {
+    const waited = db.prepare("SELECT (julianday('now') - julianday(?)) * 86400 AS s").get(prev.sent_at).s;
+    if (waited < 60) return res.status(429).json({ error: `Wait ${Math.ceil(60 - waited)}s before requesting another code` });
+  }
+
+  const code = String(crypto.randomInt(100000, 1000000));
+  db.prepare(`INSERT INTO phone_verifications (user_id, phone, code, attempts, expires_at, sent_at)
+    VALUES (?, ?, ?, 0, datetime('now','+10 minutes'), datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET phone = excluded.phone, code = excluded.code,
+      attempts = 0, expires_at = excluded.expires_at, sent_at = excluded.sent_at`)
+    .run(req.user.id, raw, code);
+
+  const result = await whatsapp.verifyCode({ userId: req.user.id, phone: raw, code });
+  if (!result.ok) return res.status(502).json({ error: 'Could not send the code to that number. Check it and try again.' });
+  res.json({ ok: true, dry_run: result.status === 'dry_run' });
+});
+
+// Step 2: confirm the code, then the number is trusted for job alerts.
+router.post('/phone/verify/confirm', (req, res) => {
+  const code = String(req.body?.code || '').trim();
+  const row = db.prepare('SELECT * FROM phone_verifications WHERE user_id = ?').get(req.user.id);
+  if (!row) return res.status(400).json({ error: 'Request a code first' });
+  const expired = db.prepare("SELECT datetime('now') > ? AS x").get(row.expires_at).x;
+  if (expired) return res.status(400).json({ error: 'That code has expired — request a new one' });
+  if (row.attempts >= 5) return res.status(429).json({ error: 'Too many attempts — request a new code' });
+  if (code !== row.code) {
+    db.prepare('UPDATE phone_verifications SET attempts = attempts + 1 WHERE user_id = ?').run(req.user.id);
+    return res.status(400).json({ error: 'That code does not match' });
+  }
+  db.prepare("UPDATE users SET phone = ?, phone_verified_at = datetime('now') WHERE id = ?").run(row.phone, req.user.id);
+  db.prepare('DELETE FROM phone_verifications WHERE user_id = ?').run(req.user.id);
+  res.json({ ok: true });
 });
 
 router.get('/earnings', (req, res) => {

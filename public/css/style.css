@@ -80,9 +80,13 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; overflow-x: clip; }
-/* Global guard against sideways scroll on mobile (clip preserves sticky headers). */
-body { overflow-x: clip; max-width: 100%; }
+html { scroll-behavior: smooth; overflow-x: hidden; overflow-x: clip; }
+/* Global guard against sideways scroll on mobile (clip preserves sticky headers;
+   hidden is the fallback for older iOS Safari, which ignores clip). */
+body {
+  overflow-x: hidden; overflow-x: clip; max-width: 100%;
+  overscroll-behavior-x: none; /* kill the sideways rubber-band / back-swipe drag */
+}
 
 body {
   background:
@@ -188,6 +192,11 @@ input, select, textarea {
   border: 1px solid var(--border); background: var(--panel);
   color: var(--text); font: inherit; font-size: .92rem;
   transition: border-color .18s, box-shadow .18s;
+}
+/* iOS Safari zooms the whole page when a focused field is under 16px, and a zoomed
+   page then pans sideways on every swipe. 16px on small screens stops both. */
+@media (max-width: 700px) {
+  input, select, textarea { font-size: 16px; }
 }
 input::placeholder { color: var(--faint); }
 input:focus, select:focus, textarea:focus {
@@ -555,8 +564,32 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 .ac-item:last-child { border-bottom: none; }
 .ac-item:hover { background: var(--panel-2); }
 .ac-item .icon { color: var(--accent); flex: none; }
+.ac-hint {
+  margin-left: 8px; padding: 1px 7px; border-radius: 99px; font-style: normal;
+  font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  background: rgba(33, 172, 207, .12); color: var(--accent-dim);
+}
+.ac-note { margin-top: 6px; font-size: .8rem; color: var(--accent-dim); line-height: 1.45; }
 
-/* ---------- category cards ---------- */
+/* ---------- category cards ----------
+   Car Wash and Laundry stay side by side at every width — this is the front door
+   of the app, so it must not stack into a scroll on a phone. */
+.cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+.cat-grid .cat-card { display: flex; flex-direction: column; }
+.cat-grid .cat-card .cat-go { margin-top: auto; justify-content: center; }
+@media (max-width: 700px) {
+  .cat-grid { gap: 12px; }
+  .cat-grid .cat-card { padding: 18px 13px; }
+  .cat-grid .cat-card .cat-ico { width: 46px; height: 46px; border-radius: 13px; margin-bottom: 12px; }
+  .cat-grid .cat-card h2 { font-size: 1.08rem; }
+  .cat-grid .cat-card > p { font-size: .82rem; margin-bottom: 11px; }
+  .cat-grid .cat-card li { font-size: .78rem; padding: 4px 0; }
+  .cat-grid .cat-card .cat-go { padding: 12px 10px; font-size: .84rem; width: 100%; }
+}
+@media (max-width: 400px) {
+  .cat-grid .cat-card ul { display: none; } /* keep both buttons above the fold */
+}
+
 .cat-card {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 26px; cursor: pointer; box-shadow: var(--shadow);

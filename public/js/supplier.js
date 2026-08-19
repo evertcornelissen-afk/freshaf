@@ -101,6 +101,7 @@ function decorate() {
   el('h-offers').insertAdjacentHTML('afterbegin', icon('spark'));
   el('h-active').insertAdjacentHTML('afterbegin', icon('droplet'));
   el('h-earnings').insertAdjacentHTML('afterbegin', icon('wallet'));
+  el('h-wa').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-history').insertAdjacentHTML('afterbegin', icon('clock'));
   el('btn-sup-geolocate').insertAdjacentHTML('afterbegin', icon('navigate'));
 }
@@ -292,7 +293,7 @@ async function enterDash() {
     el('radius-km').value = me.supplier.radius_km;
     el('radius-label').textContent = me.supplier.radius_km + ' km';
   }
-  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices()]); // content first, then reveal
+  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices(), refreshAlerts()]); // content first, then reveal
   show('view-dash');
   initMap();
   if (disconnectSse) disconnectSse();
@@ -447,12 +448,83 @@ window.advanceJob = async (orderId) => {
   } catch (e) { showError('dash-error', e.message); }
 };
 
+/* ---------- WhatsApp job alerts ---------- */
+let waState = null;
+
+async function refreshAlerts() {
+  waState = await api('/api/supplier/alerts');
+  if (!waState.whatsapp_available) { el('wa-card').classList.add('hidden'); return; }
+  el('wa-card').classList.remove('hidden');
+  const phone = (waState.phone || '').replace(/"/g, '&quot;');
+  if (waState.phone_verified) {
+    el('wa-box').innerHTML = `
+      <div class="row spread">
+        <div>
+          <strong>${escapeHtml(waState.phone || '')}</strong>
+          <div class="muted small-text">Verified — job offers arrive on WhatsApp.</div>
+        </div>
+        <label class="row" style="cursor:pointer;margin:0">
+          <input type="checkbox" id="wa-toggle" style="width:auto" ${waState.whatsapp_enabled ? 'checked' : ''}>
+          <span class="small-text">WhatsApp alerts on</span>
+        </label>
+      </div>
+      <div class="row mt"><button class="ghost small" id="wa-change">Use a different number</button></div>`;
+    el('wa-toggle').onchange = async (e) => {
+      try {
+        await api('/api/supplier/alerts', { method: 'POST', body: { whatsapp_enabled: e.target.checked } });
+        toast(e.target.checked ? 'WhatsApp alerts on' : 'WhatsApp alerts off', 'ok');
+      } catch (err) { showError('wa-error', err.message); }
+    };
+    el('wa-change').onclick = () => renderWaEntry('');
+    return;
+  }
+  renderWaEntry(phone);
+}
+
+function renderWaEntry(phone) {
+  el('wa-box').innerHTML = `
+    <label>Your WhatsApp number</label>
+    <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${phone}" autocomplete="tel">
+    <div class="row mt"><button class="small" id="wa-send">Send me a code</button></div>`;
+  el('wa-send').onclick = () => withBusy(el('wa-send'), 'Sending…', async () => {
+    try {
+      const r = await api('/api/supplier/phone/verify/send', { method: 'POST', body: { phone: el('wa-phone').value } });
+      renderWaConfirm(r.dry_run);
+    } catch (e) { showError('wa-error', e.message); }
+  });
+}
+
+function renderWaConfirm(dryRun) {
+  el('wa-box').innerHTML = `
+    <p class="muted small-text">We sent a 6-digit code to that number on WhatsApp. Enter it below.
+      ${dryRun ? '<br><strong>Test mode:</strong> WhatsApp is not connected yet — the code is in the server log.' : ''}</p>
+    <label>Code</label>
+    <input id="wa-code" inputmode="numeric" maxlength="6" placeholder="123456">
+    <div class="row mt">
+      <button class="small" id="wa-confirm">Confirm</button>
+      <button class="ghost small" id="wa-back">Change number</button>
+    </div>`;
+  el('wa-confirm').onclick = () => withBusy(el('wa-confirm'), 'Checking…', async () => {
+    try {
+      await api('/api/supplier/phone/verify/confirm', { method: 'POST', body: { code: el('wa-code').value } });
+      toast('Number verified — WhatsApp job alerts are on', 'ok');
+      await refreshAlerts();
+    } catch (e) { showError('wa-error', e.message); }
+  });
+  el('wa-back').onclick = () => renderWaEntry('');
+}
+
 async function refreshEarnings() {
   const e = await api('/api/supplier/earnings');
+  // Pros keep 100% of their own price plus the callout. Our fee rides on top of the
+  // customer's total, so the only thing a pro can owe us is fee collected in cash.
+  const owed = e.fee_owed_cents > 0
+    ? `<div class="stat"><div class="v" style="color:#c2711a">${rand(e.fee_owed_cents)}</div><div class="l">Platform fee owed on cash jobs</div></div>`
+    : '';
   el('earnings-box').innerHTML = `
     <div class="stat"><div class="v">${e.jobs}</div><div class="l">Jobs done</div></div>
-    <div class="stat"><div class="v">${rand(e.gross_cents)}</div><div class="l">Gross</div></div>
-    <div class="stat"><div class="v">${rand(e.net_cents)}</div><div class="l">Your earnings (after ${e.commission_pct}% fee)</div></div>`;
+    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">You earned — 100% yours</div></div>
+    <div class="stat"><div class="v">${rand(e.fees_cents)}</div><div class="l">${e.fee_pct}% fee, paid by customers</div></div>` + owed;
 }
 
 el('btn-login').onclick = () => withBusy(el('btn-login'), 'Signing in…', async () => {

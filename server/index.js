@@ -36,22 +36,54 @@ app.get('/api/geocode', async (req, res) => {
   if (q.length < 3) return res.json({ results: [] });
   const key = q.toLowerCase();
   if (geoCache.has(key)) return res.json({ results: geoCache.get(key) });
+  // OpenStreetMap coverage in South Africa is street-level far more often than
+  // house-level, so "12 Rivonia Rd" matches nothing while "Rivonia Rd" matches.
+  // Search on the street, then put the number the customer typed back on the label.
+  const numMatch = q.match(/^\s*(\d{1,5}[A-Za-z]?)\s+(\S.*)$/);
+  const typedNumber = numMatch ? numMatch[1] : null;
+  const searchQ = numMatch ? numMatch[2] : q;
   try {
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=en&bbox=16.2,-35.0,33.1,-22.0`;
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQ)}&limit=12&lang=en&bbox=16.2,-35.0,33.1,-22.0`;
     const r = await fetch(url, { headers: { 'User-Agent': 'FreshAF/1.0 (support@freshaf.co.za)' }, signal: AbortSignal.timeout(8000) });
     const data = await r.json();
     const results = (data.features || []).map((f) => {
       const p = f.properties || {};
+      const street = p.street || (p.name !== p.city ? p.name : null);
+      // Prefer the real house number OSM knows; otherwise re-attach what was typed.
+      const number = p.housenumber || typedNumber || null;
+      const head = number && street ? `${number} ${street}`
+        : [p.name, p.housenumber].filter(Boolean).join(' ') || street;
+      // "Johannesburg Ward 103" is an electoral boundary, not something a customer
+      // recognises as their address — drop it and keep the suburb and city.
+      const district = p.district && !/\bward\b/i.test(p.district) ? p.district : null;
       const label = [
-        [p.name, p.housenumber].filter(Boolean).join(' ') || p.street,
-        p.street && p.name !== p.street ? p.street : null,
-        p.district, p.city || p.town || p.village, p.state,
+        head,
+        street && p.name && p.name !== street && !number ? p.street : null,
+        district, p.city || p.town || p.village, p.state,
       ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ');
-      return { label, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+      return {
+        label,
+        lat: f.geometry.coordinates[1],
+        lng: f.geometry.coordinates[0],
+        // Tell the client whether the pin is the exact house or just the street,
+        // so it can ask for the number instead of pretending it has it.
+        precision: p.housenumber ? 'house' : 'street',
+      };
     }).filter((x) => x.label);
+    // One road is many OSM segments, so the same label comes back several times.
+    // A dropdown with the same address listed three times reads as broken.
+    const seen = new Set();
+    const unique = [];
+    for (const r of results) {
+      const k = r.label.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      unique.push(r);
+      if (unique.length === 6) break;
+    }
     if (geoCache.size > 500) geoCache.clear();
-    geoCache.set(key, results);
-    res.json({ results });
+    geoCache.set(key, unique);
+    res.json({ results: unique });
   } catch {
     res.json({ results: [] }); // autocomplete is best-effort; typing still works
   }

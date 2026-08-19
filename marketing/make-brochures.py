@@ -112,7 +112,7 @@ def brochure(kind):
         feats = [
             ("tag","You set your own prices","Charge what your work is worth — per wash, per vehicle type. No app tells you what to earn."),
             ("pin","Choose your area and radius","Work only where you want to. Set 5&nbsp;km, 20&nbsp;km or your whole town — change it any time."),
-            ("bell","App or WhatsApp alerts","Get new jobs whichever way suits you. No smartphone habits required."),
+            ("bell","Instant job alerts","New jobs land on your phone the moment they come in. No smartphone habits required."),
             ("check","Accept or ignore, always","No penalties, no targets, no obligation. Busy day? Ignore it."),
             ("card","Card or cash","Customers pay how they like. Cash jobs you collect on the spot."),
             ("star","Build your own name","Every rating you earn is yours — customers ask for you by name."),
@@ -133,7 +133,7 @@ def brochure(kind):
         feats = [
             ("tag","You set your own prices","Per load, per kilo, per duvet — your rates, your rules. No app tells you what to earn."),
             ("pin","Choose your area and radius","Collect only where it's worth your while. Set 5&nbsp;km, 20&nbsp;km or your whole town."),
-            ("bell","App or WhatsApp alerts","New collections come through whichever way suits you."),
+            ("bell","Instant job alerts","New collections land on your phone the moment they come in."),
             ("check","Accept or ignore, always","Machines already full? Ignore it. No penalties, no targets, no obligation."),
             ("clock","Fill your dead hours","Turn quiet mornings and idle machines into paid loads."),
             ("star","Build your own name","Every rating you earn is yours — customers ask for you by name."),

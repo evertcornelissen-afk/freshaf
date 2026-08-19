@@ -77,6 +77,18 @@
     </div>
 
     <div class="card">
+      <div class="row spread">
+        <h2 id="h-customers">Customer sign-ups</h2>
+        <div class="row">
+          <input id="cust-search" placeholder="Search name, email, phone or address" style="width:280px">
+          <a class="btn secondary small" id="btn-export-customers" href="/api/admin/customers.csv">Export CSV</a>
+        </div>
+      </div>
+      <p class="muted small-text" id="cust-count"></p>
+      <div class="table-scroll mt" id="customers-box"></div>
+    </div>
+
+    <div class="card">
       <h2 id="h-orderlog">Orders</h2>
       <div class="table-scroll" id="orders-box"></div>
     </div>

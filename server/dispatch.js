@@ -1,6 +1,7 @@
 const { db, getSetting } = require('./db');
 const realtime = require('./realtime');
 const push = require('./push');
+const whatsapp = require('./whatsapp');
 
 const offerTimers = new Map(); // offerId -> timeout
 
@@ -83,15 +84,38 @@ function offerToNext(orderId) {
     expires_in_sec: Number(getSetting('offer_timeout_sec', '60')),
   });
 
+  const timeoutSec = Number(getSetting('offer_timeout_sec', '60'));
+  const serviceLabel = order.service === 'laundry' ? 'Laundry' : 'Car wash';
+  const earnsRand = Math.round((order.supplier_price_cents + order.callout_fee_cents) / 100);
+
   // Reach the provider even when the app is closed.
   push.sendToUser(next.user_id, {
-    title: `New ${order.service === 'laundry' ? 'laundry' : 'car wash'} job — you earn R${Math.round((order.supplier_price_cents + order.callout_fee_cents) / 100)}`,
+    title: `New ${serviceLabel.toLowerCase()} job — you earn R${earnsRand}`,
     body: `${next.distance.toFixed(1)} km away · ${order.address}\nOpen FreshAF Pro to accept before it expires.`,
     url: '/supplier',
     tag: `offer-${offerId}`,
   }).catch(() => {});
 
-  const timeoutMs = Number(getSetting('offer_timeout_sec', '60')) * 1000;
+  // WhatsApp is where these pros actually live, so alert there too — but only to a
+  // number they verified, and only if they left the channel switched on.
+  if (getSetting('whatsapp_alerts_enabled', '1') === '1') {
+    const pro = db.prepare(`SELECT u.phone, u.phone_verified_at, s.alert_whatsapp
+      FROM users u JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(next.user_id);
+    if (pro?.phone && pro.phone_verified_at && pro.alert_whatsapp) {
+      whatsapp.jobAlert({
+        userId: next.user_id,
+        phone: pro.phone,
+        service: serviceLabel,
+        earnsRand,
+        distanceKm: next.distance.toFixed(1),
+        address: order.address,
+        expiresMin: Math.max(1, Math.round(timeoutSec / 60)),
+        offerId,
+      }).catch(() => {});
+    }
+  }
+
+  const timeoutMs = timeoutSec * 1000;
   offerTimers.set(offerId, setTimeout(() => expireOffer(offerId), timeoutMs));
 }
 

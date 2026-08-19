@@ -149,6 +149,32 @@ CREATE TABLE IF NOT EXISTS supplier_prices (
 );
 `);
 
+// WhatsApp job alerts. A pro only gets them once they have proved the number is theirs,
+// so we keep a short-lived code per pro and an audit line for every message we send.
+db.exec(`
+CREATE TABLE IF NOT EXISTS phone_verifications (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  phone TEXT NOT NULL,
+  code TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  sent_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS whatsapp_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  phone TEXT NOT NULL,
+  template TEXT NOT NULL,
+  status TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_log_created ON whatsapp_log(created_at);
+`);
+addColumn('users', 'phone_verified_at TEXT');
+addColumn('suppliers', 'alert_whatsapp INTEGER NOT NULL DEFAULT 1');
+
+if (!getSetting('whatsapp_alerts_enabled')) setSetting('whatsapp_alerts_enabled', '1');
 if (!getSetting('commission_pct')) setSetting('commission_pct', '15');
 // Pros set their own prices; this fee is added ON TOP and paid by the customer.
 if (!getSetting('platform_fee_pct')) setSetting('platform_fee_pct', '10');
@@ -169,4 +195,19 @@ if (!adminExists) {
   console.log(`[FreshAF] Admin account created: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD} — change ADMIN_PASSWORD in .env for production.`);
 }
 
-module.exports = { db, getSetting, setSetting };
+// In WAL mode almost everything written lives in freshaf.db-wal until SQLite folds it
+// back into freshaf.db. Left alone that log grows for weeks, and anyone who backs up
+// or copies only freshaf.db walks away with an empty database. Fold it in regularly,
+// and again on the way out, so the .db file is always the real thing.
+function checkpoint() {
+  try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } catch { /* busy — the next tick gets it */ }
+}
+const checkpointTimer = setInterval(checkpoint, 5 * 60 * 1000);
+checkpointTimer.unref?.();
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { checkpoint(); process.exit(0); });
+}
+process.on('exit', checkpoint);
+checkpoint(); // fold in whatever the last run left behind
+
+module.exports = { db, getSetting, setSetting, checkpoint };

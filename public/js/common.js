@@ -38,6 +38,12 @@ function rand(cents) {
 
 function el(id) { return document.getElementById(id); }
 
+// Customer-supplied text goes into innerHTML in a few admin tables — escape it there.
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 /* ---------- inline SVG icon set ---------- */
 const ICONS = {
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
@@ -105,9 +111,18 @@ function attachAutocomplete(input, onPick) {
   const list = document.createElement('div');
   list.className = 'ac-list hidden';
   wrap.appendChild(list);
+  // OSM knows most South African streets but few house numbers, so say plainly when
+  // a pick is street-level and the customer still owes us a number.
+  const note = document.createElement('div');
+  note.className = 'ac-note hidden';
+  wrap.parentNode.insertBefore(note, wrap.nextSibling);
 
   let timer = null, lastQuery = '';
   function hide() { list.classList.add('hidden'); }
+  function setNote(text) {
+    note.textContent = text || '';
+    note.classList.toggle('hidden', !text);
+  }
 
   input.addEventListener('input', () => {
     clearTimeout(timer);
@@ -119,7 +134,8 @@ function attachAutocomplete(input, onPick) {
         const { results } = await api('/api/geocode?q=' + encodeURIComponent(q));
         if (input.value.trim() !== lastQuery || !results.length) { hide(); return; }
         list.innerHTML = results.map((r, i) =>
-          `<div class="ac-item" data-i="${i}">${icon('pin')} ${r.label}</div>`).join('');
+          `<div class="ac-item" data-i="${i}">${icon('pin')} <span>${r.label}${
+            r.precision === 'street' ? '<em class="ac-hint">street</em>' : ''}</span></div>`).join('');
         list.classList.remove('hidden');
         list.querySelectorAll('.ac-item').forEach((n) => {
           n.addEventListener('mousedown', (e) => {
@@ -127,6 +143,14 @@ function attachAutocomplete(input, onPick) {
             const r = results[Number(n.dataset.i)];
             input.value = r.label;
             hide();
+            // A street-level hit with no number in the text still needs one from them.
+            if (r.precision === 'street' && !/^\s*\d/.test(r.label)) {
+              setNote('Add your street number in front, plus any unit or gate details.');
+              input.focus();
+              try { input.setSelectionRange(0, 0); } catch {}
+            } else {
+              setNote('');
+            }
             if (onPick) onPick(r);
           });
         });

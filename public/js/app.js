@@ -88,6 +88,7 @@ async function boot() {
 /* ---------- home showcase ---------- */
 function renderHomeServices() {
   if (!pricing) return;
+  renderCategoryCards();
   el('home-services').innerHTML = ['carwash', 'laundry'].map((key) => {
     const cat = pricing.services[key];
     return `
@@ -107,8 +108,8 @@ function renderHomeServices() {
 }
 
 /* ---------- auth navigation ---------- */
-el('btn-cta-register').onclick = () => show('view-register');
-el('btn-cta-login').onclick = () => show('view-login');
+el('btn-cta-register').onclick = (e) => { e.preventDefault(); show('view-register'); };
+el('btn-cta-login').onclick = (e) => { e.preventDefault(); show('view-login'); };
 el('btn-go-login').onclick = () => show('view-login');
 el('link-to-register').onclick = (e) => { e.preventDefault(); show('view-register'); };
 el('link-to-login').onclick = (e) => { e.preventDefault(); show('view-login'); };
@@ -116,13 +117,20 @@ el('link-back-home').onclick = (e) => { e.preventDefault(); show('view-home'); }
 
 async function enterApp() {
   if (!pricing) pricing = await api('/api/pricing');
-  setService('carwash');
+  // If they picked Car Wash or Laundry before signing up, honour it — don't make them choose twice.
+  const wanted = pendingService();
+  setService(wanted || 'carwash');
   refreshPointsRow();
   refreshSavedAddress();
   el('use-points').onchange = updateTotal;
   await refreshOrders();
   renderCategoryCards();
-  show('view-service');
+  if (wanted) {
+    try { localStorage.removeItem(SVC_KEY); } catch {}
+    show('view-order');
+  } else {
+    show('view-service');
+  }
   initMap();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
@@ -159,25 +167,43 @@ function setService(key) {
   if (sel.lat != null) refreshCallout();
   updateTotal();
 }
-document.querySelectorAll('.cat-card').forEach((c) => c.onclick = () => {
-  setService(c.dataset.svc);
+// Picking a service is the first thing anyone does, logged in or not. Logged out, we
+// remember the choice through registration and drop them straight into that booking.
+const SVC_KEY = 'freshaf_pending_svc';
+function pendingService() {
+  try { const v = localStorage.getItem(SVC_KEY); return v === 'laundry' || v === 'carwash' ? v : null; } catch { return null; }
+}
+function chooseService(key) {
+  if (key !== 'carwash' && key !== 'laundry') return;
+  if (!me) {
+    try { localStorage.setItem(SVC_KEY, key); } catch {}
+    show('view-register');
+    return;
+  }
+  setService(key);
   show('view-order');
-});
+  // Leaflet mis-sizes itself when it was laid out inside a hidden view.
+  if (map) setTimeout(() => map.invalidateSize(), 60);
+}
+document.querySelectorAll('.cat-card').forEach((c) => c.onclick = () => chooseService(c.dataset.svc));
 el('btn-change-service').onclick = () => { renderCategoryCards(); show('view-service'); refreshOrders(); };
 
 // The two categories, each with its own look and copy.
 function renderCategoryCards() {
   if (!pricing) return;
-  el('cat-ico-wash').innerHTML = icon('car', 'lg');
-  el('cat-ico-laundry').innerHTML = icon('shirt', 'lg');
   const bullets = {
     carwash: ['Washed where it stands', 'Vetted, rated washers', 'Card or cash'],
     laundry: ['Collected and delivered back', 'Wash, iron, duvets & bedding', 'Card or cash'],
   };
-  for (const k of ['carwash', 'laundry']) {
-    const listId = k === 'carwash' ? 'cat-list-wash' : 'cat-list-laundry';
-    el(listId).innerHTML = bullets[k].map((b) => `<li>${icon('check')}${b}</li>`).join('');
-  }
+  // The same two cards appear on the logged-out home and on the in-app chooser.
+  const fill = (icoId, listId, key, ico) => {
+    if (el(icoId)) el(icoId).innerHTML = icon(ico, 'lg');
+    if (el(listId)) el(listId).innerHTML = bullets[key].map((b) => `<li>${icon('check')}${b}</li>`).join('');
+  };
+  fill('cat-ico-wash', 'cat-list-wash', 'carwash', 'car');
+  fill('cat-ico-laundry', 'cat-list-laundry', 'laundry', 'shirt');
+  fill('home-ico-wash', 'home-list-wash', 'carwash', 'car');
+  fill('home-ico-laundry', 'home-list-laundry', 'laundry', 'shirt');
 }
 
 function renderPickers() {

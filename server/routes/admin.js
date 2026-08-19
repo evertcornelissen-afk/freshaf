@@ -100,9 +100,41 @@ router.get('/orders', (req, res) => {
   res.json({ orders: rows });
 });
 
+// Everyone who has signed up for the service, newest first — the sign-up book.
+router.get('/customers', (req, res) => {
+  const rows = db.prepare(`
+    SELECT u.id, u.name, u.email, u.phone, u.home_address, u.created_at, u.terms_accepted_at,
+           u.points_cents,
+           (SELECT COUNT(*) FROM orders o WHERE o.customer_id = u.id) AS orders,
+           (SELECT COUNT(*) FROM orders o WHERE o.customer_id = u.id AND o.status = 'completed') AS orders_completed,
+           (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = u.id) AS last_order_at
+    FROM users u WHERE u.role = 'customer'
+    ORDER BY u.id DESC`).all();
+  res.json({ customers: rows });
+});
+
+// CSV so the sign-up list survives outside the app — and can be worked in Excel.
+router.get('/customers.csv', (req, res) => {
+  const rows = db.prepare(`
+    SELECT u.id, u.name, u.email, u.phone, u.home_address, u.created_at,
+           (SELECT COUNT(*) FROM orders o WHERE o.customer_id = u.id) AS orders
+    FROM users u WHERE u.role = 'customer' ORDER BY u.id DESC`).all();
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const header = ['id', 'name', 'email', 'phone', 'address', 'signed_up', 'orders'];
+  const csv = [header.join(',')]
+    .concat(rows.map((r) => [r.id, r.name, r.email, r.phone, r.home_address, r.created_at, r.orders].map(esc).join(',')))
+    .join('\r\n');
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', 'attachment; filename="freshaf-signups.csv"');
+  res.send('﻿' + csv); // BOM so Excel opens the accented characters correctly
+});
+
 router.get('/stats', (req, res) => {
   const stats = {
     customers: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer'").get().c,
+    // Growth, not just a total — a flat number tells an investor nothing.
+    signups_7d: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND created_at > datetime('now','-7 days')").get().c,
+    signups_30d: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND created_at > datetime('now','-30 days')").get().c,
     suppliers_pending: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'pending'").get().c,
     suppliers_approved: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved'").get().c,
     suppliers_online: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved' AND online = 1").get().c,

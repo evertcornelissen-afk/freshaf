@@ -46,12 +46,34 @@
       <div class="glow"></div>
       <span class="eyebrow">On-demand car wash &amp; laundry</span>
       <h1>Consider it <em>done.</em></h1>
-      <p>Vetted professionals come to you — your car washed at your parking spot, your laundry collected, cleaned and delivered back. The nearest available pro is dispatched the moment you book.</p>
-      <div class="row mt" style="justify-content:center">
-        <button id="btn-cta-register">Get started</button>
-        <button class="secondary" id="btn-cta-login">Sign in</button>
+      <p>Vetted professionals come to you — your car washed at your parking spot, your laundry collected, cleaned and delivered back. Choose what you need.</p>
+    </div>
+
+    <!-- The front door: pick a service first, account second. -->
+    <div class="cat-grid" id="home-cat-grid">
+      <div class="cat-card" data-svc="carwash">
+        <div class="cat-ico" id="home-ico-wash"></div>
+        <h2>Car Wash</h2>
+        <p>A vetted washer comes to your car — at home, the office or the gym.</p>
+        <ul id="home-list-wash"></ul>
+        <span class="cat-go">Book a wash</span>
       </div>
-      <div class="feature-chips">
+      <div class="cat-card" data-svc="laundry">
+        <div class="cat-ico" id="home-ico-laundry"></div>
+        <h2>Laundry</h2>
+        <p>Collected from your door, professionally cleaned, delivered back.</p>
+        <ul id="home-list-laundry"></ul>
+        <span class="cat-go">Book a collection</span>
+      </div>
+    </div>
+
+    <p class="muted small-text mt" style="text-align:center">
+      Already with us? <a href="#" id="btn-cta-login">Sign in</a> ·
+      New here? <a href="#" id="btn-cta-register">Create an account</a>
+    </p>
+
+    <div class="hero" style="padding:26px 16px 10px">
+      <div class="feature-chips" style="margin-top:0">
         <span class="feature-chip" id="chip-vetted">Vetted professionals</span>
         <span class="feature-chip" id="chip-track">Live order tracking</span>
         <span class="feature-chip" id="chip-pay">Card or cash</span>
@@ -116,7 +138,7 @@
       <h1 style="font-size:clamp(1.6rem,3.6vw,2.3rem)">What can we <em>take off your hands?</em></h1>
       <p>Choose a service to get started.</p>
     </div>
-    <div class="grid2" id="cat-grid">
+    <div class="cat-grid" id="cat-grid">
       <div class="cat-card" data-svc="carwash" id="cat-carwash">
         <div class="cat-ico" id="cat-ico-wash"></div>
         <h2>Car Wash</h2>

@@ -10,6 +10,7 @@ function decorate() {
   el('h-suppliers').insertAdjacentHTML('afterbegin', icon('briefcase'));
   el('h-import').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-orderlog').insertAdjacentHTML('afterbegin', icon('clock'));
+  el('h-customers').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-settings').insertAdjacentHTML('afterbegin', icon('shield'));
 }
 
@@ -67,7 +68,7 @@ async function boot() {
 }
 
 async function enterDash() {
-  await Promise.all([refreshStats(), refreshSuppliers(), refreshOrders(), loadSettings()]); // content first
+  await Promise.all([refreshStats(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings()]); // content first
   show('view-dash');
   setInterval(() => { refreshStats(); refreshOrders(); }, 15000);
 }
@@ -75,7 +76,9 @@ async function enterDash() {
 async function refreshStats() {
   const s = await api('/api/admin/stats');
   el('stats-box').innerHTML = `
-    <div class="stat"><div class="v">${s.customers}</div><div class="l">Customers</div></div>
+    <div class="stat"><div class="v">${s.customers}</div><div class="l">Customers signed up</div></div>
+    <div class="stat"><div class="v">${s.signups_7d}</div><div class="l">Signed up this week</div></div>
+    <div class="stat"><div class="v">${s.signups_30d}</div><div class="l">Signed up this month</div></div>
     <div class="stat"><div class="v">${s.suppliers_pending}</div><div class="l">Suppliers pending</div></div>
     <div class="stat"><div class="v">${s.suppliers_approved}</div><div class="l">Suppliers approved</div></div>
     <div class="stat"><div class="v">${s.suppliers_online}</div><div class="l">Online now</div></div>
@@ -146,6 +149,43 @@ window.setStatus = async (id, action) => {
     await Promise.all([refreshSuppliers(), refreshStats()]);
   } catch (e) { showError('sup-error', e.message); }
 };
+
+/* ---------- customer sign-ups ---------- */
+let allCustomers = [];
+
+function renderCustomers() {
+  const q = (el('cust-search').value || '').trim().toLowerCase();
+  const rows = q
+    ? allCustomers.filter((c) => [c.name, c.email, c.phone, c.home_address]
+      .some((v) => (v || '').toLowerCase().includes(q)))
+    : allCustomers;
+  el('cust-count').textContent = q
+    ? `${rows.length} of ${allCustomers.length} sign-ups`
+    : `${allCustomers.length} sign-up${allCustomers.length === 1 ? '' : 's'}`;
+  if (!rows.length) {
+    el('customers-box').innerHTML = `<p class="empty">${q ? 'No sign-up matches that.' : 'No sign-ups yet.'}</p>`;
+    return;
+  }
+  el('customers-box').innerHTML = `<table><thead><tr>
+      <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Signed up</th><th>Orders</th><th>Rewards</th>
+    </tr></thead><tbody>` + rows.map((c) => `<tr>
+      <td>${c.id}</td>
+      <td>${escapeHtml(c.name)}</td>
+      <td><a href="mailto:${encodeURIComponent(c.email)}">${escapeHtml(c.email)}</a></td>
+      <td>${c.phone ? `<a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a>` : '—'}</td>
+      <td class="muted small-text">${escapeHtml(c.home_address || '—')}</td>
+      <td class="muted small-text">${(c.created_at || '').replace('T', ' ').slice(0, 16)}</td>
+      <td>${c.orders}${c.orders_completed ? ` <span class="muted small-text">(${c.orders_completed} done)</span>` : ''}</td>
+      <td>${c.points_cents ? rand(c.points_cents) : '—'}</td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+async function refreshCustomers() {
+  const { customers } = await api('/api/admin/customers');
+  allCustomers = customers;
+  renderCustomers();
+}
+el('cust-search').addEventListener('input', renderCustomers);
 
 async function refreshOrders() {
   const { orders } = await api('/api/admin/orders');
