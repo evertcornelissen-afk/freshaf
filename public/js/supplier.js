@@ -104,6 +104,7 @@ function decorate() {
   el('h-wa').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-history').insertAdjacentHTML('afterbegin', icon('clock'));
   el('btn-sup-geolocate').insertAdjacentHTML('afterbegin', icon('navigate'));
+  initScrollChrome();
 }
 
 function setWho() {

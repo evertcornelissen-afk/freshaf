@@ -49,6 +49,7 @@ function decorate() {
   el('btn-retry-order').insertAdjacentHTML('afterbegin', icon('refresh'));
   el('rate-stars').innerHTML = [1, 2, 3, 4, 5].map((v) =>
     `<button data-v="${v}" aria-label="${v} star"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></button>`).join('');
+  initScrollChrome();
   el('rate-stars').querySelectorAll('button').forEach((s) => {
     s.onclick = () => {
       rateStars = Number(s.dataset.v);
@@ -301,7 +302,7 @@ function updateTotal() {
   }
   const usePoints = el('use-points').checked;
   const discount = usePoints ? Math.min(me?.points_cents || 0, pro.total_cents) : 0;
-  el('order-total').textContent = rand(pro.total_cents - discount);
+  animateRand(el('order-total'), pro.total_cents - discount);
   notes.push(`${pro.business_name}: ${rand(pro.supplier_price_cents)}`);
   if (pro.callout_fee_cents) notes.push(`callout ${rand(pro.callout_fee_cents)}`);
   notes.push(`service fee ${rand(pro.platform_fee_cents)}`);

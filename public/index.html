@@ -43,6 +43,7 @@
   <!-- HOME (logged out) -->
   <div id="view-home" class="hidden">
     <div class="hero">
+      <div class="aurora"><span></span><span></span><span></span></div>
       <div class="glow"></div>
       <span class="eyebrow">On-demand car wash &amp; laundry</span>
       <h1>Consider it <em>done.</em></h1>
@@ -50,15 +51,15 @@
     </div>
 
     <!-- The front door: pick a service first, account second. -->
-    <div class="cat-grid" id="home-cat-grid">
-      <div class="cat-card" data-svc="carwash">
+    <div class="cat-grid" id="home-cat-grid" data-stagger="110">
+      <div class="cat-card reveal reveal-scale" data-svc="carwash">
         <div class="cat-ico" id="home-ico-wash"></div>
         <h2>Car Wash</h2>
         <p>A vetted washer comes to your car — at home, the office or the gym.</p>
         <ul id="home-list-wash"></ul>
         <span class="cat-go">Book a wash</span>
       </div>
-      <div class="cat-card" data-svc="laundry">
+      <div class="cat-card reveal reveal-scale" data-svc="laundry">
         <div class="cat-ico" id="home-ico-laundry"></div>
         <h2>Laundry</h2>
         <p>Collected from your door, professionally cleaned, delivered back.</p>
@@ -67,32 +68,32 @@
       </div>
     </div>
 
-    <p class="muted small-text mt" style="text-align:center">
+    <p class="muted small-text mt reveal" style="text-align:center">
       Already with us? <a href="#" id="btn-cta-login">Sign in</a> ·
       New here? <a href="#" id="btn-cta-register">Create an account</a>
     </p>
 
     <div class="hero" style="padding:26px 16px 10px">
-      <div class="feature-chips" style="margin-top:0">
-        <span class="feature-chip" id="chip-vetted">Vetted professionals</span>
-        <span class="feature-chip" id="chip-track">Live order tracking</span>
-        <span class="feature-chip" id="chip-pay">Card or cash</span>
-        <span class="feature-chip" id="chip-rewards">Money-back rewards</span>
+      <div class="feature-chips" style="margin-top:0" data-stagger="80">
+        <span class="feature-chip reveal" id="chip-vetted">Vetted professionals</span>
+        <span class="feature-chip reveal" id="chip-track">Live order tracking</span>
+        <span class="feature-chip reveal" id="chip-pay">Card or cash</span>
+        <span class="feature-chip reveal" id="chip-rewards">Money-back rewards</span>
       </div>
     </div>
 
-    <div class="grid2" id="home-services"></div>
+    <div class="grid2 reveal" id="home-services"></div>
 
-    <div class="card">
+    <div class="card reveal">
       <h2 id="h-how">How it works</h2>
-      <div class="stat-row">
-        <div class="stat"><div class="v">1</div><div class="l"><strong>Book in seconds.</strong> Pick a service, drop a pin, see the exact price upfront — callout fee included.</div></div>
-        <div class="stat"><div class="v">2</div><div class="l"><strong>The nearest pro comes to you.</strong> Track every step live, from accepted to done.</div></div>
-        <div class="stat"><div class="v">3</div><div class="l"><strong>Pay your way, earn back.</strong> Card or cash — and earn rewards on every completed order.</div></div>
+      <div class="stat-row steps" data-stagger="130">
+        <div class="stat reveal"><div class="v"><span class="count-up" data-target="1">0</span></div><div class="l"><strong>Book in seconds.</strong> Pick a service, drop a pin, see the exact price upfront — callout fee included.</div></div>
+        <div class="stat reveal"><div class="v"><span class="count-up" data-target="2">0</span></div><div class="l"><strong>The pro you chose comes to you.</strong> Track every step live, from accepted to done.</div></div>
+        <div class="stat reveal"><div class="v"><span class="count-up" data-target="3">0</span></div><div class="l"><strong>Pay your way, earn back.</strong> Card or cash — and earn rewards on every completed order.</div></div>
       </div>
     </div>
 
-    <div class="card" style="text-align:center">
+    <div class="card reveal" style="text-align:center">
       <h2 style="justify-content:center" id="h-pro">Want to earn with FreshAF?</h2>
       <p class="muted small-text" style="margin-bottom:14px">Car wash pros and laundry pros set their own area and hours. Apply in minutes.</p>
       <a class="btn" href="/supplier">Become a pro</a>
@@ -134,19 +135,20 @@
   <!-- CATEGORY CHOOSER -->
   <div id="view-service" class="hidden">
     <div class="hero" style="padding:34px 16px 26px">
+      <div class="aurora"><span></span><span></span><span></span></div>
       <div class="glow"></div>
       <h1 style="font-size:clamp(1.6rem,3.6vw,2.3rem)">What can we <em>take off your hands?</em></h1>
       <p>Choose a service to get started.</p>
     </div>
-    <div class="cat-grid" id="cat-grid">
-      <div class="cat-card" data-svc="carwash" id="cat-carwash">
+    <div class="cat-grid" id="cat-grid" data-stagger="110">
+      <div class="cat-card reveal reveal-scale" data-svc="carwash" id="cat-carwash">
         <div class="cat-ico" id="cat-ico-wash"></div>
         <h2>Car Wash</h2>
         <p>A vetted washer comes to your car — at home, the office or the gym.</p>
         <ul id="cat-list-wash"></ul>
         <span class="cat-go">Book a wash</span>
       </div>
-      <div class="cat-card" data-svc="laundry" id="cat-laundry">
+      <div class="cat-card reveal reveal-scale" data-svc="laundry" id="cat-laundry">
         <div class="cat-ico" id="cat-ico-laundry"></div>
         <h2>Laundry</h2>
         <p>Collected from your door, professionally cleaned, delivered back.</p>
@@ -154,7 +156,7 @@
         <span class="cat-go">Book a collection</span>
       </div>
     </div>
-    <div class="card" id="recent-card">
+    <div class="card reveal" id="recent-card">
       <h2 id="h-orders-2">My orders</h2>
       <div id="orders-list-2"><p class="empty">No orders yet.</p></div>
     </div>
@@ -162,7 +164,7 @@
 
   <!-- ORDER VIEW -->
   <div id="view-order" class="hidden">
-    <div class="card">
+    <div class="card reveal">
       <button class="ghost small" id="btn-change-service" style="margin-bottom:12px">Change service</button>
       <h2 id="h-book">Book a wash</h2>
       <div class="msg error" id="order-error"></div>
@@ -205,7 +207,7 @@
         <button id="btn-place-order">Book now</button>
       </div>
     </div>
-    <div class="card">
+    <div class="card reveal">
       <h2 id="h-orders">My orders</h2>
       <div id="orders-list"><p class="empty">No orders yet.</p></div>
     </div>
@@ -213,7 +215,7 @@
 
   <!-- TRACK VIEW -->
   <div id="view-track" class="hidden">
-    <div class="card">
+    <div class="card reveal">
       <div class="row spread">
         <h2 id="track-title">Your order</h2>
         <span class="pill" id="track-pill"></span>

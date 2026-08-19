@@ -135,6 +135,14 @@ requirements) · `DEPLOY.md` · `marketing/make-brochures.py` (regenerates the P
 - SQLite runs in WAL mode. `db.js` now checkpoints every 5 minutes and on shutdown — before
   that, `freshaf.db` was 4 KB while `freshaf.db-wal` held 1.4 MB, so **copying just the .db
   file would have restored an empty database**. Keep the checkpoint if you touch `db.js`.
+- **Motion system** lives at the bottom of `public/css/style.css` and in the MOTION block of
+  `public/js/common.js`: scroll reveals, staggered groups, topbar condense, scroll-progress
+  line, hero aurora, cursor-tracked card glow, count-ups, animated money totals. Two rules if
+  you touch it: the hidden state is gated behind `.js-motion` (set by JS only once it knows it
+  can reveal again, so a script failure never leaves a blank page), and `initMotion(node)` must
+  be called for any view or markup rendered after load — `switchView` already does this.
+- `.msg.error` and `.msg.ok` force `display:block`, so an empty placeholder used to render a
+  bare coloured bar above every form. `.msg:empty` now hides them. Don't remove that rule.
 - Inputs must stay **16px on screens under 700px**. Below that iOS Safari zooms the page on
   focus and the whole site then pans sideways on every swipe — that was the "moves left and
   right while swiping" bug.

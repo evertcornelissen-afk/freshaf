@@ -165,6 +165,161 @@ function icon(name, cls = '') {
   return `<span class="icon ${cls}"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${ICONS[name] || ''}</svg></span>`;
 }
 
+/* ============================================================
+   MOTION
+   Progressive enhancement only: with JS off or motion reduced,
+   every element is already in its final, visible state.
+   ============================================================ */
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const CAN_REVEAL = !REDUCED_MOTION && 'IntersectionObserver' in window;
+// Only now is it safe for the stylesheet to hide .reveal elements: we know this script
+// is running and can put them back. Anything that stops us getting here leaves the page
+// fully visible rather than blank.
+if (CAN_REVEAL) document.documentElement.classList.add('js-motion');
+
+// Reveal on scroll. Anything tagged .reveal fades up once, the first time it is seen.
+// Children of [data-stagger] follow each other rather than arriving as a block.
+let revealObserver = null;
+function observeReveals(root = document) {
+  if (!CAN_REVEAL) {
+    root.querySelectorAll?.('.reveal').forEach((n) => n.classList.add('is-in'));
+    return;
+  }
+  if (!revealObserver) {
+    revealObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add('is-in');
+        revealObserver.unobserve(e.target); // reveal once — re-animating on scroll-up is nauseating
+      }
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+  }
+  const pending = [...root.querySelectorAll('.reveal:not(.is-in), .steps:not(.is-in)')];
+  pending.forEach((n) => revealObserver.observe(n));
+  // Backstop: if anything is still hidden a few seconds later — an observer that never
+  // fired, a container that was display:none when we looked — show it anyway. A visitor
+  // must never be left staring at a blank panel because an animation did not run.
+  setTimeout(() => {
+    for (const n of pending) {
+      if (n.classList.contains('is-in')) continue;
+      const r = n.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) n.classList.add('is-in');
+    }
+  }, 2600);
+}
+
+// Give each child of a stagger group its own small delay.
+function applyStagger(root = document) {
+  root.querySelectorAll('[data-stagger]').forEach((group) => {
+    const step = Number(group.dataset.stagger) || 70;
+    [...group.children].forEach((child, i) => {
+      if (child.classList.contains('reveal')) child.style.transitionDelay = `${Math.min(i * step, 420)}ms`;
+    });
+  });
+}
+
+// Sticky bar condenses once you leave the top, plus a hairline read-progress bar.
+function initScrollChrome() {
+  const bar = document.querySelector('.topbar');
+  let progress = null;
+  if (!REDUCED_MOTION) {
+    progress = document.createElement('div');
+    progress.className = 'scroll-progress';
+    document.body.appendChild(progress);
+  }
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const y = window.scrollY || 0;
+    if (bar) bar.classList.toggle('is-scrolled', y > 12);
+    if (progress) {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      progress.style.transform = `scaleX(${max > 0 ? Math.min(1, y / max) : 0})`;
+    }
+  };
+  window.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(update);
+  }, { passive: true });
+  update();
+}
+
+// Category cards light up under the cursor. Pointer-only: on touch this never fires,
+// which is what we want — no sticky hover state left behind after a tap.
+function initPointerGlow(root = document) {
+  root.querySelectorAll('.cat-card').forEach((card) => {
+    if (card.dataset.glow) return;
+    card.dataset.glow = '1';
+    card.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    });
+  });
+}
+
+// Count a number up when it scrolls into view. Eased, so it decelerates into the value.
+function initCounters(root = document) {
+  const nodes = [...root.querySelectorAll('.count-up:not([data-counted])')];
+  if (!nodes.length) return;
+  const run = (node) => {
+    node.dataset.counted = '1';
+    const target = Number(node.dataset.target || node.textContent) || 0;
+    const suffix = node.dataset.suffix || '';
+    if (REDUCED_MOTION) { node.textContent = target + suffix; return; }
+    const dur = 1100;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      node.textContent = Math.round(target * eased) + suffix;
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  if (!('IntersectionObserver' in window)) { nodes.forEach(run); return; }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      run(e.target);
+      io.unobserve(e.target);
+    }
+  }, { threshold: 0.4 });
+  nodes.forEach((n) => io.observe(n));
+}
+
+// Roll a rand()-formatted money figure from its current value to a new one, so the
+// total visibly moves when a package, vehicle or pro changes instead of snapping.
+function animateRand(node, toCents) {
+  if (!node) return;
+  const parse = (t) => {
+    const digits = String(t).replace(/[^\d]/g, '');
+    return digits ? Number(digits) * 100 : null;
+  };
+  const from = parse(node.textContent);
+  if (REDUCED_MOTION || from === null || from === toCents) { node.textContent = rand(toCents); return; }
+  const dur = 420;
+  const start = performance.now();
+  cancelAnimationFrame(node._randRaf || 0);
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    node.textContent = rand(Math.round(from + (toCents - from) * eased));
+    if (t < 1) node._randRaf = requestAnimationFrame(tick);
+  };
+  node._randRaf = requestAnimationFrame(tick);
+}
+
+// One call to wire up a freshly rendered chunk of DOM.
+function initMotion(root = document) {
+  applyStagger(root);
+  observeReveals(root);
+  initPointerGlow(root);
+  initCounters(root);
+}
+
 /* ---------- toasts ---------- */
 function toast(message, type = 'info') {
   let root = el('toast-root');
@@ -295,4 +450,8 @@ function switchView(ids, active) {
   n.classList.remove('hidden', 'view-anim');
   void n.offsetWidth; // restart animation
   n.classList.add('view-anim');
+  // A hidden view has no box, so the observer never saw its .reveal nodes. Wire them
+  // up now that the view has one, and start each view at the top of the page.
+  if (typeof initMotion === 'function') initMotion(n);
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }

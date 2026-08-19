@@ -12,6 +12,7 @@ function decorate() {
   el('h-orderlog').insertAdjacentHTML('afterbegin', icon('clock'));
   el('h-customers').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-settings').insertAdjacentHTML('afterbegin', icon('shield'));
+  initScrollChrome();
 }
 
 /* ---------- bulk supplier import ---------- */
