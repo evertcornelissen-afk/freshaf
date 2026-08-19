@@ -21,7 +21,16 @@ collection**. Customers book, the pro they choose comes to them. Built as a web 
   - ⚠️ **No persistent disk — the database is wiped on every restart/redeploy.** This is the
     single most important outstanding item. Fix: add a card at dashboard.render.com/billing,
     then upgrade to Starter + attach a 1 GB disk at `/opt/render/project/src/data`.
-  - Render does **not** auto-deploy on git push. After pushing, trigger manually:
+  - Render does **not** auto-deploy on git push — **even though its Settings page says
+    Auto-Deploy: "On Commit"**. Verified twice on 19 Aug: pushed, waited 4+ minutes, no deploy
+    event appeared; the same commit deployed instantly when triggered by hand. The GitHub
+    webhook is not reaching Render. Worth fixing at source (disconnect and reconnect the repo
+    in Render, or check the webhook's delivery log in GitHub repo Settings → Webhooks),
+    otherwise every future push needs a manual trigger.
+  - Manual trigger via the dashboard: Events page → **Manual Deploy → Deploy latest commit**.
+    The dropdown is flaky under automation — clicking the button sometimes toggles without
+    rendering the menu; click, check for the menu, click again if it did not open.
+  - Or trigger via the API. After pushing:
     `POST https://api.render.com/v1/services/srv-d9eavarrjlhs73c2u3ag/deploys` with the
     Render API key (Evert has it; ask him — not stored in the repo).
 - **Netlify** site `7250306b-6d15-4420-a20e-496571ed8eca` — marketing + demo + a scheduled
