@@ -528,13 +528,13 @@ async function refreshEarnings() {
     <div class="stat"><div class="v">${rand(e.fees_cents)}</div><div class="l">${e.fee_pct}% fee, paid by customers</div></div>` + owed;
 }
 
-el('btn-login').onclick = () => withBusy(el('btn-login'), 'Signing in…', async () => {
+el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
     if (user.role !== 'supplier') { window.location.href = user.role === 'admin' ? '/admin' : '/'; return; }
     me = user; setWho(); route();
   } catch (e) { showError('login-error', e.message); }
-});
+}); };
 
 el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting application…', async () => {
   try {

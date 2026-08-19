@@ -352,16 +352,18 @@ let regGeo = null;
 attachAutocomplete(el('reg-address'), (r) => { regGeo = { lat: r.lat, lng: r.lng }; });
 el('reg-address').addEventListener('input', () => { regGeo = null; }); // typed edits invalidate the pick
 
-el('btn-login').onclick = () => withBusy(el('btn-login'), 'Signing in…', async () => {
+// Real form submits: browsers only offer to save a password when a form is actually
+// submitted, so these are submit handlers rather than button clicks.
+el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
     if (user.role !== 'customer') { window.location.href = user.role === 'supplier' ? '/supplier' : '/admin'; return; }
     me = user; setTopbar(); await enterApp();
     toast(`Welcome back, ${user.name.split(' ')[0]}`, 'ok');
   } catch (e) { showError('login-error', e.message); }
-});
+}); };
 
-el('btn-register').onclick = () => withBusy(el('btn-register'), 'Creating your account…', async () => {
+el('register-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-register'), 'Creating your account…', async () => {
   try {
     if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
     const { user } = await api('/api/auth/register', {
@@ -376,7 +378,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Creating your a
     me = user; setTopbar(); await enterApp();
     toast('Account created — welcome to FreshAF', 'ok');
   } catch (e) { showError('reg-error', e.message); }
-});
+}); };
 
 el('btn-logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); window.location.reload(); };
 

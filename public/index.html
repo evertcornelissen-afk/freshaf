@@ -77,9 +77,11 @@
     <div class="card" style="max-width:440px;margin:40px auto">
       <h2 id="h-signin">Sign in</h2>
       <div class="msg error" id="login-error"></div>
-      <label>Email</label><input id="login-email" type="email" autocomplete="email">
-      <label>Password</label><input id="login-password" type="password" autocomplete="current-password">
-      <div class="mt"><button id="btn-login" style="width:100%">Sign in</button></div>
+      <form id="login-form" method="post" action="/api/auth/login">
+        <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocomplete="username email" required>
+        <label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        <div class="mt"><button type="submit" id="btn-login" style="width:100%">Sign in</button></div>
+      </form>
       <p class="mt muted small-text" style="text-align:center">New to FreshAF? <a href="#" id="link-to-register">Create an account</a></p>
       <p class="muted small-text" style="text-align:center"><a href="#" id="link-back-home">Back to home</a></p>
     </div>
@@ -90,16 +92,18 @@
     <div class="card" style="max-width:440px;margin:40px auto">
       <h2 id="h-create">Create your account</h2>
       <div class="msg error" id="reg-error"></div>
-      <label>Full name</label><input id="reg-name" autocomplete="name">
-      <label>Email</label><input id="reg-email" type="email" autocomplete="email">
-      <label>Mobile number</label><input id="reg-phone" placeholder="e.g. 082 555 1234" autocomplete="tel">
-      <label>Preferred address (home or work)</label><input id="reg-address" placeholder="e.g. 12 Rivonia Rd, Sandton">
-      <label>Password (min 8 characters)</label><input id="reg-password" type="password" autocomplete="new-password">
+      <form id="register-form" method="post" action="/api/auth/register">
+      <label for="reg-name">Full name</label><input id="reg-name" name="name" autocomplete="name">
+      <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocomplete="username email">
+      <label for="reg-phone">Mobile number</label><input id="reg-phone" name="phone" placeholder="e.g. 082 555 1234" autocomplete="tel">
+      <label for="reg-address">Preferred address (home or work)</label><input id="reg-address" name="address" placeholder="e.g. 12 Rivonia Rd, Sandton" autocomplete="street-address">
+      <label for="reg-password">Password (min 8 characters)</label><input id="reg-password" name="password" type="password" autocomplete="new-password">
       <label class="row" style="margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--muted)">
         <input type="checkbox" id="reg-terms" style="width:auto">
         <span>I accept the <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank">Privacy Policy</a></span>
       </label>
-      <div class="mt"><button id="btn-register" style="width:100%">Create account</button></div>
+      <div class="mt"><button type="submit" id="btn-register" style="width:100%">Create account</button></div>
+      </form>
       <p class="mt muted small-text" style="text-align:center">Already have an account? <a href="#" id="link-to-login">Sign in</a></p>
     </div>
   </div>

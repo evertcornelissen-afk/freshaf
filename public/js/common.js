@@ -245,21 +245,6 @@ function initScrollChrome() {
   update();
 }
 
-// Category cards light up under the cursor. Pointer-only: on touch this never fires,
-// which is what we want — no sticky hover state left behind after a tap.
-function initPointerGlow(root = document) {
-  root.querySelectorAll('.cat-card').forEach((card) => {
-    if (card.dataset.glow) return;
-    card.dataset.glow = '1';
-    card.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      const r = card.getBoundingClientRect();
-      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
-      card.style.setProperty('--my', `${e.clientY - r.top}px`);
-    });
-  });
-}
-
 // Count a number up when it scrolls into view. Eased, so it decelerates into the value.
 function initCounters(root = document) {
   const nodes = [...root.querySelectorAll('.count-up:not([data-counted])')];
@@ -316,7 +301,6 @@ function animateRand(node, toCents) {
 function initMotion(root = document) {
   applyStagger(root);
   observeReveals(root);
-  initPointerGlow(root);
   initCounters(root);
 }
 

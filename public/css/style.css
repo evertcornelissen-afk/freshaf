@@ -168,7 +168,7 @@ a:hover { color: var(--accent); }
 .topbar .who { color: var(--muted); font-size: .84rem; margin-right: 12px; font-weight: 500; }
 
 /* ---------- layout ---------- */
-.wrap { max-width: 1080px; margin: 0 auto; padding: 30px 22px 90px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 16px 22px 90px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 @media (max-width: 840px) { .grid2 { grid-template-columns: 1fr; } }
 
@@ -492,7 +492,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 }
 
 /* ---------- hero ---------- */
-.hero { text-align: center; padding: 58px 16px 40px; position: relative; }
+.hero { text-align: center; padding: 26px 16px 34px; position: relative; }
 .hero .glow {
   position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
   width: min(560px, 88vw); height: 300px; border-radius: 50%;
@@ -503,7 +503,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 @keyframes heroGlow { 0%, 100% { opacity: .8; transform: translateX(-50%) scale(1); } 50% { opacity: 1; transform: translateX(-50%) scale(1.08); } }
 .hero .eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 14px; border-radius: 99px; margin-bottom: 22px;
+  padding: 6px 14px; border-radius: 99px; margin-bottom: 16px;
   background: rgba(33, 172, 207, .08); border: 1px solid rgba(33, 172, 207, .3);
   color: var(--accent-dim); font-size: .74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   animation: viewIn .5s var(--ease) both;
@@ -605,7 +605,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
   .cat-grid .cat-card h2 { font-size: 1.08rem; }
   .cat-grid .cat-card > p { font-size: .82rem; margin-bottom: 11px; }
   .cat-grid .cat-card li { font-size: .78rem; padding: 4px 0; }
-  .cat-grid .cat-card .cat-go { padding: 12px 10px; font-size: .84rem; width: 100%; }
+  .cat-grid .cat-card .cat-go { padding: 15px 10px; font-size: .95rem; }
 }
 @media (max-width: 400px) {
   .cat-grid .cat-card ul { display: none; } /* keep both buttons above the fold */
@@ -628,10 +628,13 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 .cat-card ul { list-style: none; margin-bottom: 17px; }
 .cat-card li { color: var(--muted); font-size: .84rem; padding: 5px 0; display: flex; gap: 8px; align-items: center; }
 .cat-card li .icon { color: var(--accent); }
+/* One flat, solid, full-width button. No gradient, no glow, no hover shift — both
+   cards must look identical whether or not the cursor happens to be over one. */
 .cat-go {
-  display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, var(--accent-strong), var(--accent-dim)); color: #fff;
-  font-weight: 700; font-size: .9rem;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 17px 20px; border-radius: 12px; width: 100%;
+  background: var(--accent-dim); color: #fff;
+  font-weight: 700; font-size: 1.02rem; letter-spacing: .005em;
 }
 
 /* ---------- provider picker ---------- */
@@ -757,20 +760,13 @@ button:hover::after, .btn:hover::after { transform: translateX(120%); }
 button.ghost::after, button.secondary::after { display: none; }
 button:active { transform: translateY(0) scale(.975); }
 
-/* ---------- category cards: cursor-tracked glow + crisper lift ---------- */
+/* ---------- category cards ----------
+   No cursor-tracked glow and no icon tilt: the glow lit only the card under the
+   pointer, which made the two buttons look different from each other. The card
+   keeps a plain lift so it still reads as clickable; the button never changes. */
 .cat-card { position: relative; overflow: hidden; }
-.cat-card::before {
-  content: ''; position: absolute; inset: 0; opacity: 0; pointer-events: none;
-  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(33, 172, 207, .16), transparent 68%);
-  transition: opacity .38s var(--ease);
-}
-.cat-card:hover::before { opacity: 1; }
-.cat-card { transition: transform .32s var(--ease), border-color .28s, box-shadow .32s var(--ease); }
-.cat-card:hover { transform: translateY(-6px); }
-.cat-card .cat-ico { transition: transform .38s var(--ease), background .28s; }
-.cat-card:hover .cat-ico { transform: translateY(-2px) scale(1.06) rotate(-3deg); }
-.cat-card .cat-go { transition: transform .3s var(--ease), box-shadow .3s; }
-.cat-card:hover .cat-go { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(23, 153, 194, .7); }
+.cat-card { transition: transform .28s var(--ease), border-color .24s, box-shadow .28s var(--ease); }
+.cat-card:hover { transform: translateY(-4px); }
 .cat-card > * { position: relative; }
 
 /* ---------- cards lift a touch on hover ---------- */
@@ -804,10 +800,10 @@ button:active { transform: translateY(0) scale(.975); }
   .topbar input:checked + .track .thumb { transform: translateX(19px); }
   /* "Book a collection" is longer than "Book a wash" — let it shrink, never wrap,
      so the two cards stay the same shape. */
-  .cat-grid .cat-card .cat-go { white-space: nowrap; font-size: .8rem; padding: 11px 8px; }
+  .cat-grid .cat-card .cat-go { white-space: nowrap; font-size: .92rem; padding: 17px 8px; }
 }
 @media (max-width: 380px) {
-  .cat-grid .cat-card .cat-go { font-size: .74rem; padding: 10px 4px; }
+  .cat-grid .cat-card .cat-go { font-size: .82rem; padding: 17px 4px; }
 }
 
 /* ---------- how-it-works: the line draws itself as you arrive ---------- */

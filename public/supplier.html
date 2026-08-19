@@ -49,9 +49,11 @@
       <div class="card">
         <h2 id="h-signin">Supplier sign in</h2>
         <div class="msg error" id="login-error"></div>
-        <label>Email</label><input id="login-email" type="email">
-        <label>Password</label><input id="login-password" type="password">
-        <div class="mt"><button id="btn-login">Sign in</button></div>
+        <form id="login-form" method="post" action="/api/auth/login">
+          <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocomplete="username email" required>
+          <label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password" required>
+          <div class="mt"><button type="submit" id="btn-login">Sign in</button></div>
+        </form>
       </div>
       <div class="card">
         <h2 id="h-apply">Apply to become a pro</h2>

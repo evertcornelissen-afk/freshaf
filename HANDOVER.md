@@ -113,6 +113,14 @@ requirements) · `DEPLOY.md` · `marketing/make-brochures.py` (regenerates the P
   (contractor status). Company (Pty Ltd) **not yet registered** — everything is currently in
   Evert's personal name, including the PayFast account.
 
+### Why people get signed out (fixed by config, not code)
+`data/jwt.secret` is generated on first boot and stored on the ephemeral disk. Every restart
+or deploy on the free plan wipes it, a new secret is generated, and **every existing login
+cookie becomes invalid** — so all users are silently signed out. The cookie itself is already
+30 days. Fix: set **`JWT_SECRET`** as a Render environment variable (env vars survive restarts,
+so this works on the free plan too). Same applies to `data/vapid.json` — losing it kills every
+Web Push subscription.
+
 ## OUTSTANDING — in priority order
 1. **Render card → Starter plan + persistent disk.** Until then production data can vanish.
    Evert chose this route (19 Aug) over migrating to Postgres, because Postgres would *not*
