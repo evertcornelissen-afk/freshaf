@@ -190,6 +190,12 @@ came back. Non-SQLite uploads are rejected. **The backup covers the database onl
 - SQLite runs in WAL mode. `db.js` now checkpoints every 5 minutes and on shutdown — before
   that, `freshaf.db` was 4 KB while `freshaf.db-wal` held 1.4 MB, so **copying just the .db
   file would have restored an empty database**. Keep the checkpoint if you touch `db.js`.
+- **Brand lockup.** The wordmark stands alone in the top bar (34px desktop, 28px mobile,
+  vertically centred). **Do not stack a tagline under it** — `logo.svg` has a viewBox with its
+  own baseline whitespace, so a stacked line never optically aligns no matter what the box
+  measurements say. "Fresh and Fast" lives where centring makes alignment automatic: the boot
+  splash and the footer. The pro and admin portals keep a short label as a **pill beside** the
+  wordmark, where vertical centring is exact.
 - **Motion system** lives at the bottom of `public/css/style.css` and in the MOTION block of
   `public/js/common.js`: scroll reveals, staggered groups, topbar condense, scroll-progress
   line, hero aurora, cursor-tracked card glow, count-ups, animated money totals. Two rules if

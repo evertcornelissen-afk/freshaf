@@ -127,6 +127,11 @@ a:hover { color: var(--accent); }
 }
 #splash img { width: min(230px, 62vw); animation: splashPulse 1.8s ease-in-out infinite; }
 @keyframes splashPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .72; transform: scale(.985); } }
+.splash-tag {
+  color: var(--faint); font-size: .78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .34em; text-indent: .34em;
+  margin-top: -14px;
+}
 #splash .dots { display: flex; gap: 9px; }
 #splash .dots span {
   width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
@@ -154,13 +159,17 @@ a:hover { color: var(--accent); }
   backdrop-filter: blur(14px);
 }
 .brand { display: flex; align-items: center; }
-.brand .stack { line-height: 1; }
-.brand .logo-img { height: 27px; display: block; margin-bottom: 0; }
+.brand .stack { line-height: 1; display: flex; align-items: center; gap: 10px; }
+.brand .logo-img { height: 34px; display: block; }
+/* Stacking a tagline under the wordmark never aligned — the SVG carries its own
+   baseline whitespace. The customer app drops it entirely; the portals keep a short
+   label as a pill beside the wordmark, where vertical centring makes it exact. */
 .brand .tag {
-  color: var(--faint); font-size: .62rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .145em; font-style: normal;
-  white-space: nowrap; display: block;
-  margin-top: -3px; /* the wordmark SVG has its own bottom whitespace — close the gap */
+  color: var(--accent-dim); font-size: .6rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .12em; font-style: normal;
+  white-space: nowrap;
+  padding: 4px 9px; border-radius: 99px;
+  background: rgba(33, 172, 207, .1); border: 1px solid rgba(33, 172, 207, .28);
 }
 /* The wordmark is the way home from anywhere in the app. */
 .brand-home { display: block; text-decoration: none; cursor: pointer; border-radius: 8px; }
@@ -658,6 +667,11 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
   padding: 34px 10px 8px; margin-top: 20px;
   border-top: 1px solid var(--border-soft);
 }
+.footer-tag {
+  flex-basis: 100%; text-align: center; margin-bottom: 14px;
+  color: var(--faint); font-size: .72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .22em; text-indent: .22em;
+}
 .site-footer a { color: var(--faint); font-size: .8rem; font-weight: 500; }
 .site-footer a:hover { color: var(--accent-dim); }
 
@@ -694,7 +708,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 }
 [data-theme="dark"] .topbar.is-scrolled { background: rgba(12, 21, 27, .93); }
 .topbar .brand .logo-img { transition: height .32s var(--ease); }
-.topbar.is-scrolled .brand .logo-img { height: 23px; }
+.topbar.is-scrolled .brand .logo-img { height: 28px; }
 /* "Fresh and Fast" says what the name stands for, so it stays put — on every screen
    size and while scrolling. It is the whole reason the tagline is there. */
 
@@ -788,8 +802,8 @@ button:active { transform: translateY(0) scale(.975); }
   .topbar { padding: 11px 13px; gap: 8px; flex-wrap: nowrap; }
   .topbar .brand { min-width: 0; }
   .topbar .brand .stack { display: block; min-width: 0; }
-  .topbar .brand .logo-img { height: 24px; }
-  .topbar .brand .tag { font-size: .6rem; letter-spacing: .12em; }
+  .topbar .brand .logo-img { height: 28px; }
+  .topbar .brand .tag { font-size: .55rem; padding: 3px 7px; letter-spacing: .1em; }
   .topbar > .row { flex-wrap: nowrap; gap: 6px; flex: none; }
   .topbar button.small { padding: 7px 11px; font-size: .75rem; }
   /* The account button keeps the tagline company on a 375px bar by dropping the
