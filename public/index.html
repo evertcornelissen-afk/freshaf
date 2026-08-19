@@ -160,9 +160,13 @@
       <input id="order-address" placeholder="e.g. 12 Rivonia Rd, Sandton — basement P2, bay 41">
       <label id="notes-label">Notes for the pro (optional)</label>
       <input id="order-notes" placeholder="e.g. White Hilux, keys with security">
-      <h3><span class="step-num">4</span>Choose your pro</h3>
-      <p class="muted small-text" style="margin-bottom:10px">Every pro sets their own price. Pick the one that suits you.</p>
-      <div id="pro-list"><p class="empty">Choose a package and drop your pin to see available pros.</p></div>
+      <h3><span class="step-num">4</span>Get prices</h3>
+      <p class="muted small-text" style="margin-bottom:10px">Pros near you send their price and when they can come. Pros with a published price answer instantly; the rest reply as they see it.</p>
+      <div class="row">
+        <button class="secondary" id="btn-get-quotes">Get prices</button>
+        <span id="quote-status" class="muted small-text"></span>
+      </div>
+      <div id="quote-list" class="mt"><p class="empty">Choose a package and drop your pin, then ask for prices.</p></div>
       <h3><span class="step-num">5</span>Payment</h3>
       <div class="seg" id="pay-seg">
         <label><input type="radio" name="pay" value="card" checked><span id="seg-card">Card</span></label>

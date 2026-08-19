@@ -114,9 +114,8 @@ router.post('/online', requireApproved, (req, res) => {
     if (typeof lat !== 'number' || typeof lng !== 'number') {
       return res.status(400).json({ error: 'Set your current location to go online' });
     }
-    // No prices, no jobs — otherwise a customer sees a pro with nothing to charge.
-    const priced = db.prepare('SELECT COUNT(*) c FROM supplier_prices WHERE user_id = ?').get(req.user.id).c;
-    if (!priced) return res.status(400).json({ error: 'Set your prices before going online' });
+    // A published price list is optional now: without one you simply quote each job
+    // yourself. Blocking here kept per-job pros off the platform entirely.
     db.prepare('UPDATE suppliers SET online = 1, lat = ?, lng = ? WHERE user_id = ?').run(lat, lng, req.user.id);
     // A new supplier coming online may unlock stuck orders.
     const stuck = db.prepare("SELECT id FROM orders WHERE status = 'searching'").all();
@@ -210,6 +209,108 @@ router.get('/jobs', (req, res) => {
     active: active.map(dispatch.orderPublic),
     history: history.map(dispatch.orderPublic),
   });
+});
+
+/* ---------- quote requests ----------
+   Open jobs near this pro. Anyone can answer with their own price and when they can come,
+   including pros who have no published price list at all. */
+const quotes = require('../quotes');
+
+
+function proContext(userId) {
+  return db.prepare(`SELECT s.*, u.name FROM suppliers s JOIN users u ON u.id = s.user_id
+    WHERE s.user_id = ?`).get(userId);
+}
+
+router.get('/quote-requests', requireApproved, (req, res) => {
+  const me = proContext(req.user.id);
+  if (!me || !me.online || me.lat == null) return res.json({ requests: [] });
+  const maxRadius = Number(getSetting('dispatch_radius_km', '25'));
+  const limit = Math.min(me.radius_km || maxRadius, maxRadius);
+  const mine = (me.services || 'carwash').split(',');
+
+  const rows = db.prepare(`
+    SELECT r.*, q.id AS my_quote_id, q.supplier_price_cents AS my_price_cents,
+           q.availability AS my_availability, q.source AS my_source, q.status AS my_quote_status
+    FROM quote_requests r
+    LEFT JOIN quotes q ON q.request_id = r.id AND q.supplier_id = ?
+    WHERE r.status = 'open' AND datetime('now') <= r.expires_at
+    ORDER BY r.id DESC LIMIT 40`).all(req.user.id);
+
+  const requests = rows.filter((r) => mine.includes(r.service)).map((r) => {
+    const distance = dispatch.haversineKm(r.lat, r.lng, me.lat, me.lng);
+    if (distance > limit) return null;
+    const svc = SERVICES[r.service];
+    return {
+      id: r.id,
+      service: r.service,
+      service_name: svc?.name || r.service,
+      package: r.package,
+      package_name: svc?.packages[r.package]?.name || r.package,
+      unit_name: svc?.units[r.vehicle]?.name || r.vehicle,
+      unit_label: svc?.unitLabel || '',
+      address: r.address,
+      notes: r.notes,
+      distance_km: +distance.toFixed(1),
+      callout_fee_cents: quotes.calloutFor(distance),
+      suggested_cents: svc?.packages[r.package]?.base ?? null,
+      created_at: r.created_at,
+      expires_at: r.expires_at,
+      my_quote: r.my_quote_id ? {
+        id: r.my_quote_id, price_cents: r.my_price_cents,
+        availability: r.my_availability, source: r.my_source, status: r.my_quote_status,
+      } : null,
+    };
+  }).filter(Boolean);
+
+  res.json({ requests, fee_pct: Number(getSetting('platform_fee_pct', '10')) });
+});
+
+// Send (or replace) my price and availability for one request.
+router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
+  const me = proContext(req.user.id);
+  if (!me || !me.online || me.lat == null) return res.status(400).json({ error: 'Go online before quoting' });
+
+  const request = db.prepare("SELECT * FROM quote_requests WHERE id = ? AND status = 'open'").get(req.params.id);
+  if (!request) return res.status(409).json({ error: 'That request is no longer open' });
+  const expired = db.prepare("SELECT datetime('now') > ? AS x").get(request.expires_at).x;
+  if (expired) return res.status(409).json({ error: 'That request has expired' });
+  if (!(me.services || 'carwash').split(',').includes(request.service)) {
+    return res.status(403).json({ error: 'You do not offer that service' });
+  }
+
+  const cents = Math.round(Number(req.body?.price_cents));
+  if (!Number.isFinite(cents) || cents < 2000 || cents > 2000000) {
+    return res.status(400).json({ error: 'Your price must be between R20 and R20 000' });
+  }
+  const maxRadius = Number(getSetting('dispatch_radius_km', '25'));
+  const limit = Math.min(me.radius_km || maxRadius, maxRadius);
+  const distance = dispatch.haversineKm(request.lat, request.lng, me.lat, me.lng);
+  if (distance > limit) return res.status(403).json({ error: 'That job is outside your travel radius' });
+
+  const total = quotes.insertQuote({
+    requestId: request.id,
+    supplierId: req.user.id,
+    supplierPrice: cents,
+    distanceKm: distance,
+    availability: String(req.body?.availability || '').slice(0, 80) || null,
+    note: String(req.body?.note || '').slice(0, 200) || null,
+    source: 'manual',
+  });
+  quotes.notifyCustomer(request);
+  res.json({ ok: true, total_cents: total, you_earn_cents: cents + quotes.calloutFor(distance) });
+});
+
+// Not interested — stop showing it to me.
+router.post('/quote-requests/:id/decline', requireApproved, (req, res) => {
+  const request = db.prepare('SELECT * FROM quote_requests WHERE id = ?').get(req.params.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
+  db.prepare(`INSERT INTO quotes (request_id, supplier_id, supplier_price_cents, total_cents, status)
+    VALUES (?, ?, 0, 0, 'declined')
+    ON CONFLICT(request_id, supplier_id) DO UPDATE SET status = 'declined'`)
+    .run(request.id, req.user.id);
+  quotes.notifyCustomer(request);
+  res.json({ ok: true });
 });
 
 /* ---------- job alert channels ---------- */

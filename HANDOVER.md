@@ -57,7 +57,26 @@ collection**. Customers book, the pro they choose comes to them. Built as a web 
 - Old 15%-deducted commission model is gone. `commission_pct` setting still exists but
   `platform_fee_pct` (=10) is what's used.
 
-## Customer flow (rebuilt 28 July)
+## HYBRID QUOTING (built 19 Aug — this replaces choose-a-pro-from-a-price-list)
+The customer logs the job **once**; pros answer with their own price and availability.
+- Prices in the catalogue are **indicative only** and shown as "from R180".
+- `POST /api/quote-requests` opens a request and asks every approved, online pro whose radius
+  covers the pin and who offers that service.
+  - Pros **with** a published price list are auto-quoted instantly (`quotes.source = 'auto'`),
+    so the customer normally has something bookable within a second.
+  - Pros **without** one get a push/WhatsApp/SSE nudge and send their own price + availability
+    (`source = 'manual'`). They can also override their published price for a specific job.
+- Quotes stream to the customer live over SSE (`quotes_update`).
+- `POST /api/quotes/:id/accept` books that pro at exactly their quoted price. **A quote is the
+  pro's commitment, so there is no second accept step** — a cash order goes straight to
+  `accepted`. Card orders go `pending_payment` and are confirmed by `afterPayment()`.
+- Requests expire after `quote_window_min` (default 30) and are swept once a minute.
+- **A pro no longer needs a price list to go online.** That block was removed — it kept
+  per-job operators off the platform entirely.
+- Tables: `quote_requests`, `quotes`. Logic in `server/quotes.js`.
+- The old `/api/quote/providers` and `POST /api/orders` paths still exist and still work.
+
+## Customer flow (rebuilt 28 July, quoting added 19 Aug)
 Home (logged out) → register/login → **category chooser: Car Wash or Laundry** → booking
 (package → vehicle/load → map pin + address → **choose your pro** → payment) → live tracking.
 

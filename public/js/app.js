@@ -4,8 +4,6 @@ let pricing = null;
 let svc = 'carwash';
 let sel = { package: null, unit: null, lat: null, lng: null };
 let callout = null;
-let providers = [];
-let chosenPro = null;
 let map, pin;
 let currentOrder = null;
 let rateStars = 0;
@@ -123,6 +121,14 @@ async function enterApp() {
   initMap();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
+    quotes_update: (data) => {
+      if (data.request_id !== quoteRequestId) return;
+      quotesList = data.quotes || [];
+      el('quote-status').textContent = quotesList.length
+        ? `${quotesList.length} price${quotesList.length === 1 ? '' : 's'} in`
+        : 'Waiting for pros…';
+      renderQuotes();
+    },
     order_update: async (order) => {
       if (currentOrder && order.id === currentOrder.id) renderTrack(order);
       refreshOrders();
@@ -203,7 +209,7 @@ function renderPickers() {
       <span class="tick">${icon('check')}</span>
       <div class="pkg-icon">${icon(PKG_ICONS[p.key] || 'droplet', 'lg')}</div>
       <div class="name">${p.name}</div>
-      <div class="price">${rand(p.base)} <small>base</small></div>
+      <div class="price"><small>from</small> ${rand(p.base)}</div>
       <div class="desc">${p.desc} · ${p.eta}</div>
     </div>`).join('');
   const vg = el('veh-grid');
@@ -221,51 +227,87 @@ function renderPickers() {
 function refreshSel() {
   document.querySelectorAll('#pkg-grid .pkg').forEach((n) => n.classList.toggle('selected', n.dataset.pkg === sel.package));
   document.querySelectorAll('#veh-grid .pkg').forEach((n) => n.classList.toggle('selected', n.dataset.unit === sel.unit));
-  refreshProviders();
+  invalidateQuotes();
   updateTotal();
 }
 
 /* ---------- choose your pro (each sets their own price) ---------- */
-async function refreshProviders() {
-  const box = el('pro-list');
-  if (!sel.package || !sel.unit || sel.lat == null) {
-    providers = []; chosenPro = null;
-    box.innerHTML = '<p class="empty">Choose a package and drop your pin to see available pros.</p>';
+/* ---------- quotes ----------
+   The customer logs one request; pros answer with their own price and availability.
+   Published prices answer automatically, so there is usually something bookable at once. */
+let quoteRequestId = null;
+let quotesList = [];
+let chosenQuote = null;
+
+function quotesReady() {
+  return !!(sel.package && sel.unit && sel.lat != null && el('order-address').value.trim());
+}
+
+function resetQuotes(message) {
+  quoteRequestId = null; quotesList = []; chosenQuote = null;
+  el('quote-list').innerHTML = `<p class="empty">${message}</p>`;
+  el('quote-status').textContent = '';
+  updateTotal();
+}
+
+function renderQuotes() {
+  const box = el('quote-list');
+  if (!quotesList.length) {
+    box.innerHTML = '<p class="empty">Waiting for pros to send their prices…</p>';
+    chosenQuote = null;
     updateTotal();
     return;
   }
-  box.innerHTML = '<p class="empty">Finding pros near you…</p>';
-  try {
-    const q = await api(`/api/quote/providers?service=${svc}&package=${sel.package}&vehicle=${sel.unit}&lat=${sel.lat}&lng=${sel.lng}`);
-    providers = q.providers || [];
-    if (!providers.length) {
-      chosenPro = null;
-      box.innerHTML = '<p class="empty">No pros are available at this address right now. Try again shortly or move your pin.</p>';
-      updateTotal();
-      return;
-    }
-    if (!providers.some((p) => p.supplier_id === chosenPro)) chosenPro = providers[0].supplier_id;
-    box.innerHTML = providers.map((p) => `
-      <div class="pro-opt ${p.supplier_id === chosenPro ? 'selected' : ''}" data-id="${p.supplier_id}">
-        <div>
-          <div class="who">${p.business_name}</div>
-          <div class="meta">${p.distance_km} km away${p.rating ? ` · ★ ${p.rating} (${p.rating_count})` : ' · New pro'}</div>
-        </div>
-        <div class="amt">
-          <strong>${rand(p.total_cents)}</strong>
-          <span class="brk">${rand(p.supplier_price_cents)} pro${p.callout_fee_cents ? ' + ' + rand(p.callout_fee_cents) + ' callout' : ''} + ${rand(p.platform_fee_cents)} fee</span>
-        </div>
-      </div>`).join('');
-    box.querySelectorAll('.pro-opt').forEach((n) => n.onclick = () => {
-      chosenPro = Number(n.dataset.id);
-      box.querySelectorAll('.pro-opt').forEach((x) => x.classList.toggle('selected', x === n));
-      updateTotal();
-    });
-  } catch (e) {
-    providers = []; chosenPro = null;
-    box.innerHTML = '<p class="empty">Could not load pros right now.</p>';
-  }
+  if (!quotesList.some((q) => q.id === chosenQuote)) chosenQuote = quotesList[0].id;
+  box.innerHTML = quotesList.map((q) => `
+    <div class="pro-opt ${q.id === chosenQuote ? 'selected' : ''}" data-id="${q.id}">
+      <div>
+        <div class="who">${escapeHtml(q.business_name)}</div>
+        <div class="meta">${q.distance_km} km away${q.rating ? ` · ★ ${q.rating} (${q.rating_count})` : ' · New pro'}</div>
+        ${q.availability ? `<div class="meta">${escapeHtml(q.availability)}</div>` : ''}
+        ${q.note ? `<div class="meta">${escapeHtml(q.note)}</div>` : ''}
+      </div>
+      <div class="amt">
+        <strong>${rand(q.total_cents)}</strong>
+        <span class="brk">${rand(q.supplier_price_cents)} pro${q.callout_fee_cents ? ' + ' + rand(q.callout_fee_cents) + ' callout' : ''} + ${rand(q.platform_fee_cents)} fee</span>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('.pro-opt').forEach((n) => n.onclick = () => {
+    chosenQuote = Number(n.dataset.id);
+    box.querySelectorAll('.pro-opt').forEach((x) => x.classList.toggle('selected', x === n));
+    updateTotal();
+  });
   updateTotal();
+}
+
+el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros…', async () => {
+  if (!quotesReady()) {
+    showError('order-error', 'Pick a package, a size, your location and an address first.');
+    return;
+  }
+  try {
+    const r = await api('/api/quote-requests', {
+      method: 'POST',
+      body: {
+        service: svc, package: sel.package, vehicle: sel.unit,
+        address: el('order-address').value, lat: sel.lat, lng: sel.lng,
+        notes: el('order-notes').value,
+      },
+    });
+    quoteRequestId = r.request_id;
+    quotesList = r.quotes || [];
+    el('quote-status').textContent = r.asked
+      ? `${r.asked} pro${r.asked === 1 ? '' : 's'} asked · ${r.auto_quoted} answered instantly`
+      : 'No pros are online near you right now.';
+    renderQuotes();
+  } catch (e) { showError('order-error', e.message); }
+});
+
+// Anything that changes the job invalidates the prices pros gave for it.
+function invalidateQuotes() {
+  if (!quoteRequestId) return;
+  api(`/api/quote-requests/${quoteRequestId}/cancel`, { method: 'POST' }).catch(() => {});
+  resetQuotes('The job changed — ask for prices again.');
 }
 
 function refreshPointsRow() {
@@ -280,24 +322,22 @@ function refreshSavedAddress() {
 }
 
 function updateTotal() {
-  const pro = providers.find((p) => p.supplier_id === chosenPro);
-  const notes = [];
-  if (!pro) {
+  const q = quotesList.find((x) => x.id === chosenQuote);
+  if (!q) {
     el('order-total').textContent = '—';
-    el('price-note').textContent = sel.package && sel.unit && sel.lat != null
-      ? 'Choose a pro above to see your total.' : '';
+    el('price-note').textContent = quotesReady()
+      ? 'Ask for prices above, then pick a pro.' : '';
     return;
   }
   const usePoints = el('use-points').checked;
-  const discount = usePoints ? Math.min(me?.points_cents || 0, pro.total_cents) : 0;
-  animateRand(el('order-total'), pro.total_cents - discount);
-  notes.push(`${pro.business_name}: ${rand(pro.supplier_price_cents)}`);
-  if (pro.callout_fee_cents) notes.push(`callout ${rand(pro.callout_fee_cents)}`);
-  notes.push(`service fee ${rand(pro.platform_fee_cents)}`);
+  const discount = usePoints ? Math.min(me?.points_cents || 0, q.total_cents) : 0;
+  animateRand(el('order-total'), q.total_cents - discount);
+  const notes = [`${q.business_name}: ${rand(q.supplier_price_cents)}`];
+  if (q.callout_fee_cents) notes.push(`callout ${rand(q.callout_fee_cents)}`);
+  notes.push(`service fee ${rand(q.platform_fee_cents)}`);
   if (discount > 0) notes.push(`rewards −${rand(discount)}`);
   el('price-note').textContent = notes.join(' · ');
 }
-
 
 /* ---------- map ---------- */
 function initMap() {
@@ -322,7 +362,7 @@ function setPin(lat, lng) {
   if (pin) pin.setLatLng([lat, lng]); else pin = L.marker([lat, lng]).addTo(map);
   el('pin-status').innerHTML = `${icon('pin')} Pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   refreshCallout();
-  refreshProviders();
+  invalidateQuotes();
 }
 
 el('btn-geolocate').onclick = () => {
@@ -442,16 +482,12 @@ function openAccount() {
 el('btn-place-order').onclick = async () => {
   try {
     if (!sel.package || !sel.unit) throw new Error('Choose a package and an option first');
-    if (!chosenPro) throw new Error('Choose a pro before booking');
+    if (!chosenQuote) throw new Error('Ask for prices, then pick a pro before booking');
     const payment_method = document.querySelector('input[name=pay]:checked').value;
-    const data = await api('/api/orders', {
+    // The quote IS the pro's commitment, so accepting it books the job outright.
+    const data = await api(`/api/quotes/${chosenQuote}/accept`, {
       method: 'POST',
-      body: {
-        service: svc, package: sel.package, vehicle: sel.unit, supplier_id: chosenPro,
-        address: el('order-address').value, lat: sel.lat, lng: sel.lng,
-        notes: el('order-notes').value, payment_method,
-        use_points: el('use-points').checked,
-      },
+      body: { payment_method, use_points: el('use-points').checked },
     });
     if (data.payment_url) { window.location.href = data.payment_url; return; }
     const { user } = await api('/api/auth/me');

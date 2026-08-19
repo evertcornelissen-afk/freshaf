@@ -88,11 +88,150 @@ router.get('/quote/providers', authRequired('customer'), (req, res) => {
   res.json({ providers, fee_pct: feePct });
 });
 
+/* ---------- hybrid quoting ----------
+   The customer logs the job once; published prices answer instantly, per-job pros answer
+   themselves. Everything the customer picks from is a real commitment from a real pro. */
+const quotes = require('../quotes');
+const { SERVICES } = require('../pricing');
+
+function catalogHas(service, pkg, unit) {
+  const svc = SERVICES[service];
+  return !!(svc && svc.packages[pkg] && svc.units[unit]);
+}
+
+router.post('/quote-requests', authRequired('customer'), (req, res) => {
+  const { service, package: pkg, vehicle, address, lat, lng, notes } = req.body || {};
+  if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
+  if (!catalogHas(service, pkg, vehicle)) return res.status(400).json({ error: 'Choose a package and size' });
+  if (!address?.trim() || typeof lat !== 'number' || typeof lng !== 'number') {
+    return res.status(400).json({ error: 'Pick your location on the map and enter an address' });
+  }
+
+  // One open request per service — otherwise pros get the same job twice.
+  const existing = db.prepare(`SELECT id FROM quote_requests
+    WHERE customer_id = ? AND service = ? AND status = 'open'`).get(req.user.id, service);
+  if (existing) {
+    db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE id = ?").run(existing.id);
+    db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE request_id = ? AND status = 'open'").run(existing.id);
+  }
+
+  const windowMin = quotes.settings().windowMin;
+  const info = db.prepare(`
+    INSERT INTO quote_requests (customer_id, service, package, vehicle, address, lat, lng, notes, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' minutes'))`)
+    .run(req.user.id, service, pkg, vehicle, address.trim(), lat, lng,
+      (notes || '').slice(0, 300) || null, windowMin);
+
+  const request = quotes.getRequest(Number(info.lastInsertRowid));
+  const { asked, auto } = quotes.openRequest(request);
+  res.json({
+    request_id: request.id,
+    asked, auto_quoted: auto,
+    expires_in_min: windowMin,
+    quotes: quotes.listQuotes(request.id),
+  });
+});
+
+router.get('/quote-requests/:id', authRequired('customer'), (req, res) => {
+  const request = db.prepare('SELECT * FROM quote_requests WHERE id = ? AND customer_id = ?')
+    .get(req.params.id, req.user.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
+  res.json({
+    request_id: request.id, status: request.status, order_id: request.order_id,
+    quotes: quotes.listQuotes(request.id),
+  });
+});
+
+router.post('/quote-requests/:id/cancel', authRequired('customer'), (req, res) => {
+  const request = db.prepare('SELECT * FROM quote_requests WHERE id = ? AND customer_id = ?')
+    .get(req.params.id, req.user.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
+  if (request.status === 'open') {
+    db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE id = ?").run(request.id);
+    db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE request_id = ? AND status = 'open'").run(request.id);
+  }
+  res.json({ ok: true });
+});
+
 router.get('/quote/callout', authRequired('customer'), (req, res) => {
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   const service = SERVICE_KEYS.includes(req.query.service) ? req.query.service : 'carwash';
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'lat and lng required' });
   res.json(computeCallout(lat, lng, service));
+});
+
+// Accept one quote: it becomes the order, at exactly the price that pro quoted.
+router.post('/quotes/:id/accept', authRequired('customer'), (req, res) => {
+  const { payment_method, use_points } = req.body || {};
+  if (!['card', 'cash'].includes(payment_method)) return res.status(400).json({ error: 'Choose a payment method' });
+
+  const q = db.prepare(`SELECT q.*, r.customer_id, r.service, r.package, r.vehicle,
+      r.address, r.lat, r.lng, r.notes, r.status AS request_status, r.id AS request_id
+    FROM quotes q JOIN quote_requests r ON r.id = q.request_id
+    WHERE q.id = ? AND r.customer_id = ?`).get(req.params.id, req.user.id);
+  if (!q) return res.status(404).json({ error: 'Quote not found' });
+  if (q.status !== 'open') return res.status(409).json({ error: 'That quote is no longer available' });
+  if (q.request_status !== 'open') return res.status(409).json({ error: 'This request is closed' });
+
+  const active = db.prepare(`SELECT id FROM orders WHERE customer_id = ? AND service = ?
+    AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, q.service);
+  if (active) return res.status(409).json({ error: 'You already have an active order for this service. Complete or cancel it first.' });
+
+  // The pro must still be free — they may have taken another job while quoting.
+  const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ?
+    AND status IN ('accepted','en_route','in_progress')`).get(q.supplier_id);
+  if (busy) return res.status(409).json({ error: 'That pro has just taken another job. Please pick another quote.' });
+
+  const customer = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const pointsUsed = use_points ? Math.min(customer.points_cents || 0, q.total_cents) : 0;
+  if (pointsUsed > 0) {
+    db.prepare('UPDATE users SET points_cents = points_cents - ? WHERE id = ?').run(pointsUsed, req.user.id);
+  }
+  const amountDue = q.total_cents - pointsUsed;
+  if (customer.home_lat == null) {
+    db.prepare('UPDATE users SET home_lat = ?, home_lng = ?, home_address = COALESCE(home_address, ?) WHERE id = ?')
+      .run(q.lat, q.lng, q.address, req.user.id);
+  }
+
+  const isCash = payment_method === 'cash';
+  const paidByPoints = !isCash && amountDue === 0;
+  const paymentStatus = isCash ? 'collect_on_completion' : paidByPoints ? 'paid' : 'unpaid';
+  // A quote is the pro's commitment, so there is no second accept step — once it is paid
+  // for (or is cash) the job is theirs.
+  const status = (isCash || paidByPoints) ? 'accepted' : 'pending_payment';
+
+  const info = db.prepare(`INSERT INTO orders
+    (customer_id, supplier_id, service, package, vehicle, price_cents, callout_fee_cents,
+     points_used_cents, supplier_price_cents, platform_fee_cents, requested_supplier_id,
+     address, lat, lng, notes, payment_method, payment_status, status, accepted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(req.user.id, (isCash || paidByPoints) ? q.supplier_id : null,
+      q.service, q.package, q.vehicle, q.total_cents, q.callout_fee_cents, pointsUsed,
+      q.supplier_price_cents, q.platform_fee_cents, q.supplier_id,
+      q.address, q.lat, q.lng, q.notes, payment_method, paymentStatus, status,
+      (isCash || paidByPoints) ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null);
+  const orderId = Number(info.lastInsertRowid);
+
+  db.prepare("UPDATE quotes SET status = 'accepted' WHERE id = ?").run(q.id);
+  db.prepare("UPDATE quotes SET status = 'declined' WHERE request_id = ? AND id != ? AND status = 'open'")
+    .run(q.request_id, q.id);
+  db.prepare("UPDATE quote_requests SET status = 'booked', order_id = ? WHERE id = ?").run(orderId, q.request_id);
+
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  // Tell every pro who quoted how it went, so nobody is left waiting.
+  for (const other of db.prepare('SELECT supplier_id, status FROM quotes WHERE request_id = ?').all(q.request_id)) {
+    realtime.send(other.supplier_id, 'quote_result', {
+      request_id: q.request_id,
+      won: other.supplier_id === q.supplier_id && (isCash || paidByPoints),
+      pending_payment: other.supplier_id === q.supplier_id && !(isCash || paidByPoints),
+    });
+  }
+  if (isCash || paidByPoints) {
+    dispatch.notifyCustomer(order);
+    return res.json({ order: dispatch.orderPublic(order) });
+  }
+  const pay = payments.createPayment(order, customer);
+  res.json({ order: dispatch.orderPublic(order), payment_url: pay.url, payment_mode: pay.mode });
 });
 
 router.post('/orders', authRequired('customer'), (req, res) => {
@@ -168,13 +307,35 @@ router.post('/orders', authRequired('customer'), (req, res) => {
 });
 
 // Sandbox payment confirmation (used by /pay/:id page when no PayFast keys are set).
+// A paid order that came from an accepted quote already has its pro committed — confirm
+// the booking instead of putting it back out to dispatch.
+function afterPayment(orderId) {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  if (!order) return;
+  const fromQuote = db.prepare("SELECT id FROM quote_requests WHERE order_id = ? AND status = 'booked'").get(orderId);
+  if (fromQuote && order.requested_supplier_id) {
+    const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ? AND id != ?
+      AND status IN ('accepted','en_route','in_progress')`).get(order.requested_supplier_id, orderId);
+    if (!busy) {
+      db.prepare(`UPDATE orders SET supplier_id = ?, status = 'accepted',
+        accepted_at = datetime('now') WHERE id = ?`).run(order.requested_supplier_id, orderId);
+      const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+      dispatch.notifyCustomer(updated);
+      realtime.send(order.requested_supplier_id, 'quote_result', { request_id: fromQuote.id, won: true });
+      return;
+    }
+    // The pro took something else while the customer was paying — fall back to dispatch.
+  }
+  dispatch.startDispatch(orderId);
+}
+
 router.post('/orders/:id/pay-sandbox', authRequired('customer'), (req, res) => {
   if (payments.LIVE) return res.status(400).json({ error: 'Live payments enabled — sandbox disabled' });
   const order = db.prepare('SELECT * FROM orders WHERE id = ? AND customer_id = ?').get(req.params.id, req.user.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'Order is not awaiting payment' });
   db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(order.id);
-  dispatch.startDispatch(order.id);
+  afterPayment(order.id);
   res.json({ ok: true });
 });
 
@@ -190,7 +351,7 @@ router.post('/payments/payfast/itn', express.urlencoded({ extended: false }), (r
     const order = db.prepare("SELECT * FROM orders WHERE id = ? AND status = 'pending_payment'").get(orderId);
     if (order) {
       db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(orderId);
-      dispatch.startDispatch(orderId);
+      afterPayment(orderId);
     }
   }
   res.send('ok');

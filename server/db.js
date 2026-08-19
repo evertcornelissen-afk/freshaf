@@ -149,6 +149,47 @@ CREATE TABLE IF NOT EXISTS supplier_prices (
 );
 `);
 
+// Hybrid quoting. The customer logs one request; pros who already published a price
+// answer it instantly and automatically, and pros who price per job answer it themselves
+// with their own price and when they can come. The customer picks from whatever arrives.
+db.exec(`
+CREATE TABLE IF NOT EXISTS quote_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL REFERENCES users(id),
+  service TEXT NOT NULL,
+  package TEXT NOT NULL,
+  vehicle TEXT NOT NULL,
+  address TEXT NOT NULL,
+  lat REAL NOT NULL, lng REAL NOT NULL,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','booked','cancelled','expired')),
+  order_id INTEGER REFERENCES orders(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS quotes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL REFERENCES quote_requests(id),
+  supplier_id INTEGER NOT NULL REFERENCES users(id),
+  supplier_price_cents INTEGER NOT NULL,
+  callout_fee_cents INTEGER NOT NULL DEFAULT 0,
+  platform_fee_cents INTEGER NOT NULL DEFAULT 0,
+  total_cents INTEGER NOT NULL,
+  distance_km REAL,
+  availability TEXT,
+  note TEXT,
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('auto','manual')),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','accepted','declined','withdrawn','expired')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (request_id, supplier_id)
+);
+CREATE INDEX IF NOT EXISTS idx_quotes_request ON quotes(request_id, status);
+CREATE INDEX IF NOT EXISTS idx_quotes_supplier ON quotes(supplier_id, status);
+CREATE INDEX IF NOT EXISTS idx_qr_customer ON quote_requests(customer_id, status);
+`);
+// How long a request stays open for pros to answer.
+if (!getSetting('quote_window_min')) setSetting('quote_window_min', '30');
+
 // WhatsApp job alerts. A pro only gets them once they have proved the number is theirs,
 // so we keep a short-lived code per pro and an audit line for every message we send.
 db.exec(`

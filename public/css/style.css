@@ -155,7 +155,7 @@ a:hover { color: var(--accent); }
 }
 .brand { display: flex; align-items: center; }
 .brand .stack { line-height: 1.05; }
-.brand .logo-img { height: 21px; display: block; margin-bottom: 4px; }
+.brand .logo-img { height: 27px; display: block; margin-bottom: 5px; }
 .brand .tag {
   color: var(--faint); font-size: .66rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .16em; font-style: normal;
@@ -693,7 +693,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 }
 [data-theme="dark"] .topbar.is-scrolled { background: rgba(12, 21, 27, .93); }
 .topbar .brand .logo-img { transition: height .32s var(--ease); }
-.topbar.is-scrolled .brand .logo-img { height: 18px; }
+.topbar.is-scrolled .brand .logo-img { height: 23px; }
 /* "Fresh and Fast" says what the name stands for, so it stays put — on every screen
    size and while scrolling. It is the whole reason the tagline is there. */
 
@@ -787,7 +787,7 @@ button:active { transform: translateY(0) scale(.975); }
   .topbar { padding: 11px 13px; gap: 8px; flex-wrap: nowrap; }
   .topbar .brand { min-width: 0; }
   .topbar .brand .stack { display: block; min-width: 0; }
-  .topbar .brand .logo-img { height: 19px; }
+  .topbar .brand .logo-img { height: 24px; }
   .topbar .brand .tag { font-size: .6rem; letter-spacing: .12em; }
   .topbar > .row { flex-wrap: nowrap; gap: 6px; flex: none; }
   .topbar button.small { padding: 7px 11px; font-size: .75rem; }

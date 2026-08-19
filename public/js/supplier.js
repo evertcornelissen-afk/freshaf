@@ -99,6 +99,7 @@ function decorate() {
   el('btn-enable-alerts').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-avail').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-offers').insertAdjacentHTML('afterbegin', icon('spark'));
+  el('h-requests').insertAdjacentHTML('afterbegin', icon('wallet'));
   el('h-active').insertAdjacentHTML('afterbegin', icon('droplet'));
   el('h-earnings').insertAdjacentHTML('afterbegin', icon('wallet'));
   el('h-wa').insertAdjacentHTML('afterbegin', icon('signal'));
@@ -294,11 +295,24 @@ async function enterDash() {
     el('radius-km').value = me.supplier.radius_km;
     el('radius-label').textContent = me.supplier.radius_km + ' km';
   }
-  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices(), refreshAlerts()]); // content first, then reveal
+  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices(), refreshAlerts(), refreshRequests()]); // content first, then reveal
   show('view-dash');
   initMap();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
+    quote_request: (data) => {
+      ping();
+      toast(data.auto_quoted
+        ? 'New request nearby — your published price was sent automatically'
+        : 'New request nearby — send your price', 'info');
+      refreshRequests();
+    },
+    quote_result: (data) => {
+      if (data.won) toast('You won the job — it is in your active jobs now', 'ok');
+      else if (data.pending_payment) toast('Customer chose you — waiting on their payment', 'info');
+      refreshRequests();
+      refreshJobs();
+    },
     offer: (data) => {
       ping();
       toast('New job offer nearby', 'info');
@@ -513,6 +527,85 @@ function renderWaConfirm(dryRun) {
     } catch (e) { showError('wa-error', e.message); }
   });
   el('wa-back').onclick = () => renderWaEntry('');
+}
+
+/* ---------- job requests (quote them) ---------- */
+let reqFeePct = 10;
+
+async function refreshRequests() {
+  const data = await api('/api/supplier/quote-requests');
+  reqFeePct = data.fee_pct ?? 10;
+  const box = el('requests-box');
+  const list = data.requests || [];
+  if (!list.length) {
+    box.innerHTML = '<p class="empty">No open requests near you right now. Stay online — they appear here the moment a customer asks.</p>';
+    return;
+  }
+  box.innerHTML = list.map((r) => {
+    const quoted = r.my_quote && r.my_quote.status === 'open';
+    return `
+    <div class="offer-card" data-req="${r.id}">
+      <div class="row spread">
+        <div>
+          <strong>${escapeHtml(r.package_name)}</strong>
+          <div class="muted small-text">${escapeHtml(r.unit_name)} · ${r.distance_km} km away</div>
+          <div class="muted small-text">${escapeHtml(r.address)}</div>
+          ${r.notes ? `<div class="muted small-text">Note: ${escapeHtml(r.notes)}</div>` : ''}
+        </div>
+        <span class="pill ${quoted ? 'ok' : 'warn'}">${quoted ? 'You quoted ' + rand(r.my_quote.price_cents) : 'Awaiting your price'}</span>
+      </div>
+      <div class="row mt" style="align-items:flex-end;gap:10px">
+        <div style="flex:1;min-width:120px">
+          <label style="margin-bottom:4px">Your price (R)</label>
+          <input type="number" class="q-price" min="20" max="20000" step="10"
+                 value="${quoted ? Math.round(r.my_quote.price_cents / 100) : ''}"
+                 placeholder="${r.suggested_cents ? Math.round(r.suggested_cents / 100) : '250'}">
+        </div>
+        <div style="flex:1;min-width:150px">
+          <label style="margin-bottom:4px">When can you come?</label>
+          <input class="q-when" maxlength="80" value="${quoted ? escapeHtml(r.my_quote.availability || '') : ''}"
+                 placeholder="e.g. Today within the hour">
+        </div>
+      </div>
+      ${r.callout_fee_cents ? `<p class="muted small-text mt">Plus ${rand(r.callout_fee_cents)} callout, also yours.</p>` : ''}
+      <div class="row mt">
+        <button class="small q-send">${quoted ? 'Update my price' : 'Send my price'}</button>
+        <button class="ghost small q-skip">Not interested</button>
+        <span class="muted small-text q-preview"></span>
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.offer-card').forEach((card) => {
+    const id = card.dataset.req;
+    const priceInput = card.querySelector('.q-price');
+    const preview = card.querySelector('.q-preview');
+    const showPreview = () => {
+      const r = Math.round(Number(priceInput.value));
+      preview.textContent = Number.isFinite(r) && r > 0
+        ? `You earn R${r} · customer pays about R${Math.round(r * (1 + reqFeePct / 100))}` : '';
+    };
+    priceInput.addEventListener('input', showPreview);
+    showPreview();
+    card.querySelector('.q-send').onclick = (e) => withBusy(e.target, 'Sending…', async () => {
+      try {
+        const rands = Math.round(Number(priceInput.value));
+        if (!Number.isFinite(rands) || rands <= 0) throw new Error('Enter your price first');
+        await api(`/api/supplier/quote-requests/${id}/quote`, {
+          method: 'POST',
+          body: { price_cents: rands * 100, availability: card.querySelector('.q-when').value },
+        });
+        toast('Price sent — the customer can book you now', 'ok');
+        await refreshRequests();
+      } catch (err) { showError('req-error', err.message); }
+    });
+    card.querySelector('.q-skip').onclick = async () => {
+      try {
+        await api(`/api/supplier/quote-requests/${id}/decline`, { method: 'POST' });
+        await refreshRequests();
+      } catch (err) { showError('req-error', err.message); }
+    };
+  });
 }
 
 async function refreshEarnings() {
