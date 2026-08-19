@@ -26,19 +26,19 @@ collection**. Customers book, the pro they choose comes to them. Built as a web 
     deploy, and silently invalidated every login cookie. Env vars survive restarts, so that
     cause of being signed out is gone. **This is only half the fix** — see the disk item above:
     if the database itself is reset, the user account is gone regardless of a valid cookie.
-  - **ROOT CAUSE of the broken auto-deploy, found in the build log 19 Aug:**
-    `==> It looks like we don't have access to your repo, but we'll try to clone it anyway.`
-    Render's GitHub connection has lost access to the repository. It can still *clone* because
-    the repo is public, which is why manual deploys work — but with no repo access there is no
-    webhook, so pushes never trigger a build. Fix: Render → the service → **Connect** → reconnect
-    the GitHub account and re-authorise the `freshaf` repo. Until then every push needs a manual
-    Manual Deploy → Deploy latest commit.
-  - Render does **not** auto-deploy on git push — **even though its Settings page says
-    Auto-Deploy: "On Commit"**. Verified twice on 19 Aug: pushed, waited 4+ minutes, no deploy
-    event appeared; the same commit deployed instantly when triggered by hand. The GitHub
-    webhook is not reaching Render. Worth fixing at source (disconnect and reconnect the repo
-    in Render, or check the webhook's delivery log in GitHub repo Settings → Webhooks),
-    otherwise every future push needs a manual trigger.
+  - **AUTO-DEPLOY — fixed 19 Aug.** The real cause was that Render had **no GitHub connection
+    at all**: Settings → Source → Edit showed *"No repositories found"*, because the service was
+    created from a **public Git URL**. Render can clone a public URL but gets no webhook from it,
+    which is why Auto-Deploy read "On Commit" while nothing ever happened, and why every build
+    log warned `It looks like we don't have access to your repo, but we'll try to clone it anyway.`
+    Two things were done: Evert installed Render's GitHub app, and a **GitHub push webhook
+    (id 667846481) pointing at Render's private Deploy Hook** was added with `gh`.
+    Inspect or repair it with:
+    `gh api repos/evertcornelissen-afk/freshaf/hooks` and
+    `gh api repos/evertcornelissen-afk/freshaf/hooks/667846481/deliveries`.
+    ⚠️ **Regenerating the Deploy Hook in Render invalidates that webhook** — update its config
+    URL to match. If you ever see two deploys per push, the GitHub app and the webhook are both
+    firing: delete the webhook and keep the app.
   - Manual trigger via the dashboard: Events page → **Manual Deploy → Deploy latest commit**.
     The dropdown is flaky under automation — clicking the button sometimes toggles without
     rendering the menu; click, check for the menu, click again if it did not open.
