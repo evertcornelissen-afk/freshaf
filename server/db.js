@@ -157,6 +157,10 @@ addColumn('orders', 'platform_fee_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'fee_settled INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'requested_supplier_id INTEGER');
 addColumn('suppliers', 'radius_km REAL');
+// Scheduling. NULL means as soon as possible. Stored as local wall time
+// ("2026-08-22 09:00") — South Africa is a single zone with no daylight saving,
+// so there is nothing to convert and no ambiguity.
+addColumn('orders', 'scheduled_for TEXT');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS supplier_prices (
@@ -182,6 +186,7 @@ CREATE TABLE IF NOT EXISTS quote_requests (
   lat REAL NOT NULL, lng REAL NOT NULL,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','booked','cancelled','expired')),
+  scheduled_for TEXT,
   order_id INTEGER REFERENCES orders(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   expires_at TEXT NOT NULL
@@ -207,6 +212,7 @@ CREATE INDEX IF NOT EXISTS idx_quotes_supplier ON quotes(supplier_id, status);
 CREATE INDEX IF NOT EXISTS idx_qr_customer ON quote_requests(customer_id, status);
 `);
 // How long a request stays open for pros to answer.
+addColumn('quote_requests', 'scheduled_for TEXT');
 if (!getSetting('quote_window_min')) setSetting('quote_window_min', '30');
 
 // WhatsApp job alerts. A pro only gets them once they have proved the number is theirs,

@@ -251,6 +251,8 @@ router.get('/quote-requests', requireApproved, (req, res) => {
       unit_label: svc?.unitLabel || '',
       address: r.address,
       notes: r.notes,
+      scheduled_for: r.scheduled_for || null,
+      when_label: quotes.whenLabel(r.scheduled_for),
       distance_km: +distance.toFixed(1),
       callout_fee_cents: quotes.calloutFor(distance),
       suggested_cents: svc?.packages[r.package]?.base ?? null,

@@ -86,6 +86,17 @@ The customer logs the job **once**; pros answer with their own price and availab
 - Tables: `quote_requests`, `quotes`. Logic in `server/quotes.js`.
 - The old `/api/quote/providers` and `POST /api/orders` paths still exist and still work.
 
+### Scheduling (added 20 Aug)
+Step 4 of the booking form is **As soon as possible** or **Schedule a time** (datetime-local,
+15-minute steps, 15 min to 30 days ahead, validated server-side in `parseScheduledFor`).
+Stored on `quote_requests.scheduled_for` and copied to `orders.scheduled_for` as **local wall
+time** (`2026-08-23 14:30`) — South Africa is a single zone with no daylight saving, so nothing
+is converted. Pros see the slot on the request card and quote against it.
+**Important consequence:** the "pro is already busy" filter is skipped for scheduled work, in
+`quotes.eligiblePros`, in quote acceptance and in `afterPayment`. A pro mid-job today can and
+should be able to take a booking for Saturday — verified a pro holding an ASAP job and a future
+booking at the same time.
+
 ## Customer flow (rebuilt 28 July, quoting added 19 Aug)
 Home (logged out) → register/login → **category chooser: Car Wash or Laundry** → booking
 (package → vehicle/load → map pin + address → **choose your pro** → payment) → live tracking.

@@ -29,8 +29,14 @@ function calloutFor(distanceKm) {
 }
 
 // Every pro who could do this job, whether or not they have published a price.
+// A pro mid-job cannot take another one *right now*, but they can absolutely take a
+// booking for Saturday — so the busy filter only applies to as-soon-as-possible work.
 function eligiblePros(request) {
   const { maxRadius } = settings();
+  const busyClause = request.scheduled_for ? '' : `
+      AND s.user_id NOT IN (
+        SELECT supplier_id FROM orders
+        WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))`;
   const rows = db.prepare(`
     SELECT s.user_id, s.business_name, s.lat, s.lng, s.radius_km, s.rating_sum, s.rating_count,
            u.name AS pro_name, u.phone, u.phone_verified_at, s.alert_whatsapp,
@@ -39,10 +45,7 @@ function eligiblePros(request) {
     FROM suppliers s
     JOIN users u ON u.id = s.user_id
     WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
-      AND instr(',' || s.services || ',', ',' || ? || ',') > 0
-      AND s.user_id NOT IN (
-        SELECT supplier_id FROM orders
-        WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
+      AND instr(',' || s.services || ',', ',' || ? || ',') > 0${busyClause}
   `).all(request.service, request.package, request.service);
 
   return rows.map((r) => {
@@ -120,6 +123,16 @@ function notifyCustomer(request) {
 
 function serviceLabel(service) { return service === 'laundry' ? 'Laundry' : 'Car wash'; }
 
+// "2026-08-22 09:00" -> "Sat 22 Aug, 09:00". Null means as soon as possible.
+function whenLabel(scheduledFor) {
+  if (!scheduledFor) return 'As soon as possible';
+  const d = new Date(String(scheduledFor).replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return String(scheduledFor);
+  return d.toLocaleString('en-ZA', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
 // Ask everyone, and auto-answer for anyone who already published a price.
 function openRequest(request) {
   const pros = eligiblePros(request);
@@ -133,7 +146,9 @@ function openRequest(request) {
     if (listed != null) {
       insertQuote({
         requestId: request.id, supplierId: pro.user_id, supplierPrice: listed,
-        distanceKm: pro.distance, availability: 'From your published price list',
+        distanceKm: pro.distance,
+        // For a booked slot the useful thing to show is the slot, not where the price came from.
+        availability: request.scheduled_for ? whenLabel(request.scheduled_for) : 'From your published price list',
         note: null, source: 'auto',
       });
       auto++;
@@ -149,6 +164,7 @@ function openRequest(request) {
       vehicle: request.vehicle,
       address: request.address,
       distance_km: +pro.distance.toFixed(1),
+      scheduled_for: request.scheduled_for,
       auto_quoted: listed != null,
     });
   }
@@ -157,7 +173,7 @@ function openRequest(request) {
   for (const pro of asked) {
     push.sendToUser(pro.user_id, {
       title: `New ${serviceLabel(request.service).toLowerCase()} request — send your price`,
-      body: `${pro.distance.toFixed(1)} km away · ${request.address}\nOpen FreshAF Pro to quote.`,
+      body: `${whenLabel(request.scheduled_for)} · ${pro.distance.toFixed(1)} km away\n${request.address}\nOpen FreshAF Pro to quote.`,
       url: '/supplier',
       tag: `quote-${request.id}`,
     }).catch(() => {});
@@ -200,5 +216,5 @@ staleTimer.unref?.();
 
 module.exports = {
   openRequest, listQuotes, insertQuote, notifyCustomer, getRequest,
-  eligiblePros, calloutFor, settings, expireStale, quotePublic, serviceLabel,
+  eligiblePros, calloutFor, settings, expireStale, quotePublic, serviceLabel, whenLabel,
 };

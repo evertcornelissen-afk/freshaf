@@ -160,14 +160,25 @@
       <input id="order-address" placeholder="e.g. 12 Rivonia Rd, Sandton — basement P2, bay 41">
       <label id="notes-label">Notes for the pro (optional)</label>
       <input id="order-notes" placeholder="e.g. White Hilux, keys with security">
-      <h3><span class="step-num">4</span>Get prices</h3>
+      <h3><span class="step-num">4</span>When do you want it?</h3>
+      <div class="seg" id="when-seg">
+        <label><input type="radio" name="when" value="asap" checked><span id="seg-asap">As soon as possible</span></label>
+        <label><input type="radio" name="when" value="scheduled"><span id="seg-later">Schedule a time</span></label>
+      </div>
+      <div id="when-picker" class="hidden mt">
+        <label for="scheduled-for">Date and time</label>
+        <input type="datetime-local" id="scheduled-for" step="900">
+        <p class="muted small-text" id="when-hint">Pros quote against this time and tell you if they can make it. You can book up to 30 days ahead.</p>
+      </div>
+
+      <h3><span class="step-num">5</span>Get prices</h3>
       <p class="muted small-text" style="margin-bottom:10px">Pros near you send their price and when they can come. Pros with a published price answer instantly; the rest reply as they see it.</p>
       <div class="row">
         <button class="secondary" id="btn-get-quotes">Get prices</button>
         <span id="quote-status" class="muted small-text"></span>
       </div>
       <div id="quote-list" class="mt"><p class="empty">Choose a package and drop your pin, then ask for prices.</p></div>
-      <h3><span class="step-num">5</span>Payment</h3>
+      <h3><span class="step-num">6</span>Payment</h3>
       <div class="seg" id="pay-seg">
         <label><input type="radio" name="pay" value="card" checked><span id="seg-card">Card</span></label>
         <label><input type="radio" name="pay" value="cash"><span id="seg-cash">Cash on completion</span></label>

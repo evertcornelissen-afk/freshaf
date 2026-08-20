@@ -99,13 +99,29 @@ function catalogHas(service, pkg, unit) {
   return !!(svc && svc.packages[pkg] && svc.units[unit]);
 }
 
+// Accepts "2026-08-22T09:00" from a datetime-local input. Stored as local wall time —
+// South Africa has one timezone and no daylight saving, so there is nothing to convert.
+function parseScheduledFor(raw) {
+  if (!raw) return { value: null };
+  const m = String(raw).trim().match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  if (!m) return { error: 'That date and time could not be read' };
+  const when = new Date(`${m[1]}T${m[2]}`);
+  if (Number.isNaN(when.getTime())) return { error: 'That date and time could not be read' };
+  const now = Date.now();
+  if (when.getTime() < now + 15 * 60 * 1000) return { error: 'Choose a time at least 15 minutes from now' };
+  if (when.getTime() > now + 30 * 24 * 3600 * 1000) return { error: 'You can book up to 30 days ahead' };
+  return { value: `${m[1]} ${m[2]}` };
+}
+
 router.post('/quote-requests', authRequired('customer'), (req, res) => {
-  const { service, package: pkg, vehicle, address, lat, lng, notes } = req.body || {};
+  const { service, package: pkg, vehicle, address, lat, lng, notes, scheduled_for } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
   if (!catalogHas(service, pkg, vehicle)) return res.status(400).json({ error: 'Choose a package and size' });
   if (!address?.trim() || typeof lat !== 'number' || typeof lng !== 'number') {
     return res.status(400).json({ error: 'Pick your location on the map and enter an address' });
   }
+  const sched = parseScheduledFor(scheduled_for);
+  if (sched.error) return res.status(400).json({ error: sched.error });
 
   // One open request per service — otherwise pros get the same job twice.
   const existing = db.prepare(`SELECT id FROM quote_requests
@@ -117,15 +133,16 @@ router.post('/quote-requests', authRequired('customer'), (req, res) => {
 
   const windowMin = quotes.settings().windowMin;
   const info = db.prepare(`
-    INSERT INTO quote_requests (customer_id, service, package, vehicle, address, lat, lng, notes, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' minutes'))`)
+    INSERT INTO quote_requests (customer_id, service, package, vehicle, address, lat, lng, notes, scheduled_for, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' minutes'))`)
     .run(req.user.id, service, pkg, vehicle, address.trim(), lat, lng,
-      (notes || '').slice(0, 300) || null, windowMin);
+      (notes || '').slice(0, 300) || null, sched.value, windowMin);
 
   const request = quotes.getRequest(Number(info.lastInsertRowid));
   const { asked, auto } = quotes.openRequest(request);
   res.json({
     request_id: request.id,
+    scheduled_for: request.scheduled_for,
     asked, auto_quoted: auto,
     expires_in_min: windowMin,
     quotes: quotes.listQuotes(request.id),
@@ -166,7 +183,7 @@ router.post('/quotes/:id/accept', authRequired('customer'), (req, res) => {
   if (!['card', 'cash'].includes(payment_method)) return res.status(400).json({ error: 'Choose a payment method' });
 
   const q = db.prepare(`SELECT q.*, r.customer_id, r.service, r.package, r.vehicle,
-      r.address, r.lat, r.lng, r.notes, r.status AS request_status, r.id AS request_id
+      r.address, r.lat, r.lng, r.notes, r.scheduled_for, r.status AS request_status, r.id AS request_id
     FROM quotes q JOIN quote_requests r ON r.id = q.request_id
     WHERE q.id = ? AND r.customer_id = ?`).get(req.params.id, req.user.id);
   if (!q) return res.status(404).json({ error: 'Quote not found' });
@@ -177,10 +194,13 @@ router.post('/quotes/:id/accept', authRequired('customer'), (req, res) => {
     AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, q.service);
   if (active) return res.status(409).json({ error: 'You already have an active order for this service. Complete or cancel it first.' });
 
-  // The pro must still be free — they may have taken another job while quoting.
-  const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ?
-    AND status IN ('accepted','en_route','in_progress')`).get(q.supplier_id);
-  if (busy) return res.status(409).json({ error: 'That pro has just taken another job. Please pick another quote.' });
+  // For work happening now the pro must still be free. A booking for a future date is
+  // fine even if they are mid-job today.
+  if (!q.scheduled_for) {
+    const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ?
+      AND status IN ('accepted','en_route','in_progress') AND scheduled_for IS NULL`).get(q.supplier_id);
+    if (busy) return res.status(409).json({ error: 'That pro has just taken another job. Please pick another quote.' });
+  }
 
   const customer = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   const pointsUsed = use_points ? Math.min(customer.points_cents || 0, q.total_cents) : 0;
@@ -203,13 +223,14 @@ router.post('/quotes/:id/accept', authRequired('customer'), (req, res) => {
   const info = db.prepare(`INSERT INTO orders
     (customer_id, supplier_id, service, package, vehicle, price_cents, callout_fee_cents,
      points_used_cents, supplier_price_cents, platform_fee_cents, requested_supplier_id,
-     address, lat, lng, notes, payment_method, payment_status, status, accepted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+     address, lat, lng, notes, payment_method, payment_status, status, accepted_at, scheduled_for)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(req.user.id, (isCash || paidByPoints) ? q.supplier_id : null,
       q.service, q.package, q.vehicle, q.total_cents, q.callout_fee_cents, pointsUsed,
       q.supplier_price_cents, q.platform_fee_cents, q.supplier_id,
       q.address, q.lat, q.lng, q.notes, payment_method, paymentStatus, status,
-      (isCash || paidByPoints) ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null);
+      (isCash || paidByPoints) ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
+      q.scheduled_for);
   const orderId = Number(info.lastInsertRowid);
 
   db.prepare("UPDATE quotes SET status = 'accepted' WHERE id = ?").run(q.id);
@@ -314,8 +335,8 @@ function afterPayment(orderId) {
   if (!order) return;
   const fromQuote = db.prepare("SELECT id FROM quote_requests WHERE order_id = ? AND status = 'booked'").get(orderId);
   if (fromQuote && order.requested_supplier_id) {
-    const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ? AND id != ?
-      AND status IN ('accepted','en_route','in_progress')`).get(order.requested_supplier_id, orderId);
+    const busy = order.scheduled_for ? null : db.prepare(`SELECT id FROM orders WHERE supplier_id = ? AND id != ?
+      AND status IN ('accepted','en_route','in_progress') AND scheduled_for IS NULL`).get(order.requested_supplier_id, orderId);
     if (!busy) {
       db.prepare(`UPDATE orders SET supplier_id = ?, status = 'accepted',
         accepted_at = datetime('now') WHERE id = ?`).run(order.requested_supplier_id, orderId);

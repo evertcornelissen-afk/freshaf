@@ -548,6 +548,7 @@ async function refreshRequests() {
       <div class="row spread">
         <div>
           <strong>${escapeHtml(r.package_name)}</strong>
+          <div class="small-text" style="color:var(--accent-dim);font-weight:700">${icon('clock')} ${escapeHtml(r.when_label)}</div>
           <div class="muted small-text">${escapeHtml(r.unit_name)} · ${r.distance_km} km away</div>
           <div class="muted small-text">${escapeHtml(r.address)}</div>
           ${r.notes ? `<div class="muted small-text">Note: ${escapeHtml(r.notes)}</div>` : ''}
@@ -562,9 +563,9 @@ async function refreshRequests() {
                  placeholder="${r.suggested_cents ? Math.round(r.suggested_cents / 100) : '250'}">
         </div>
         <div style="flex:1;min-width:150px">
-          <label style="margin-bottom:4px">When can you come?</label>
+          <label style="margin-bottom:4px">${r.scheduled_for ? 'Can you make that time?' : 'When can you come?'}</label>
           <input class="q-when" maxlength="80" value="${quoted ? escapeHtml(r.my_quote.availability || '') : ''}"
-                 placeholder="e.g. Today within the hour">
+                 placeholder="${r.scheduled_for ? 'e.g. Yes, that works' : 'e.g. Today within the hour'}">
         </div>
       </div>
       ${r.callout_fee_cents ? `<p class="muted small-text mt">Plus ${rand(r.callout_fee_cents)} callout, also yours.</p>` : ''}

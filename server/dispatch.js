@@ -19,7 +19,7 @@ function orderPublic(order) {
   const { id, service, package: pkg, vehicle, price_cents, address, lat, lng, notes,
     payment_method, payment_status, status, created_at, accepted_at, completed_at, supplier_id,
     callout_fee_cents, points_used_cents, points_earned_cents,
-    supplier_price_cents, platform_fee_cents } = order;
+    supplier_price_cents, platform_fee_cents, scheduled_for } = order;
   let supplier = null;
   if (supplier_id) {
     const s = db.prepare(`
@@ -33,6 +33,7 @@ function orderPublic(order) {
   }
   return { id, service, package: pkg, vehicle, price_cents, address, lat, lng, notes,
     payment_method, payment_status, status, created_at, accepted_at, completed_at, supplier,
+    scheduled_for: scheduled_for || null,
     callout_fee_cents: callout_fee_cents || 0,
     points_used_cents: points_used_cents || 0,
     points_earned_cents: points_earned_cents || 0,

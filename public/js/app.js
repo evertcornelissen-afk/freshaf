@@ -278,6 +278,44 @@ function renderQuotes() {
   updateTotal();
 }
 
+/* ---------- when: now or scheduled ---------- */
+// "2026-08-22 09:00" -> "Sat 22 Aug, 09:00"
+function whenLabel(scheduledFor) {
+  if (!scheduledFor) return 'As soon as possible';
+  const d = new Date(String(scheduledFor).replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return String(scheduledFor);
+  return d.toLocaleString('en-ZA', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+function scheduledValue() {
+  const mode = document.querySelector('input[name=when]:checked')?.value;
+  return mode === 'scheduled' ? (el('scheduled-for').value || null) : null;
+}
+
+// datetime-local wants local wall time, so build the min/max from the local clock
+// rather than toISOString(), which would shift them by the UTC offset.
+function localStamp(date) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
+}
+function refreshWhenBounds() {
+  const input = el('scheduled-for');
+  const soonest = new Date(Date.now() + 30 * 60 * 1000);
+  soonest.setMinutes(Math.ceil(soonest.getMinutes() / 15) * 15, 0, 0);
+  input.min = localStamp(soonest);
+  input.max = localStamp(new Date(Date.now() + 30 * 24 * 3600 * 1000));
+  if (!input.value) input.value = input.min;
+}
+document.querySelectorAll('input[name=when]').forEach((r) => r.onchange = () => {
+  const scheduled = r.value === 'scheduled' && r.checked;
+  el('when-picker').classList.toggle('hidden', !scheduled);
+  if (scheduled) refreshWhenBounds();
+  invalidateQuotes(); // a different time is a different job — old prices no longer apply
+});
+el('scheduled-for').addEventListener('change', invalidateQuotes);
+
 el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros…', async () => {
   if (!quotesReady()) {
     showError('order-error', 'Pick a package, a size, your location and an address first.');
@@ -290,6 +328,7 @@ el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros
         service: svc, package: sel.package, vehicle: sel.unit,
         address: el('order-address').value, lat: sel.lat, lng: sel.lng,
         notes: el('order-notes').value,
+        scheduled_for: scheduledValue(),
       },
     });
     quoteRequestId = r.request_id;
@@ -560,6 +599,9 @@ function renderTrack(order) {
   const breakdown = [];
   if (order.callout_fee_cents > 0) breakdown.push(`includes ${rand(order.callout_fee_cents)} callout fee`);
   if (order.points_used_cents > 0) breakdown.push(`rewards applied −${rand(order.points_used_cents)}`);
+  if (order.scheduled_for) {
+    body += `<p class="mt" style="color:var(--accent-dim);font-weight:700">${icon('clock')} Booked for ${whenLabel(order.scheduled_for)}</p>`;
+  }
   body += `<p class="muted">${icon('pin')} ${order.address}</p>
     <p class="mt"><strong>${rand(order.amount_due_cents)}</strong> <span class="muted">· ${order.payment_method === 'cash' ? 'Cash on completion' : 'Paid by card'}${breakdown.length ? ' · ' + breakdown.join(' · ') : ''}</span></p>`;
   if (order.status === 'completed' && order.points_earned_cents > 0) {
