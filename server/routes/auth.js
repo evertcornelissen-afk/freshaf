@@ -73,15 +73,30 @@ router.post('/register', (req, res) => {
     if (!supplierServices.length) return res.status(400).json({ error: 'Choose at least one service you offer' });
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim());
+  // Store one canonical form. The column is UNIQUE COLLATE NOCASE so matching was already
+  // case-insensitive, but storing lower case keeps exports, comparisons and support lookups
+  // from ever disagreeing about whether two addresses are the same person.
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
   if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
-  const info = db.prepare(`INSERT INTO users (role, name, email, phone, password_hash, home_address, home_lat, home_lng, terms_accepted_at)
+  let info;
+  try {
+    info = db.prepare(`INSERT INTO users (role, name, email, phone, password_hash, home_address, home_lat, home_lng, terms_accepted_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
-    .run(role, name.trim(), email.trim(), phone?.trim() || null, bcrypt.hashSync(password, 10),
+    .run(role, name.trim(), cleanEmail, phone?.trim() || null, bcrypt.hashSync(password, 10),
       home_address?.trim() || null,
       typeof home_lat === 'number' ? home_lat : null,
       typeof home_lng === 'number' ? home_lng : null);
+  } catch (e) {
+    // Belt and braces: two people submitting the same address at the same moment slip past
+    // the check above, and the UNIQUE index catches it. Answer with the same clear message
+    // rather than a 500.
+    if (String(e.message || '').includes('UNIQUE')) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+    throw e;
+  }
   const userId = Number(info.lastInsertRowid);
 
   if (role === 'supplier') {
