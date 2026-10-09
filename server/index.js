@@ -106,6 +106,7 @@ app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));
 app.get('/terms', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'terms.html')));
+app.get('/contact', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'contact.html')));
 app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));
 
 app.use((err, req, res, next) => {
