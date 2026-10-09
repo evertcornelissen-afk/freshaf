@@ -46,8 +46,12 @@ collection**. Customers book, the pro they choose comes to them. Built as a web 
 - **Netlify** site `7250306b-6d15-4420-a20e-496571ed8eca` — marketing + demo + a scheduled
   function (`netlify/functions/keepwarm.mjs`) that pings Render every 10 min so the free tier
   doesn't sleep. Deploy: `netlify deploy --prod --site 7250306b-...`
-- **PayFast** merchant 18767813 — integrated and live-mode, but the **account is still pending
-  PayFast's own verification**, so card payments fail at their end. Cash works fully.
+- **PayFast** merchant 18767813 — integrated, live-mode, and **VERIFIED since 27 July 2026**
+  (email from Ebrahim Salie, Onboarding Compliance Specialist, Payfast/Network; confirmed by
+  noreply@payfast.io the same day). The old "pending verification" note was wrong.
+  ⚠️ **Open question:** verification predates the company (26 Aug) and the FNB account (8 Oct),
+  so the nominated payout account is probably NOT FreshAF's. Check the entity and payout
+  account in the Payfast dashboard — see `PAYFAST-REGISTRATION.md`.
 - **Domain** freshaf.io — bought, live, pointing at Render.
 
 ## THE PRICING MODEL (rebuilt 28 July — this is the current model)

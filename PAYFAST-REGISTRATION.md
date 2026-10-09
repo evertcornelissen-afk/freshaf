@@ -1,4 +1,60 @@
-# PayFast verification — document pack
+# PayFast — ALREADY VERIFIED (correction) + the real outstanding item
+
+> ## ⚠️ Correction, 9 October 2026
+>
+> **The PayFast merchant account is already verified.** I wrote the pack below from the stale
+> note in HANDOVER.md that said verification was pending. Evert's inbox proves otherwise.
+>
+> Email from **Ebrahim Salie, Onboarding Compliance Specialist, Payfast (Network Group)**,
+> Monday 27 July 2026 13:30, subject `Re:[## 1766062 ##] 18767813 - Account verification`:
+>
+> > *"I am pleased to inform you that your account has been successfully verified and you will
+> > receive an automated response to confirm this as well. You are now able to transact through
+> > Payfast and payout to your nominated South African bank account."*
+>
+> Confirmed by a second mail the same day from `noreply@payfast.io`:
+> *"Your Payfast account has been verified."*
+>
+> So **no FICA documents need submitting.** Skip the document list below unless the account has
+> to be re-registered under the company.
+
+---
+
+## The real outstanding item: which entity and which bank account?
+
+The dates do not line up, and this matters.
+
+| Event | Date |
+|---|---|
+| Payfast account verified | **27 July 2026** |
+| FreshAF (Pty) Ltd incorporated | **26 August 2026** |
+| FNB business account opened | **8 October 2026** |
+
+Payfast was verified **a month before the company existed** and **ten weeks before the FreshAF
+bank account was opened**. So the "nominated South African bank account" Payfast pays into
+**cannot be the FreshAF FNB account** — it is whatever account was nominated in July, most
+likely Evert's personal account or MVP Sales (Pty) Ltd's.
+
+**Consequence if left alone:** every rand a FreshAF customer pays lands in a different entity's
+bank account. That is a tax and accounting problem, it undermines the separation the Pty Ltd was
+registered to create, and it will be ugly to unwind after real trading starts.
+
+### What to check in the Payfast dashboard
+
+1. **Registered entity** on the merchant account — Evert personally, MVP Sales, or FreshAF (Pty) Ltd?
+2. **Nominated payout bank account** — is it the FNB Gold Business account (branch 210203) in
+   the name of FRESHAF (PTY) LTD?
+3. If either is wrong, change it. Changing the registered entity to a newly registered company
+   will almost certainly trigger **re-verification** — and that is when the document list below
+   becomes relevant again.
+
+### Still true regardless
+
+- The FNB account **has not been activated with a deposit** (FNB's own words on the letter).
+  Payfast cannot pay into a dormant account. Deposit R10.
+- **Beneficial Ownership** at CIPC was due around 9 September and may be outstanding.
+
+---
 
 *Checked against your actual documents on 9 October 2026. Merchant account 18767813 already
 exists and the app is running in **live mode** (`payments_live: true`), so nothing needs
