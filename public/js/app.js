@@ -109,6 +109,7 @@ async function enterApp() {
   // booking is disorienting when you have just typed in your details.
   const wanted = pendingService();
   setService(wanted || 'carwash');
+  refreshPaymentMethods();
   refreshPointsRow();
   refreshSavedAddress();
   el('use-points').onchange = updateTotal;
@@ -345,6 +346,26 @@ function invalidateQuotes() {
   if (!quoteRequestId) return;
   api(`/api/quote-requests/${quoteRequestId}/cancel`, { method: 'POST' }).catch(() => {});
   resetQuotes('The job changed — ask for prices again.');
+}
+
+// Card is only offered when a real gateway is configured. Without merchant keys the app
+// falls back to an internal sandbox page — fine for testing, but sending a paying customer
+// there would be a lie. Cash never touches the gateway, so it always works.
+function refreshPaymentMethods() {
+  const live = !!pricing?.payments_live;
+  const cardInput = document.querySelector('#pay-seg input[name=pay][value="card"]');
+  const cardLabel = cardInput?.closest('label');
+  if (cardLabel) cardLabel.classList.toggle('hidden', !live);
+  if (!live) {
+    const cash = document.querySelector('#pay-seg input[name=pay][value="cash"]');
+    if (cash) cash.checked = true;
+    if (!el('pay-note')) {
+      el('pay-seg').insertAdjacentHTML('afterend',
+        '<p class="muted small-text mt" id="pay-note">Card payments are coming soon. Pay your pro in cash when the job is done.</p>');
+    }
+  } else {
+    el('pay-note')?.remove();
+  }
 }
 
 function refreshPointsRow() {
