@@ -147,11 +147,26 @@ Home (logged out) → register/login → **category chooser: Car Wash or Laundry
 `SUPPLY-TARGETS-NORTHERN-SUBURBS.md` (recruitment list) · `STORE-LAUNCH.md` (App/Play Store
 requirements) · `DEPLOY.md` · `marketing/make-brochures.py` (regenerates the PDFs)
 
+## THE COMPANY (registered 26 Aug 2026 — this supersedes "not yet registered")
+**FRESHAF (PTY) LTD**, registration **2026/683087/07**, incorporated 26 August 2026, standard
+MOI (CoR 15.1A), financial year end February, status IN BUSINESS.
+- Directors: **MERTENS, NIKKI** and **CORNELISSEN, EVERT**, both active from 26/08/2026.
+- Registered office: 35 Sterappel Crescent, Essenhout Estate, Langeberg Heights, Cape Town,
+  Western Cape, 7570 (a residential address — it is published on `/contact`, see note there).
+- Bank: **FNB Gold Business Account**, Durbanville branch 210203, opened 08/10/2026, in the
+  company name with the registration number matching CIPC exactly.
+  WARNING: the confirmation letter says the account **has not yet been activated with a deposit**.
+- WARNING: **Beneficial Ownership** was due at CIPC within 10 business days of registration
+  (approx 9 September 2026) — verify whether it was filed.
+- WARNING: CIPC holds **RPELLETDP@GMAIL.COM** as the company contact email, not Evert's.
+- Source documents live in the `FreshAF` folder on Evert's Desktop.
+- Full PayFast document pack and the two blockers: **`PAYFAST-REGISTRATION.md`**.
+
 ## People
 - **Evert Cornelissen** — founder. Owns ops, marketing, supply recruitment, pricing decisions.
 - **A lawyer partner** — owns all legal. First deliverable: the Supplier/Pro Agreement
-  (contractor status). Company (Pty Ltd) **not yet registered** — everything is currently in
-  Evert's personal name, including the PayFast account.
+  (contractor status). Company **FreshAF (Pty) Ltd registered 26 Aug 2026** — see the company section above.
+  The PayFast merchant account (18767813) still needs FICA verification under the company.
 
 ### Why people get signed out (fixed by config, not code)
 `data/jwt.secret` is generated on first boot and stored on the ephemeral disk. Every restart
