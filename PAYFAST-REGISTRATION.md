@@ -5,11 +5,11 @@ business.*
 
 ---
 
-## ⚠️ Live right now: freshaf.io is charging cards through DENCITY's merchant account
+## ⚠️ Live right now: freshaf.io has merchant keys that are not FreshAF's
 
 `freshaf.io` is running with `payments_live: true` because `PAYFAST_MERCHANT_ID` and
-`PAYFAST_MERCHANT_KEY` are set on Render — and **those keys belong to Dencity**, an unrelated
-app with its own verified PayFast merchant account (18767813).
+`PAYFAST_MERCHANT_KEY` are set on Render — and **FreshAF (Pty) Ltd has no PayFast merchant
+account yet** — so whatever those credentials are, they were not issued to FreshAF.
 
 ```js
 const LIVE = Boolean(MERCHANT_ID && MERCHANT_KEY);   // server/payments.js
@@ -17,12 +17,13 @@ const LIVE = Boolean(MERCHANT_ID && MERCHANT_KEY);   // server/payments.js
 
 Two problems, and the second is worse than the first:
 
-1. **The money lands in Dencity's account.** FreshAF has no record of the receipt, and the
-   funds sit under a different entity.
-2. **It puts Dencity's verified account at risk.** A PayFast merchant account is verified
-   against a specific business and a specific website. Processing transactions for an unrelated
-   site is exactly the kind of thing that gets a merchant account suspended or frozen pending
-   review. Dencity's payments work today — this could break them.
+1. **The money lands somewhere other than FreshAF.** FreshAF would have no record of the receipt
+   and the funds would sit under a different entity.
+2. **It risks whichever account those keys belong to.** A PayFast merchant account is verified
+   against a specific business and a specific website, so processing for a different site is the
+   kind of thing that gets an account suspended pending review.
+
+To settle it in ten seconds: reveal `PAYFAST_MERCHANT_ID` in Render and see which account it is.
 
 There are zero FreshAF customers, so no transaction has actually run. But this must not survive
 into supplier loading or any marketing push, and the risk is not only FreshAF's.

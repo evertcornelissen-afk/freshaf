@@ -123,7 +123,7 @@ Two options:
 - **Create `admin@freshaf.io` first** (cleanest — PayFast correspondence lands where Nikki can
   see it too, and it matches the domain on the application)
 - **Apply with `evert@mvps.co.za` now and change it later.** Workable, but it is the same entity
-  confusion that put Dencity's keys on this site, and PayFast may query why the contact domain
+  confusion that put another business's keys on this site, and PayFast may query why the contact domain
   does not match the trading domain.
 
 Your call. If you want the mailbox first, I still need one answer: **existing Google Workspace
@@ -133,7 +133,8 @@ Your call. If you want the mailbox first, I still need one answer: **existing Go
 
 ## Still outstanding and unrelated to PayFast
 
-- **Dencity's PayFast keys are still live on freshaf.io.** `payments_live` is still `true`.
+- **PayFast keys that are not FreshAF's are still live on freshaf.io.** `payments_live` is `true`,
+  yet FreshAF has no merchant account.
   I cannot clear them — Render has signed me out and signing in needs your password.
   Until then, freshaf.io would route card payments through Dencity's merchant account, which
   risks that account being suspended for processing for an unrelated site.

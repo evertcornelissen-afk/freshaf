@@ -22,10 +22,13 @@ Then: use **26 Shiraz Street, Oude Westhof, 7530** (what CIPC has for Evert — 
 Field-by-field answers for the whole application: **`PAYFAST-APPLICATION-SHEET.md`**.
 
 ### Blocked on Evert
-1. **Clear Dencity's PayFast keys from Render.** `payments_live` is still `true` using merchant
-   18767813, which belongs to **Dencity**. freshaf.io would settle cards into Dencity's account and
-   could get that account suspended. Claude cannot do it — Render keeps demanding a password.
-   The app now hides the Card option when `payments_live` is false, so cash is unaffected.
+1. **Clear the PayFast keys on Render.** `payments_live` is still `true`, so merchant credentials
+   are set — but **FreshAF (Pty) Ltd has no PayFast merchant account yet**, so they cannot be
+   FreshAF's. Any card payment would settle into whichever account they do belong to.
+   Verify by revealing `PAYFAST_MERCHANT_ID` in Render and comparing it to FreshAF's own ID once
+   the application is approved. Until then, clear all three PayFast variables.
+   Claude cannot do it — Render keeps demanding a password. The app now hides the Card option when
+   `payments_live` is false, so cash is unaffected.
 2. **Persistent disk.** Still not attached. Customers, suppliers and orders are wiped on every
    restart or deploy. Nothing can truly launch until this is done.
 3. **Three FICA documents** still missing: proof of business address (<3 months), both directors'
@@ -82,11 +85,12 @@ Field-by-field answers for the whole application: **`PAYFAST-APPLICATION-SHEET.m
   function (`netlify/functions/keepwarm.mjs`) that pings Render every 10 min so the free tier
   doesn't sleep. Deploy: `netlify deploy --prod --site 7250306b-...`
 - **PayFast** — ⚠️ **FreshAF has NO PayFast account of its own yet.**
-  The verified merchant 18767813 in the inbox belongs to **Dencity**, an unrelated app.
-  Render currently holds Dencity's `PAYFAST_MERCHANT_ID` / `_KEY`, so `payments_live` is true
-  and **freshaf.io would charge cards into Dencity's account** — which also risks Dencity's
-  merchant account being suspended for processing for an unrelated site.
-  **Clear those three env vars until FreshAF has its own verified account.** Cash works fully
+  The verified merchant account seen in the inbox (18767813) was issued to a different business
+  entirely and has nothing to do with this project. Render nonetheless has
+  `PAYFAST_MERCHANT_ID` / `_KEY` set, so `payments_live` is true — and since FreshAF has no
+  merchant account yet, those credentials cannot be FreshAF's.
+  **Clear those three env vars until FreshAF has its own verified account**, and reveal
+  `PAYFAST_MERCHANT_ID` in Render to confirm which account they belong to. Cash works fully
   without them. Full plan and document list: `PAYFAST-REGISTRATION.md`.
 - **Domain** freshaf.io — bought, live, pointing at Render.
 
