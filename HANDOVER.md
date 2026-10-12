@@ -6,6 +6,41 @@
 On-demand marketplace, South Africa. Two services: **mobile car wash** and **laundry
 collection**. Customers book, the pro they choose comes to them. Built as a web app + PWA.
 
+## WHERE THINGS STAND — 12 October 2026 (read this first)
+
+**Immediate next action: finish the PayFast application, Step 6/6.**
+Open the tab, clear the UBO **Physical Address** field, retype, and **click a suggestion from the
+dropdown**. It is a Google Places autocomplete; typing without selecting leaves five of the six
+address fields null, validation fails, and PayFast's error element never renders — so the
+"Add another UBO's details" link appears dead. Console proof:
+`[vue-scrollto warn]: Trying to scroll to an element that is not on the page: .error`
+
+Then: use **26 Shiraz Street, Oude Westhof, 7530** (what CIPC has for Evert — the form had
+18 Chantelle Street, which is MVP Sales' address), add **Nikki Mertens** as a second UBO
+(ID 9709010159082, 35 Sterappel Crescent, 7570), and Submit.
+
+Field-by-field answers for the whole application: **`PAYFAST-APPLICATION-SHEET.md`**.
+
+### Blocked on Evert
+1. **Clear Dencity's PayFast keys from Render.** `payments_live` is still `true` using merchant
+   18767813, which belongs to **Dencity**. freshaf.io would settle cards into Dencity's account and
+   could get that account suspended. Claude cannot do it — Render keeps demanding a password.
+   The app now hides the Card option when `payments_live` is false, so cash is unaffected.
+2. **Persistent disk.** Still not attached. Customers, suppliers and orders are wiped on every
+   restart or deploy. Nothing can truly launch until this is done.
+3. **Three FICA documents** still missing: proof of business address (<3 months), both directors'
+   IDs (both sides), Beneficial Ownership at CIPC (was due ~9 Sept).
+4. **Activate the FNB account** with any deposit — the letter says it never has been.
+
+### Done since the last handover
+- `admin@freshaf.io` created (**GoDaddy Professional Email**, not Google Workspace) and configured
+  in Outlook: IMAP `imap.secureserver.net` 993 SSL/TLS, SMTP `smtpout.secureserver.net` 465 SSL/TLS.
+  Outlook defaults to 143/25 with encryption **None** — always change both.
+- `freshaf.co.za` was found to belong to **an unrelated agency**; all 13 in-app support references
+  were repointed to `admin@freshaf.io`.
+- `/contact` published with the ECT Act section 43 disclosures.
+- Card payment option now hidden whenever no real gateway is configured.
+
 ## Live URLs
 | What | URL |
 |---|---|
