@@ -136,7 +136,7 @@ Your call. If you want the mailbox first, I still need one answer: **existing Go
 - **PayFast keys that are not FreshAF's are still live on freshaf.io.** `payments_live` is `true`,
   yet FreshAF has no merchant account.
   I cannot clear them — Render has signed me out and signing in needs your password.
-  Until then, freshaf.io would route card payments through Dencity's merchant account, which
+  Until then, freshaf.io would route card payments through the other account's merchant account, which
   risks that account being suspended for processing for an unrelated site.
 - **No persistent disk on Render.** Customers and suppliers are still wiped on every restart.
 
