@@ -264,12 +264,12 @@ async function route() {
     ic.innerHTML = icon('x', 'xl');
     ic.style.color = 'var(--danger)';
     heading.textContent = 'Application not approved';
-    detail.textContent = s.status_reason ? `Reason: ${s.status_reason}` : 'Contact support@freshaf.co.za for more information.';
+    detail.textContent = s.status_reason ? `Reason: ${s.status_reason}` : 'Contact admin@freshaf.io for more information.';
   } else {
     ic.innerHTML = icon('alert', 'xl');
     ic.style.color = 'var(--danger)';
     heading.textContent = 'Account suspended';
-    detail.textContent = s.status_reason ? `Reason: ${s.status_reason}` : 'Contact support@freshaf.co.za.';
+    detail.textContent = s.status_reason ? `Reason: ${s.status_reason}` : 'Contact admin@freshaf.io.';
   }
   listenAccountUpdates();
 }

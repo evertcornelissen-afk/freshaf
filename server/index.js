@@ -44,7 +44,7 @@ app.get('/api/geocode', async (req, res) => {
   const searchQ = numMatch ? numMatch[2] : q;
   try {
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQ)}&limit=12&lang=en&bbox=16.2,-35.0,33.1,-22.0`;
-    const r = await fetch(url, { headers: { 'User-Agent': 'FreshAF/1.0 (support@freshaf.co.za)' }, signal: AbortSignal.timeout(8000) });
+    const r = await fetch(url, { headers: { 'User-Agent': 'FreshAF/1.0 (admin@freshaf.io)' }, signal: AbortSignal.timeout(8000) });
     const data = await r.json();
     const results = (data.features || []).map((f) => {
       const p = f.properties || {};

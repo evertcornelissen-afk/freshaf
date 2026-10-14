@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { db } = require('../db');
 const { setAuthCookie, clearAuthCookie, readToken, authRequired } = require('../auth');
+const mailer = require('../mailer');
 
 const router = express.Router();
 
@@ -114,6 +115,9 @@ router.post('/register', (req, res) => {
         service_area?.trim() || null, equipmentSummary, supplierServices.join(','),
         bank_name?.trim() || null, bank_account?.trim() || null, bank_branch?.trim() || null,
         JSON.stringify(cleanVehicles), JSON.stringify(cleanEquipment));
+    mailer.proApplicationReceived({ to: cleanEmail, name: name.trim() }).catch(() => {});
+    mailer.adminNewPro({ name: name.trim(), business: business_name.trim(), email: cleanEmail,
+      phone: phone?.trim(), services: supplierServices }).catch(() => {});
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);

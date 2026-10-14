@@ -14,7 +14,7 @@ if (fs.existsSync(KEYS_FILE)) {
   keys = webpush.generateVAPIDKeys();
   fs.writeFileSync(KEYS_FILE, JSON.stringify(keys));
 }
-webpush.setVapidDetails('mailto:support@freshaf.co.za', keys.publicKey, keys.privateKey);
+webpush.setVapidDetails('mailto:admin@freshaf.io', keys.publicKey, keys.privateKey);
 
 function publicKey() { return keys.publicKey; }
 

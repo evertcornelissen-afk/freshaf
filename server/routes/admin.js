@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const { db, getSetting, setSetting } = require('../db');
 const { authRequired } = require('../auth');
 const realtime = require('../realtime');
+const push = require('../push');
+const mailer = require('../mailer');
 
 const router = express.Router();
 router.use(authRequired('admin'));
@@ -76,6 +78,13 @@ function setSupplierStatus(req, res, status) {
   db.prepare('UPDATE suppliers SET status = ?, status_reason = ?, online = ? WHERE user_id = ?')
     .run(status, reason, online, s.user_id);
   realtime.send(s.user_id, 'account_update', { status, reason });
+  // The pro is rarely looking at the app when this happens, so tell them on every channel.
+  const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(s.user_id);
+  push.sendToUser(s.user_id, status === 'approved'
+    ? { title: 'You are approved on FreshAF Pro', body: 'Set your prices and go online to start receiving jobs.', url: '/supplier', tag: 'account' }
+    : { title: 'Update on your FreshAF Pro account', body: reason || 'Open FreshAF Pro for details.', url: '/supplier', tag: 'account' }
+  ).catch(() => {});
+  if (u) mailer.proStatusChanged({ to: u.email, name: u.name, status, reason }).catch(() => {});
   res.json({ ok: true });
 }
 
@@ -203,6 +212,8 @@ router.get('/readiness', (req, res) => {
         detail: payments.LIVE ? 'PayFast keys are set.' : 'Running in sandbox. Cash orders work fully.' },
       { key: 'whatsapp', label: 'WhatsApp job alerts live', ok: whatsapp.configured(),
         detail: whatsapp.configured() ? 'Alerts are being sent.' : 'Dry run — see WHATSAPP-SETUP.md.' },
+      { key: 'email', label: 'Account emails live', ok: require('../mailer').configured(),
+        detail: require('../mailer').configured() ? 'Sending from admin@freshaf.io.' : 'Dry run — set SMTP_PASS (the admin@freshaf.io mailbox password) on Render.' },
       { key: 'suppliers', label: 'Approved pros on the platform', ok: approvedPros > 0,
         detail: `${approvedPros} approved. Nothing else matters without supply.` },
       { key: 'admin_password', label: 'Admin password changed from default', ok: !!process.env.ADMIN_PASSWORD,
