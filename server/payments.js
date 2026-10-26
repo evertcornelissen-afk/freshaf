@@ -8,7 +8,12 @@ const MERCHANT_KEY = process.env.PAYFAST_MERCHANT_KEY || '';
 const PASSPHRASE = process.env.PAYFAST_PASSPHRASE || '';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5757';
 
-const LIVE = Boolean(MERCHANT_ID && MERCHANT_KEY);
+// Card payments stay off unless someone explicitly turns them on. PayFast declined
+// FreshAF's merchant application (we collect for third-party Pros), so FreshAF holds
+// no PayFast merchant account: keys left in the environment must never be enough on
+// their own to start taking cards. See PAYMENTS-STRATEGY.md.
+const ENABLED = process.env.PAYMENTS_LIVE === 'true';
+const LIVE = ENABLED && Boolean(MERCHANT_ID && MERCHANT_KEY);
 
 function payfastSignature(params, passphrase) {
   const keys = Object.keys(params);

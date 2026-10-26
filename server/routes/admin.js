@@ -209,7 +209,7 @@ router.get('/readiness', (req, res) => {
         detail: process.env.JWT_SECRET ? 'Sessions survive deploys.'
           : 'JWT_SECRET is not set, so every deploy signs everyone out.' },
       { key: 'card_payments', label: 'Card payments live', ok: payments.LIVE,
-        detail: payments.LIVE ? 'PayFast keys are set.' : 'Running in sandbox. Cash orders work fully.' },
+        detail: payments.LIVE ? 'Card gateway is live.' : 'Off until PAYMENTS_LIVE=true and a merchant account is approved. Cash orders work fully.' },
       { key: 'whatsapp', label: 'WhatsApp job alerts live', ok: whatsapp.configured(),
         detail: whatsapp.configured() ? 'Alerts are being sent.' : 'Dry run — see WHATSAPP-SETUP.md.' },
       { key: 'email', label: 'Account emails live', ok: require('../mailer').configured(),
