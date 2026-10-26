@@ -171,13 +171,12 @@ async function renderDocs() {
   });
 }
 
-/* ---------- your prices (pro sets them; our fee goes on top) ---------- */
+/* ---------- your prices (the pro sets what FreshAF pays them per job) ---------- */
 let priceCat = null;
 
 async function renderPrices() {
   const data = await api('/api/supplier/prices');
   priceCat = data.services;
-  el('fee-pct-label').textContent = data.fee_pct + '%';
   const svcKeys = Object.keys(priceCat);
   if (!svcKeys.length) { el('prices-box').innerHTML = '<p class="empty">No services on your account.</p>'; return; }
   el('prices-box').innerHTML = svcKeys.map((k) => {
@@ -584,7 +583,7 @@ async function refreshRequests() {
     const showPreview = () => {
       const r = Math.round(Number(priceInput.value));
       preview.textContent = Number.isFinite(r) && r > 0
-        ? `You earn R${r} · customer pays about R${Math.round(r * (1 + reqFeePct / 100))}` : '';
+        ? `FreshAF pays you R${r} for this job` : '';
     };
     priceInput.addEventListener('input', showPreview);
     showPreview();
@@ -611,15 +610,15 @@ async function refreshRequests() {
 
 async function refreshEarnings() {
   const e = await api('/api/supplier/earnings');
-  // Pros keep 100% of their own price plus the callout. Our fee rides on top of the
-  // customer's total, so the only thing a pro can owe us is fee collected in cash.
+  // FreshAF buys each job from the pro at the pro's own price plus the callout, so a pro
+  // is never paid less than they quoted. The only thing they can owe us is the balance of
+  // a cash job they collected on our behalf.
   const owed = e.fee_owed_cents > 0
-    ? `<div class="stat"><div class="v" style="color:#c2711a">${rand(e.fee_owed_cents)}</div><div class="l">Platform fee owed on cash jobs</div></div>`
+    ? `<div class="stat"><div class="v" style="color:#c2711a">${rand(e.fee_owed_cents)}</div><div class="l">Owed to FreshAF from cash jobs</div></div>`
     : '';
   el('earnings-box').innerHTML = `
     <div class="stat"><div class="v">${e.jobs}</div><div class="l">Jobs done</div></div>
-    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">You earned — 100% yours</div></div>
-    <div class="stat"><div class="v">${rand(e.fees_cents)}</div><div class="l">${e.fee_pct}% fee, paid by customers</div></div>` + owed;
+    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">FreshAF paid you — your price in full</div></div>` + owed;
 }
 
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {

@@ -66,9 +66,9 @@ function quotePublic(q) {
     rating: q.rating_count ? +(q.rating_sum / q.rating_count).toFixed(1) : null,
     rating_count: q.rating_count || 0,
     distance_km: q.distance_km,
-    supplier_price_cents: q.supplier_price_cents,
-    callout_fee_cents: q.callout_fee_cents,
-    platform_fee_cents: q.platform_fee_cents,
+    // FreshAF sells the job to the customer at total_cents. What we pay the pro, and
+    // what we keep, is our cost of sale and our margin — not the customer's business,
+    // and itemising it on their bill is what made us look like a payment intermediary.
     total_cents: q.total_cents,
     availability: q.availability,
     note: q.note,

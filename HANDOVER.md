@@ -1,34 +1,47 @@
 # FreshAF — Handover / context for a new chat
 
-*Last updated: 19 August 2026. Paste this file (or point Claude at it) to resume work in a fresh session.*
+*Last updated: 26 October 2026. Paste this file (or point Claude at it) to resume work in a fresh session.*
 
 ## What FreshAF is
-On-demand marketplace, South Africa. Two services: **mobile car wash** and **laundry
+On-demand mobile services, South Africa. Two of them: **mobile car wash** and **laundry
 collection**. Customers book, the pro they choose comes to them. Built as a web app + PWA.
 
-## WHERE THINGS STAND — 12 October 2026 (read this first)
+**FreshAF is the merchant of record** (changed 26 Oct 2026, read `MERCHANT-OF-RECORD.md` before
+touching pricing or the T&C). FreshAF sells the service to the customer and buys the work from
+the pro as a subcontractor — the Uber structure. It is **not** a facilitator that collects on a
+pro's behalf; that model got FreshAF declined by PayFast as a third-party payment provider.
 
-**Immediate next action: finish the PayFast application, Step 6/6.**
-Open the tab, clear the UBO **Physical Address** field, retype, and **click a suggestion from the
-dropdown**. It is a Google Places autocomplete; typing without selecting leaves five of the six
-address fields null, validation fails, and PayFast's error element never renders — so the
-"Add another UBO's details" link appears dead. Console proof:
-`[vue-scrollto warn]: Trying to scroll to an element that is not on the page: .error`
+## WHERE THINGS STAND — 26 October 2026 (read this first)
 
-Then: use **26 Shiraz Street, Oude Westhof, 7530** (what CIPC has for Evert — the form had
-18 Chantelle Street, which is MVP Sales' address), add **Nikki Mertens** as a second UBO
-(ID 9709010159082, 35 Sterappel Crescent, 7570), and Submit.
+**PayFast declined FreshAF**, because under the old model FreshAF collected customers' money and
+paid it to a different business — a Third Party Payment Provider under the NPS Act, which no
+ordinary merchant account covers. Reapplying elsewhere unchanged would have failed the same way.
 
-Field-by-field answers for the whole application: **`PAYFAST-APPLICATION-SHEET.md`**.
+**Decision taken: FreshAF became the merchant of record.** Customer contracts with FreshAF;
+FreshAF buys the job from the pro. Implemented 26 Oct across the code, the T&C, the ECT Act
+disclosures and a draft Supplier Agreement.
+
+- Why, and the options rejected: **`PAYMENTS-STRATEGY.md`**
+- What changed, and the VAT arithmetic that now sets the margin: **`MERCHANT-OF-RECORD.md`**
+- The FreshAF ↔ pro contract, unsigned: **`SUPPLIER-AGREEMENT-DRAFT.md`**
+
+**Immediate next action: decide the margin, then resubmit the PayFast application** under the
+correct description ("we sell mobile car wash and laundry and subcontract the work"). The
+field-by-field answers are still valid: **`PAYFAST-APPLICATION-SHEET.md`**. The old UBO
+form bug and its fix are recorded there too — the Physical Address field is a Google Places
+autocomplete, so you must **click a dropdown suggestion**, not just type.
+
+⚠️ **The margin is 10% and that is probably wrong now.** As merchant of record, VAT applies to
+the full order value, not to a fee. At 10% every job becomes loss-making the moment FreshAF
+registers for VAT; 15% is break-even and ~26.5% keeps a real 10%. One admin setting,
+`platform_fee_pct`. Cheapest to change now, with zero customers and zero approved pros.
 
 ### Blocked on Evert
-1. **Clear the PayFast keys on Render.** `payments_live` is still `true`, so merchant credentials
-   are set — but **FreshAF (Pty) Ltd has no PayFast merchant account yet**, so they cannot be
-   FreshAF's. Any card payment would settle into whichever account they do belong to.
-   Verify by revealing `PAYFAST_MERCHANT_ID` in Render and comparing it to FreshAF's own ID once
-   the application is approved. Until then, clear all three PayFast variables.
-   Claude cannot do it — Render keeps demanding a password. The app now hides the Card option when
-   `payments_live` is false, so cash is unaffected.
+1. **Clear the PayFast keys on Render.** Merchant credentials are still set there, and
+   **FreshAF has no PayFast merchant account**, so they are not FreshAF's. Less urgent than it
+   was: since 26 Oct card payments also require `PAYMENTS_LIVE=true`, which is not set, so stale
+   keys can no longer switch card payments on by themselves. Still clear them.
+   Claude cannot do it — Render keeps demanding a password.
 2. **Persistent disk.** Still not attached. Customers, suppliers and orders are wiped on every
    restart or deploy. Nothing can truly launch until this is done.
 3. **Three FICA documents** still missing: proof of business address (<3 months), both directors'
@@ -94,25 +107,32 @@ Field-by-field answers for the whole application: **`PAYFAST-APPLICATION-SHEET.m
   without them. Full plan and document list: `PAYFAST-REGISTRATION.md`.
 - **Domain** freshaf.io — bought, live, pointing at Render.
 
-## THE PRICING MODEL (rebuilt 28 July — this is the current model)
-**Pros set their own prices. FreshAF adds 10% ON TOP, paid by the customer.**
+## THE PRICING MODEL (merchant of record since 26 Oct 2026)
+**The pro sets the price FreshAF pays them. FreshAF adds its margin and sells at one price.**
 - Pro sets a price per package (e.g. Express Wash = R250) in FreshAF Pro → `supplier_prices` table.
+  That price is **FreshAF's cost of sale**, not a price to the customer.
 - The vehicle/load multiplier still applies on top of the pro's price (sedan ×1, SUV ×1.25, etc.).
-- Customer picks a **specific pro** from a list showing that pro's price, distance and rating.
-- Customer pays: `pro price + callout fee + 10% platform fee`. **The pro keeps 100% of their
-  price + the callout.** Our fee never comes out of their money.
-- Verified working: pro sets R250 → customer pays R275 → pro earns R250.
-- **Cash jobs:** the pro collects our 10% at the door, so it's owed back to us. Tracked on
-  `orders.fee_settled` and surfaced in the pro's earnings as "fee owed". **There is no
-  collection mechanism yet — this is an open business decision.**
+- Customer picks a **specific pro** from a list showing business name, rating, distance,
+  availability and **one FreshAF price** — "all in, nothing added".
+- `platform_fee_pct` (=10) is FreshAF's **margin**, added when pricing to the customer.
+  **The pro is still paid their full price + the full callout; nothing is deducted from them.**
+- ⚠️ **The customer never sees the split.** `quotePublic` in `server/quotes.js` deliberately does
+  not return `supplier_price_cents`, `platform_fee_cents` or `callout_fee_cents`. They stay in the
+  DB for the accounts. Itemising them on a customer's bill is what made FreshAF look like a
+  payment intermediary — **do not put the breakdown back.**
+- Verified 26 Oct: pro R313 + R0 callout + R31 margin → customer sees **R344 and nothing else**.
+- **Cash jobs:** the pro collects the full amount **as FreshAF's collection agent** and owes
+  FreshAF the balance above their own price. Tracked on `orders.fee_settled`, shown in the pro's
+  earnings as "Owed to FreshAF from cash jobs". **There is still no collection mechanism — open
+  business decision since July.**
 - Dispatch offers **only to the chosen pro**. If they decline/time out the order goes to
-  `no_providers` and the customer picks again — deliberately no silent substitution, because
-  another pro's price would differ from what the customer agreed.
-- Old 15%-deducted commission model is gone. `commission_pct` setting still exists but
-  `platform_fee_pct` (=10) is what's used.
+  `no_providers` and the customer picks again. The T&C now also allows FreshAF to offer a
+  replacement at the same price, or a full refund — but never a silent substitution.
+- Old 15%-deducted commission model is gone. `commission_pct` still exists in settings, unused.
 
 ## HYBRID QUOTING (built 19 Aug — this replaces choose-a-pro-from-a-price-list)
-The customer logs the job **once**; pros answer with their own price and availability.
+The customer logs the job **once**; pros tell FreshAF what they would charge, and the customer
+is shown FreshAF's price for each of them.
 - Prices in the catalogue are **indicative only** and shown as "from R180".
 - `POST /api/quote-requests` opens a request and asks every approved, online pro whose radius
   covers the pin and who offers that service.

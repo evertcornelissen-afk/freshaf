@@ -230,9 +230,10 @@ function refreshSel() {
   updateTotal();
 }
 
-/* ---------- choose your pro (each sets their own price) ---------- */
+/* ---------- choose your pro (one FreshAF price per pro) ---------- */
 /* ---------- quotes ----------
-   The customer logs one request; pros answer with their own price and availability.
+   The customer logs one request; pros tell us what they would charge, and we show the
+   customer OUR price for each of them. FreshAF sells the job; the pro performs it.
    Published prices answer automatically, so there is usually something bookable at once. */
 let quoteRequestId = null;
 let quotesList = [];
@@ -268,7 +269,7 @@ function renderQuotes() {
       </div>
       <div class="amt">
         <strong>${rand(q.total_cents)}</strong>
-        <span class="brk">${rand(q.supplier_price_cents)} pro${q.callout_fee_cents ? ' + ' + rand(q.callout_fee_cents) + ' callout' : ''} + ${rand(q.platform_fee_cents)} fee</span>
+        <span class="brk">all in, nothing added</span>
       </div>
     </div>`).join('');
   box.querySelectorAll('.pro-opt').forEach((n) => n.onclick = () => {
@@ -390,9 +391,7 @@ function updateTotal() {
   const usePoints = el('use-points').checked;
   const discount = usePoints ? Math.min(me?.points_cents || 0, q.total_cents) : 0;
   animateRand(el('order-total'), q.total_cents - discount);
-  const notes = [`${q.business_name}: ${rand(q.supplier_price_cents)}`];
-  if (q.callout_fee_cents) notes.push(`callout ${rand(q.callout_fee_cents)}`);
-  notes.push(`service fee ${rand(q.platform_fee_cents)}`);
+  const notes = [`${q.business_name} · travel ${svc === 'laundry' ? 'and collection ' : ''}included`];
   if (discount > 0) notes.push(`rewards −${rand(discount)}`);
   el('price-note').textContent = notes.join(' · ');
 }
@@ -618,7 +617,6 @@ function renderTrack(order) {
       <p>Contacting the nearest available ${noun}…</p></div>`;
   }
   const breakdown = [];
-  if (order.callout_fee_cents > 0) breakdown.push(`includes ${rand(order.callout_fee_cents)} callout fee`);
   if (order.points_used_cents > 0) breakdown.push(`rewards applied −${rand(order.points_used_cents)}`);
   if (order.scheduled_for) {
     body += `<p class="mt" style="color:var(--accent-dim);font-weight:700">${icon('clock')} Booked for ${whenLabel(order.scheduled_for)}</p>`;

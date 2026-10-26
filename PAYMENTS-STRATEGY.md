@@ -73,7 +73,22 @@ The gap is the one that has been open since July: **there is still no mechanism 
 
 ---
 
-## Recommendation
+## DECIDED — 26 October 2026: Route B
+
+Evert chose **Route B, the Uber structure**: FreshAF sells the service and buys the work from the
+Pro. Reason: the Pros were sitting unapproved waiting for payments to be solved, and Route B
+unblocks them without an enterprise sales cycle or a sponsoring bank.
+
+Implemented the same day — code, T&C, ECT disclosures and a draft Supplier Agreement. See
+**`MERCHANT-OF-RECORD.md`**, which also carries the VAT arithmetic that now decides what the
+margin has to be.
+
+Route A (Stitch) is parked, not dead: if FreshAF ever wants Pros paid automatically out of each
+transaction rather than from its own account, that is a marketplace-payments product again.
+
+---
+
+## Recommendation (as written before the decision)
 
 **Launch on Route C. Decide between A and B while real orders are happening.**
 

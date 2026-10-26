@@ -54,7 +54,7 @@ function priceFor(serviceKey, packageKey, unitKey, supplierBaseCents) {
   return Math.round(supplierBaseCents * unit.mult / 100) * 100;
 }
 
-// Our fee, charged ON TOP of the pro's price and paid by the customer.
+// Our margin, added on top of what we pay the pro, to reach FreshAF's selling price.
 function platformFee(supplierPriceCents, pct) {
   return Math.round(supplierPriceCents * pct / 100 / 100) * 100;
 }
