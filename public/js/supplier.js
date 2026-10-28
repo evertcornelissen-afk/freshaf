@@ -611,7 +611,7 @@ async function refreshEarnings() {
   // is never paid less than they quoted. The only thing they can owe us is the balance of
   // a cash job they collected on our behalf.
   const owed = e.fee_owed_cents > 0
-    ? `<div class="stat"><div class="v" style="color:${e.cash_blocked ? 'var(--bad, #c0392b)' : '#c2711a'}">${rand(e.fee_owed_cents)}</div><div class="l">Owed to FreshAF from cash jobs${e.cash_cap_cents ? ` · limit ${rand(e.cash_cap_cents)}` : ''}</div></div>`
+    ? `<div class="stat"><div class="v" style="color:${e.cash_blocked ? '#c0392b' : '#c2711a'}">${rand(e.fee_owed_cents)}</div><div class="l">Owed to FreshAF from cash jobs${e.cash_cap_cents ? ` · limit ${rand(e.cash_cap_cents)}` : ''}</div></div>`
     : '';
   const blocked = e.cash_blocked
     ? `<div class="msg error" style="display:block;grid-column:1/-1">You are holding ${rand(e.fee_owed_cents)} of FreshAF's money from cash jobs, over the ${rand(e.cash_cap_cents)} limit. <strong>You will not be offered jobs until it is settled.</strong> Pay it in and we will clear it straight away.</div>`
