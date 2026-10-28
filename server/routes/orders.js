@@ -43,7 +43,7 @@ router.get('/quote/providers', authRequired('customer'), (req, res) => {
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'Pick a location first' });
 
-  const feePct = Number(getSetting('platform_fee_pct', '10'));
+  const feePct = Number(getSetting('platform_fee_pct', '20'));
   const maxRadius = Number(getSetting('dispatch_radius_km', '25'));
   const freeKm = Number(getSetting('callout_free_km', '5'));
   const perKm = Number(getSetting('callout_per_km_cents', '1000'));
@@ -283,7 +283,7 @@ router.post('/orders', authRequired('customer'), (req, res) => {
   if (supplierPrice == null) return res.status(400).json({ error: 'Invalid package or size selection' });
 
   const callout = computeCallout(lat, lng, service);
-  const feePct = Number(getSetting('platform_fee_pct', '10'));
+  const feePct = Number(getSetting('platform_fee_pct', '20'));
   const fee = platformFee(supplierPrice + callout.fee_cents, feePct);
   // Customer pays the pro's price + callout + our fee on top. The pro keeps their price + callout.
   const price = supplierPrice + callout.fee_cents + fee;

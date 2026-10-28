@@ -6,6 +6,7 @@ const { db, getSetting, setSetting } = require('../db');
 const { authRequired } = require('../auth');
 const realtime = require('../realtime');
 const push = require('../push');
+const balance = require('../balance');
 const mailer = require('../mailer');
 
 const router = express.Router();
@@ -64,6 +65,7 @@ router.get('/suppliers', (req, res) => {
       bank_name: r.bank_name, bank_account: r.bank_account, bank_branch: r.bank_branch,
       documents: db.prepare('SELECT id, kind, original_name FROM supplier_docs WHERE user_id = ?').all(r.user_id),
       status: r.status, status_reason: r.status_reason, online: !!r.online,
+      ...balance.status(r.user_id),
       rating: r.rating_count ? +(r.rating_sum / r.rating_count).toFixed(1) : null,
       rating_count: r.rating_count, created_at: r.created_at,
     })),
@@ -93,6 +95,16 @@ router.get('/docs/:docId', (req, res) => {
   const doc = db.prepare('SELECT * FROM supplier_docs WHERE id = ?').get(req.params.docId);
   if (!doc) return res.status(404).json({ error: 'Document not found' });
   res.sendFile(path.join(__dirname, '..', '..', 'data', 'uploads', doc.stored_name));
+});
+
+// Record that a pro has paid in the cash they were holding. Clears the balance that
+// keeps them off the platform.
+router.post('/suppliers/:id/settle-cash', (req, res) => {
+  const s = db.prepare('SELECT user_id FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  const cleared = balance.settle(s.user_id);
+  console.log(`[FreshAF] Cash settled for supplier ${s.user_id}: R${(cleared / 100).toFixed(2)}`);
+  res.json({ ok: true, cleared_cents: cleared, ...balance.status(s.user_id) });
 });
 
 router.post('/suppliers/:id/approve', (req, res) => setSupplierStatus(req, res, 'approved'));

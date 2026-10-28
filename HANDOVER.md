@@ -31,10 +31,16 @@ field-by-field answers are still valid: **`PAYFAST-APPLICATION-SHEET.md`**. The 
 form bug and its fix are recorded there too — the Physical Address field is a Google Places
 autocomplete, so you must **click a dropdown suggestion**, not just type.
 
-⚠️ **The margin is 10% and that is probably wrong now.** As merchant of record, VAT applies to
-the full order value, not to a fee. At 10% every job becomes loss-making the moment FreshAF
-registers for VAT; 15% is break-even and ~26.5% keeps a real 10%. One admin setting,
-`platform_fee_pct`. Cheapest to change now, with zero customers and zero approved pros.
+✅ **The margin is 20%** (set 28 Oct, was 10%). Set in `server/db.js` rather than the admin panel
+because the host database is still ephemeral — a panel change would not survive the next restart.
+Verified: pro paid R313 → customer sees R376. It clears VAT, but only just (R13.96 a job once
+registered). See `MERCHANT-OF-RECORD.md`.
+
+✅ **Cash collection now works the Uber way** (28 Oct). A pro's unsettled cash margin accrues
+against their account; at **R300** (`cash_owed_cap_cents`) they cannot go online, cannot quote and
+are dropped from dispatch until an admin records the money as received. `server/balance.js`, with
+a **Settle cash** button on each pro's admin row. Automatic set-off against card payouts is the
+remaining piece and needs card to be live. See **`GETTING-PAID.md`**.
 
 ### Blocked on Evert
 1. **Clear the PayFast keys on Render.** Merchant credentials are still set there, and
@@ -114,17 +120,18 @@ registers for VAT; 15% is break-even and ~26.5% keeps a real 10%. One admin sett
 - The vehicle/load multiplier still applies on top of the pro's price (sedan ×1, SUV ×1.25, etc.).
 - Customer picks a **specific pro** from a list showing business name, rating, distance,
   availability and **one FreshAF price** — "all in, nothing added".
-- `platform_fee_pct` (=10) is FreshAF's **margin**, added when pricing to the customer.
+- `platform_fee_pct` (=20) is FreshAF's **margin**, added when pricing to the customer.
   **The pro is still paid their full price + the full callout; nothing is deducted from them.**
 - ⚠️ **The customer never sees the split.** `quotePublic` in `server/quotes.js` deliberately does
   not return `supplier_price_cents`, `platform_fee_cents` or `callout_fee_cents`. They stay in the
   DB for the accounts. Itemising them on a customer's bill is what made FreshAF look like a
   payment intermediary — **do not put the breakdown back.**
-- Verified 26 Oct: pro R313 + R0 callout + R31 margin → customer sees **R344 and nothing else**.
+- Verified 28 Oct: pro R313 + R0 callout + R63 margin → customer sees **R376 and nothing else**.
 - **Cash jobs:** the pro collects the full amount **as FreshAF's collection agent** and owes
   FreshAF the balance above their own price. Tracked on `orders.fee_settled`, shown in the pro's
-  earnings as "Owed to FreshAF from cash jobs". **There is still no collection mechanism — open
-  business decision since July.**
+  earnings as "Owed to FreshAF from cash jobs". **Capped at R300** — above it `server/balance.js`
+  blocks going online, blocks quoting and removes them from `eligiblePros` until an admin hits
+  **Settle cash**. Set-off against card payouts still to wire when card goes live.
 - Dispatch offers **only to the chosen pro**. If they decline/time out the order goes to
   `no_providers` and the customer picks again. The T&C now also allows FreshAF to offer a
   replacement at the same price, or a full refund — but never a silent substitution.

@@ -85,14 +85,18 @@ to claim back**:
 **15% is break-even. You need about 26.5% to actually keep 10%.** Uber charges ~25%. That is not
 a coincidence.
 
-### Recommendation
+### ✅ DECIDED 28 October 2026: the margin is **20%**
 
-**Set the margin to 25% now, before the first customer and the first approved Pro.** It costs
-nothing today and it is the cheapest moment this company will ever have to change it. Raising it
-later means telling Pros their jobs are worth less and telling customers prices went up 15%.
+I recommended 25%; Evert chose 20%. Set in `server/db.js`, not through the admin panel, **because
+the host database is still ephemeral and a panel change would not survive the next restart**. A
+guarded one-time migration moves an existing 10% to 20% and never re-fires, so a later deliberate
+choice is never overwritten.
 
-It is one admin setting, `platform_fee_pct`. Nothing in the customer-facing app changes, because
-the customer only ever sees one number.
+Verified: pro paid R313 → customer sees **R376**, margin R63, and the customer sees no breakdown.
+
+20% clears VAT, but not by much. On that job, once registered: R376 − R49.04 VAT − R313 =
+**R13.96**. Positive, where 10% was −R8.70. Revisit the number, or start preferring VAT-registered
+Pros, before crossing R1m in bookings.
 
 Mitigations worth knowing:
 

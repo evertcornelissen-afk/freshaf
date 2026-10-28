@@ -11,10 +11,11 @@ const realtime = require('./realtime');
 const push = require('./push');
 const whatsapp = require('./whatsapp');
 const dispatch = require('./dispatch');
+const balance = require('./balance');
 
 function settings() {
   return {
-    feePct: Number(getSetting('platform_fee_pct', '10')),
+    feePct: Number(getSetting('platform_fee_pct', '20')),
     maxRadius: Number(getSetting('dispatch_radius_km', '25')),
     freeKm: Number(getSetting('callout_free_km', '5')),
     perKm: Number(getSetting('callout_per_km_cents', '1000')),
@@ -48,7 +49,9 @@ function eligiblePros(request) {
       AND instr(',' || s.services || ',', ',' || ? || ',') > 0${busyClause}
   `).all(request.service, request.package, request.service);
 
-  return rows.map((r) => {
+  // A pro sitting on too much of our cash stops being offered work until they settle.
+  const blocked = balance.blockedSupplierIds();
+  return rows.filter((r) => !blocked.has(r.user_id)).map((r) => {
     const distance = dispatch.haversineKm(request.lat, request.lng, r.lat, r.lng);
     // A pro is only asked if the customer is inside the radius THEY chose.
     const limit = Math.min(r.radius_km || maxRadius, maxRadius);

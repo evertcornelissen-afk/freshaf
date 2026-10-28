@@ -529,11 +529,8 @@ function renderWaConfirm(dryRun) {
 }
 
 /* ---------- job requests (quote them) ---------- */
-let reqFeePct = 10;
-
 async function refreshRequests() {
   const data = await api('/api/supplier/quote-requests');
-  reqFeePct = data.fee_pct ?? 10;
   const box = el('requests-box');
   const list = data.requests || [];
   if (!list.length) {
@@ -614,11 +611,14 @@ async function refreshEarnings() {
   // is never paid less than they quoted. The only thing they can owe us is the balance of
   // a cash job they collected on our behalf.
   const owed = e.fee_owed_cents > 0
-    ? `<div class="stat"><div class="v" style="color:#c2711a">${rand(e.fee_owed_cents)}</div><div class="l">Owed to FreshAF from cash jobs</div></div>`
+    ? `<div class="stat"><div class="v" style="color:${e.cash_blocked ? 'var(--bad, #c0392b)' : '#c2711a'}">${rand(e.fee_owed_cents)}</div><div class="l">Owed to FreshAF from cash jobs${e.cash_cap_cents ? ` · limit ${rand(e.cash_cap_cents)}` : ''}</div></div>`
+    : '';
+  const blocked = e.cash_blocked
+    ? `<div class="msg error" style="display:block;grid-column:1/-1">You are holding ${rand(e.fee_owed_cents)} of FreshAF's money from cash jobs, over the ${rand(e.cash_cap_cents)} limit. <strong>You will not be offered jobs until it is settled.</strong> Pay it in and we will clear it straight away.</div>`
     : '';
   el('earnings-box').innerHTML = `
     <div class="stat"><div class="v">${e.jobs}</div><div class="l">Jobs done</div></div>
-    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">FreshAF paid you — your price in full</div></div>` + owed;
+    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">FreshAF paid you — your price in full</div></div>` + owed + blocked;
 }
 
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {

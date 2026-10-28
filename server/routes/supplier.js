@@ -7,6 +7,7 @@ const { db, getSetting } = require('../db');
 const { authRequired } = require('../auth');
 const dispatch = require('../dispatch');
 const realtime = require('../realtime');
+const balance = require('../balance');
 
 const router = express.Router();
 router.use(authRequired('supplier'));
@@ -81,7 +82,7 @@ router.get('/prices', (req, res) => {
       })),
     };
   }
-  res.json({ services: out, fee_pct: Number(getSetting('platform_fee_pct', '10')) });
+  res.json({ services: out, fee_pct: Number(getSetting('platform_fee_pct', '20')) });
 });
 
 router.post('/prices', (req, res) => {
@@ -106,6 +107,9 @@ router.post('/prices', (req, res) => {
 
 router.post('/online', requireApproved, (req, res) => {
   const { online, lat, lng, radius_km } = req.body || {};
+  if (online && balance.isBlocked(req.user.id)) {
+    return res.status(402).json({ error: balance.blockedMessage(req.user.id) });
+  }
   if (typeof radius_km === 'number' && radius_km > 0) {
     db.prepare('UPDATE suppliers SET radius_km = ? WHERE user_id = ?')
       .run(Math.min(200, Math.max(1, radius_km)), req.user.id);
@@ -225,6 +229,9 @@ function proContext(userId) {
 router.get('/quote-requests', requireApproved, (req, res) => {
   const me = proContext(req.user.id);
   if (!me || !me.online || me.lat == null) return res.json({ requests: [] });
+  if (balance.isBlocked(req.user.id)) {
+    return res.json({ requests: [], ...balance.status(req.user.id) });
+  }
   const maxRadius = Number(getSetting('dispatch_radius_km', '25'));
   const limit = Math.min(me.radius_km || maxRadius, maxRadius);
   const mine = (me.services || 'carwash').split(',');
@@ -265,13 +272,14 @@ router.get('/quote-requests', requireApproved, (req, res) => {
     };
   }).filter(Boolean);
 
-  res.json({ requests, fee_pct: Number(getSetting('platform_fee_pct', '10')) });
+  res.json({ requests, fee_pct: Number(getSetting('platform_fee_pct', '20')) });
 });
 
 // Send (or replace) my price and availability for one request.
 router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
   const me = proContext(req.user.id);
   if (!me || !me.online || me.lat == null) return res.status(400).json({ error: 'Go online before quoting' });
+  if (balance.isBlocked(req.user.id)) return res.status(402).json({ error: balance.blockedMessage(req.user.id) });
 
   const request = db.prepare("SELECT * FROM quote_requests WHERE id = ? AND status = 'open'").get(req.params.id);
   if (!request) return res.status(409).json({ error: 'That request is no longer open' });
@@ -394,7 +402,8 @@ router.get('/earnings', (req, res) => {
     earned_cents: row.earned,
     fees_cents: row.fees,
     fee_owed_cents: owed,
-    fee_pct: Number(getSetting('platform_fee_pct', '10')),
+    fee_pct: Number(getSetting('platform_fee_pct', '20')),
+    ...balance.status(req.user.id),
   });
 });
 

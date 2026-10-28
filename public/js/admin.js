@@ -152,17 +152,34 @@ async function refreshSuppliers() {
           ? '<br>' + s.documents.map((d) => `<a href="/api/admin/docs/${d.id}" target="_blank">${d.kind.replace(/_/g, ' ')}</a>`).join(' · ')
           : '<br><span style="color:var(--warn)">No documents uploaded</span>'}</td>
       <td><span class="pill ${s.status === 'approved' ? 'ok' : s.status === 'pending' ? 'warn' : 'bad'}">${s.status}</span>
+        ${s.cash_blocked ? '<br><span class="pill bad" style="margin-top:5px">cash limit</span>' : ''}
         ${s.online ? '<br><span class="pill ok live" style="margin-top:5px">online</span>' : ''}
+        ${s.cash_owed_cents > 0 ? `<br><span class="muted small-text">holds ${rand(s.cash_owed_cents)} cash</span>` : ''}
         ${s.rating ? `<br><span class="muted small-text">${starInline} ${s.rating} (${s.rating_count})</span>` : ''}</td>
       <td>
         <div class="row" style="flex-wrap:nowrap">
         ${s.status !== 'approved' ? `<button class="small" onclick="setStatus(${s.user_id},'approve')">Approve</button>` : ''}
         ${s.status === 'pending' ? `<button class="danger small" onclick="setStatus(${s.user_id},'reject')">Reject</button>` : ''}
         ${s.status === 'approved' ? `<button class="danger small" onclick="setStatus(${s.user_id},'suspend')">Suspend</button>` : ''}
+        ${s.cash_owed_cents > 0 ? `<button class="small" onclick="settleCash(${s.user_id}, ${s.cash_owed_cents})">Settle cash</button>` : ''}
         </div>
       </td>
     </tr>`).join('') + '</tbody></table>';
 }
+
+window.settleCash = async (id, owed) => {
+  try {
+    const ok = await modal({
+      title: `Record ${rand(owed)} received?`,
+      body: 'Confirm only once the money is actually in the FreshAF account. This clears the balance and, if they were over the limit, puts them back on the platform.',
+      confirmText: 'Mark as settled',
+    });
+    if (!ok) return;
+    const r = await api(`/api/admin/suppliers/${id}/settle-cash`, { method: 'POST' });
+    toast(`${rand(r.cleared_cents)} settled`, 'ok');
+    await refreshSuppliers();
+  } catch (e) { showError('sup-error', e.message); }
+};
 
 window.setStatus = async (id, action) => {
   try {

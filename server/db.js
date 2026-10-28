@@ -242,8 +242,23 @@ addColumn('suppliers', 'alert_whatsapp INTEGER NOT NULL DEFAULT 1');
 
 if (!getSetting('whatsapp_alerts_enabled')) setSetting('whatsapp_alerts_enabled', '1');
 if (!getSetting('commission_pct')) setSetting('commission_pct', '15');
-// Pros set their own prices; this fee is added ON TOP and paid by the customer.
-if (!getSetting('platform_fee_pct')) setSetting('platform_fee_pct', '10');
+// FreshAF's margin: added to what we pay the pro to reach our selling price. It has to
+// carry VAT on the whole order once we register, which is why it is 20 and not 10.
+if (!getSetting('platform_fee_pct')) setSetting('platform_fee_pct', '20');
+// Moved 10 -> 20 on 28 Oct 2026 with the merchant-of-record restructure. Applied here
+// rather than through the admin panel because the host database is still ephemeral, so a
+// panel change would not survive the next restart. The marker stops it ever re-firing,
+// so a later deliberate choice of 10% is never overwritten.
+if (!getSetting('margin_20_applied')) {
+  if (getSetting('platform_fee_pct') === '10') {
+    setSetting('platform_fee_pct', '20');
+    console.log('[FreshAF] Platform margin moved from 10% to 20% (merchant-of-record pricing).');
+  }
+  setSetting('margin_20_applied', '1');
+}
+// How much of FreshAF's money a pro may be holding from cash jobs before they are taken
+// off the platform until they settle. The Uber mechanic. R300 by default.
+if (!getSetting('cash_owed_cap_cents')) setSetting('cash_owed_cap_cents', '30000');
 if (!getSetting('dispatch_radius_km')) setSetting('dispatch_radius_km', '25');
 if (!getSetting('offer_timeout_sec')) setSetting('offer_timeout_sec', '60');
 if (!getSetting('points_earn_pct')) setSetting('points_earn_pct', '5');
