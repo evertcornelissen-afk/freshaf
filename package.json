@@ -1,14 +1,15 @@
 {
   "name": "freshaf",
   "version": "1.0.0",
-  "description": "FreshAF (Fresh and Fast) — on-demand mobile car wash marketplace",
+  "description": "FreshAF (Fresh and Fast) \u2014 on-demand mobile car wash marketplace",
   "main": "server/index.js",
   "engines": {
     "node": ">=23.4"
   },
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node server/index.js"
+    "dev": "node server/index.js",
+    "test": "node test/stitch-signature.test.js && node test/stitch-webhook-route.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

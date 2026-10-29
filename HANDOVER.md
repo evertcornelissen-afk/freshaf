@@ -25,7 +25,16 @@ disclosures and a draft Supplier Agreement.
 - What changed, and the VAT arithmetic that now sets the margin: **`MERCHANT-OF-RECORD.md`**
 - The FreshAF ↔ pro contract, unsigned: **`SUPPLIER-AGREEMENT-DRAFT.md`**
 
-**Immediate next action: decide the margin, then resubmit the PayFast application** under the
+**Payment provider is now STITCH, not PayFast** (29 Oct). As merchant of record FreshAF only
+needs Stitch's self-serve **Express** tier (~2.95% local cards, no monthly fee) — no marketplace
+product, no enterprise sales cycle. The integration is **built and tested**; what is left is an
+account, env vars on Render, and two switches only Stitch can flip (enable Card, allowlist
+freshaf.io). Step-by-step: **`STITCH-SETUP.md`**. `npm test` covers the webhook path.
+
+**Immediate next action: create the Stitch Express account.** The old PayFast instructions below
+are kept only because the application answers transfer directly.
+
+~~**Decide the margin, then resubmit the PayFast application**~~ under the
 correct description ("we sell mobile car wash and laundry and subcontract the work"). The
 field-by-field answers are still valid: **`PAYFAST-APPLICATION-SHEET.md`**. The old UBO
 form bug and its fix are recorded there too — the Physical Address field is a Google Places

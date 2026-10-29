@@ -161,6 +161,7 @@ addColumn('suppliers', 'radius_km REAL');
 // ("2026-08-22 09:00") — South Africa is a single zone with no daylight saving,
 // so there is nothing to convert and no ambiguity.
 addColumn('orders', 'scheduled_for TEXT');
+addColumn('orders', 'payment_ref TEXT'); // the gateway's id for this payment
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS supplier_prices (

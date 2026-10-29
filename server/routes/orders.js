@@ -3,6 +3,7 @@ const { db, getSetting } = require('../db');
 const { authRequired } = require('../auth');
 const { SERVICE_KEYS, quote, catalog, priceFor, platformFee } = require('../pricing');
 const payments = require('../payments');
+const stitch = require('../stitch');
 const dispatch = require('../dispatch');
 const realtime = require('../realtime');
 
@@ -178,7 +179,7 @@ router.get('/quote/callout', authRequired('customer'), (req, res) => {
 });
 
 // Accept one quote: it becomes the order, at exactly the price that pro quoted.
-router.post('/quotes/:id/accept', authRequired('customer'), (req, res) => {
+router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => {
   const { payment_method, use_points } = req.body || {};
   if (!['card', 'cash'].includes(payment_method)) return res.status(400).json({ error: 'Choose a payment method' });
 
@@ -251,11 +252,12 @@ router.post('/quotes/:id/accept', authRequired('customer'), (req, res) => {
     dispatch.notifyCustomer(order);
     return res.json({ order: dispatch.orderPublic(order) });
   }
-  const pay = payments.createPayment(order, customer);
+  const pay = await startPayment(order, customer, res);
+  if (!pay) return;
   res.json({ order: dispatch.orderPublic(order), payment_url: pay.url, payment_mode: pay.mode });
 });
 
-router.post('/orders', authRequired('customer'), (req, res) => {
+router.post('/orders', authRequired('customer'), async (req, res) => {
   const { service, package: pkg, vehicle, address, lat, lng, notes, payment_method, use_points,
     supplier_id } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
@@ -323,11 +325,29 @@ router.post('/orders', authRequired('customer'), (req, res) => {
     dispatch.startDispatch(orderId);
     return res.json({ order: dispatch.orderPublic(order) });
   }
-  const pay = payments.createPayment(order, customer);
+  const pay = await startPayment(order, customer, res);
+  if (!pay) return;
   res.json({ order: dispatch.orderPublic(order), payment_url: pay.url, payment_mode: pay.mode });
 });
 
-// Sandbox payment confirmation (used by /pay/:id page when no PayFast keys are set).
+// Ask the gateway for a payment URL. A gateway can be down or misconfigured, and the
+// customer must be told that plainly rather than left on a dead screen with an order
+// sitting in pending_payment.
+async function startPayment(order, customer, res) {
+  try {
+    const pay = await payments.createPayment(order, customer);
+    if (pay.reference) db.prepare('UPDATE orders SET payment_ref = ? WHERE id = ?').run(pay.reference, order.id);
+    return pay;
+  } catch (e) {
+    console.error('[FreshAF] Payment setup failed for order', order.id, e);
+    res.status(502).json({
+      error: 'We could not reach our payment provider. Your order is saved — try again in a moment, or choose cash.',
+    });
+    return null;
+  }
+}
+
+// Sandbox payment confirmation (used by the /pay/:id page when no gateway is configured).
 // A paid order that came from an accepted quote already has its pro committed — confirm
 // the booking instead of putting it back out to dispatch.
 function afterPayment(orderId) {
@@ -374,6 +394,36 @@ router.post('/payments/payfast/itn', express.urlencoded({ extended: false }), (r
       db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(orderId);
       afterPayment(orderId);
     }
+  }
+  res.send('ok');
+});
+
+// Stitch webhook (Svix). The status on the browser redirect is attacker-controllable,
+// so this signed callback is the only thing that marks an order paid.
+router.post('/payments/stitch/webhook', (req, res) => {
+  if (!stitch.verifyWebhook(req.body, req.headers)) {
+    console.warn('[FreshAF] Rejected a Stitch webhook with a bad or missing signature.');
+    return res.status(400).send('bad signature');
+  }
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body);
+  } catch {
+    return res.status(400).send('bad payload');
+  }
+  const event = stitch.readPaymentEvent(payload);
+  // Acknowledge anything we do not act on, or Stitch will keep retrying it.
+  if (!event || !Number.isFinite(event.orderId)) return res.send('ok');
+
+  if (event.paid) {
+    const order = db.prepare("SELECT * FROM orders WHERE id = ? AND status = 'pending_payment'").get(event.orderId);
+    if (order) {
+      db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(event.orderId);
+      afterPayment(event.orderId);
+      console.log(`[FreshAF] Stitch confirmed payment for order ${event.orderId}.`);
+    }
+  } else {
+    console.log(`[FreshAF] Stitch reported ${event.state} for order ${event.orderId}.`);
   }
   res.send('ok');
 });

@@ -73,6 +73,19 @@ The gap is the one that has been open since July: **there is still no mechanism 
 
 ---
 
+## DECIDED — 29 October 2026: Stitch, on the Express tier
+
+Evert chose **Stitch** as the gateway. Worth noting what changed: Route A originally meant
+Stitch's **marketplace** product, with an enterprise sales cycle and a business with no
+transactions trying to sign a split-payments contract. Because Route B made FreshAF the merchant
+of record first, **the self-serve Express tier is now sufficient** — cheaper, faster, and no
+sponsoring-bank conversation. The two routes turned out to compose rather than compete.
+
+Built and tested 29 Oct: `server/stitch.js`, provider dispatch in `server/payments.js`, signed
+webhook route, `npm test`. Setup steps: **`STITCH-SETUP.md`**.
+
+---
+
 ## DECIDED — 26 October 2026: Route B
 
 Evert chose **Route B, the Uber structure**: FreshAF sells the service and buys the work from the

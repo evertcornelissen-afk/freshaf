@@ -19,6 +19,9 @@ app.use((req, res, next) => {
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
+// Stitch signs the RAW body, so this one path must not be JSON-parsed. express.json()
+// skips a request whose body a previous parser already set.
+app.use('/api/payments/stitch/webhook', express.raw({ type: '*/*', limit: '1mb' }));
 app.use(express.json());
 app.use(cookieParser());
 
