@@ -28,7 +28,43 @@ account FreshAF can actually get.
 
 ## What you do
 
-### 1. Create the account — ~15 minutes
+> 📖 **Read `STITCH-CONTRACT-REVIEW.md` before signing.** Their acquiring terms contain two
+> clauses the old FreshAF would have failed, one deadline that moved, and one risk we had not
+> priced in (settlement timing).
+
+### 1. Create the account — ~5 minutes
+
+**https://express.stitch.money/signup**. Claude cannot do this step: it creates an account, sets a
+password, and accepts the Acquiring Service Terms, which is a contract binding FreshAF.
+
+| Field | Value |
+|---|---|
+| First name | `Evert` |
+| Last name | `Cornelissen` |
+| Phone number | `078 299 1050` |
+| Email address | `admin@freshaf.io` — **not** a personal address; Nikki shares this mailbox |
+| Password | yours; put it in the password manager, not in chat |
+| Terms and Conditions + Privacy Policy | tick — required |
+| **Acquiring Service Terms** | tick — required. **This is the card contract.** See the review doc |
+| Marketing communication | optional; leave unticked |
+
+### 2. The business description — get this exactly right
+
+Clause 7.7.3 of the acquiring terms bars transactions for *"goods or services which fall outside
+the description of your Business"* without prior written approval, so **what you type here is
+contractually binding**, not marketing copy. It must name **both** services:
+
+> FreshAF (Pty) Ltd sells on-demand mobile car wash and laundry services to consumers in South
+> Africa. Customers book and pay FreshAF online; we set the price, invoice in our own name, and
+> are responsible to the customer for the service. The work is performed at the customer's
+> address by independent service professionals whom FreshAF engages and pays as our
+> subcontractors. FreshAF is the merchant of record and does not hold or disburse funds on
+> behalf of third parties.
+
+If they want to see it, send them **https://freshaf.io/terms** and **https://freshaf.io/contact**
+— both say exactly this, verified 2 Nov 2026.
+
+### 3. Company details
 
 Go to **https://express.stitch.money** and sign up as **FRESHAF (PTY) LTD**.
 
@@ -49,7 +85,7 @@ for the field-by-field answers, they transfer directly.
 > ⚠️ Still outstanding from that list: proof of business address under 3 months, both directors'
 > IDs (both sides), and Beneficial Ownership filed at CIPC. Expect Stitch to ask for the same.
 
-### 2. Ask Stitch to switch on two things
+### 4. Ask Stitch to switch on two things
 
 Neither can be done from the dashboard, and **the integration will not work without them**:
 
@@ -57,7 +93,7 @@ Neither can be done from the dashboard, and **the integration will not work with
 2. **Allowlist `https://freshaf.io`** for redirects. Stitch refuses to send a customer back to a
    domain that is not on the list, and production clients must be https.
 
-### 3. Create a webhook subscription
+### 5. Create a webhook subscription
 
 Point it at:
 
@@ -69,7 +105,7 @@ Subscribe to the **`payment`** event type. Stitch returns a **signing secret** b
 — that is `STITCH_WEBHOOK_SECRET` below. **The route is already built and tested**; it rejects
 anything that is not correctly signed.
 
-### 4. Set these on Render, then tell me
+### 6. Set these on Render, then tell me
 
 Render → freshaf service → Environment. **Do not paste any of these into chat** — set them
 yourself and just tell me they are in.
@@ -92,7 +128,7 @@ beneficiary variables empty — the two approaches are mutually exclusive in the
 charges anyone. Flipping it to `true` is the single switch that turns card on, and only once
 every value above is present.
 
-### 5. Clear the dead PayFast variables
+### 7. Clear the dead PayFast variables
 
 `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`. They are not FreshAF's, they
 are not used now that the provider is Stitch, and they should not be sitting there.
@@ -142,11 +178,25 @@ Then place one real low-value order and pay it. Check that:
 
 ---
 
+## Ask them these before going live
+
+From `STITCH-CONTRACT-REVIEW.md` — the acquiring terms leave all three open:
+
+1. **What is the settlement period?** Cl. 10.1 states none. FreshAF pays pros their full price out
+   of its own account on a 20% margin, so a week's hold means funding the pros' money ourselves.
+2. **Is a reserve or rolling reserve applied to a new merchant, and at what percentage and for how
+   long?** Cl. 8.2 and 10.2 allow one; no figure is published.
+3. **Confirm in writing that FreshAF is onboarded as a merchant of record**, not as a marketplace
+   under clause 13. If they do treat us as a marketplace, cl. 13.2 requires a signed written
+   agreement with every pro **before** depositing transactions.
+
 ## Still open, and not Stitch's fault
 
 - **No persistent disk on Render.** Orders and customers are wiped on every restart. Taking real
   card money into a database that forgets the order is worse than taking no card money. **Fix this
   before `PAYMENTS_LIVE=true`.**
 - **Chargebacks are FreshAF's loss** now, and a pro may already have been paid. Set a payout delay.
+- **`SUPPLIER-AGREEMENT-DRAFT.md` is unsigned.** The deadline moved: it was "before the first pro
+  is approved", and acquiring clause 13.2 makes it **also "before the first card payment"**.
 - **Set-off against card payouts** — the other half of the cash mechanic in `GETTING-PAID.md` —
   can be wired as soon as card revenue exists. `balance.settle()` is the hook.
