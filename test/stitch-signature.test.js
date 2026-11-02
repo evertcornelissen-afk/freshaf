@@ -41,24 +41,35 @@ check('rotation: good signature among several accepted',
 Date.now = realNow;
 check('replayed old delivery rejected (clock restored)', stitch.verifyWebhook(PAYLOAD, headers()), false);
 
-console.log('\npayload parsing');
-const completed = {
-  data: { client: { paymentInitiationRequests: { node: {
-    __typename: 'PaymentInitiationRequest',
-    id: 'cGF5cmVxLzk2YjUyODU1',
-    externalReference: '4821',
-    amount: { currency: 'ZAR', quantity: '376.00' },
-    state: { __typename: 'PaymentInitiationRequestCompleted' },
-  } } } },
+console.log('\npayload parsing (Stitch Express payment.paid)');
+// Shape taken from the Event Catalog in the Stitch Express dashboard. Note there is no
+// merchantReference on it: the order is matched by linkId, not by anything in here.
+const paid = {
+  amount: 37600,
+  id: '5A26F599-A473-4672-A232-2171483F999A',
+  linkId: 'DjbyqE',
+  status: 'PAID',
+  type: 'LINK',
 };
-const cancelled = JSON.parse(JSON.stringify(completed));
-cancelled.data.client.paymentInitiationRequests.node.state.__typename = 'PaymentInitiationRequestCancelled';
-
-const a = stitch.readPaymentEvent(completed);
-check('completed -> orderId 4821', a.orderId, 4821);
-check('completed -> paid true', a.paid, true);
-check('cancelled -> paid false', stitch.readPaymentEvent(cancelled).paid, false);
+const a = stitch.readPaymentEvent(paid);
+check('paid -> paid true', a.paid, true);
+check('paid -> linkId carried', a.linkId, 'DjbyqE');
+check('paid -> amount stays in CENTS', a.amountCents, 37600);
+check('settled -> paid true', stitch.readPaymentEvent({ ...paid, status: 'SETTLED' }).paid, true);
+check('unknown status -> paid false', stitch.readPaymentEvent({ ...paid, status: 'EXPIRED' }).paid, false);
+check('no id -> null', stitch.readPaymentEvent({ status: 'PAID' }), null);
 check('unrelated shape -> null', stitch.readPaymentEvent({ hello: 'world' }), null);
+
+console.log('\nreference round-trip');
+check('merchantReference for order 4821', stitch.merchantReference(4821), 'FRESHAF-4821');
+check('reference parses back', stitch.orderIdFromReference('FRESHAF-4821'), 4821);
+check('foreign reference rejected', stitch.orderIdFromReference('ORDER-4821'), null);
+
+console.log('\nreturn URL');
+// A trailing slash on the registered URL never matches, so never produce one.
+check('no trailing slash', stitch.returnUrl('https://freshaf.io/'), 'https://freshaf.io/payment-complete');
+check('payerName falls back when too short', stitch.payerName({ name: 'Al' }), 'FreshAF Customer');
+check('payerPhone normalises to E.164', stitch.payerPhone({ phone: '078 299 1050' }), '+27782991050');
 
 const passed = checks.filter(Boolean).length;
 console.log(`\n${passed}/${checks.length} ${passed === checks.length ? 'PASS' : 'FAIL'}`);

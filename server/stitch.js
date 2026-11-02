@@ -1,34 +1,39 @@
-// Stitch (stitch.money) card payments.
+// Stitch Express card payments.
 //
 // FreshAF is the merchant of record, so this is an ordinary card acquirer integration:
 // the customer pays FreshAF, the money settles into FreshAF's own bank account, and we
 // pay pros separately as our suppliers. No marketplace or split-payment product needed.
 //
-// Flow, per https://docs.stitch.money/payment-products/payins/card/once-off/hosted-ui
-//   1. POST client_credentials to the token endpoint (cached until it expires).
-//   2. clientPaymentInitiationRequestCreate over GraphQL -> { id, url }.
-//   3. Redirect the customer to url + ?redirect_uri=<our return page>.
-//   4. Trust ONLY the signed webhook for marking an order paid. The status query
-//      parameter on the return is attacker-controllable.
+// IMPORTANT: Stitch Express (https://express.stitch.money/api/v1) is a REST API and a
+// DIFFERENT PRODUCT from the Stitch Enterprise/Connect GraphQL API at api.stitch.money.
+// Two differences will silently destroy money if you mix them up:
+//   - Express amounts are in CENTS (5000 = R50.00). The GraphQL API takes decimal rands.
+//   - Express tokens are JSON {clientId, clientSecret, scope}, not OAuth form posts.
+// Spec: https://express.stitch.money/api/openapi.json
+//
+// Flow:
+//   1. POST /api/v1/token -> short-lived bearer (15 min), cached.
+//   2. POST /api/v1/payment-links -> { id, link }.
+//   3. Send the customer to link + ?redirect_url=<a REGISTERED return URL>.
+//   4. Trust ONLY the signed webhook for marking an order paid. The return parameters
+//      are attacker-controllable.
 const crypto = require('crypto');
 
-const TOKEN_URL = 'https://secure.stitch.money/connect/token';
-const API_URL = 'https://api.stitch.money/graphql';
+const API_BASE = (process.env.STITCH_API_BASE || 'https://express.stitch.money').replace(/\/$/, '');
 
 const CLIENT_ID = process.env.STITCH_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.STITCH_CLIENT_SECRET || '';
 const SCOPE = process.env.STITCH_SCOPE || 'client_paymentrequest';
 const WEBHOOK_SECRET = process.env.STITCH_WEBHOOK_SECRET || '';
 
-// Either settle into our own bank account, or against a Stitch merchant id if they
-// issue us one. The two are mutually exclusive in their API.
-const MERCHANT_ID = process.env.STITCH_MERCHANT_ID || '';
-const BENEFICIARY_NAME = process.env.STITCH_BENEFICIARY_NAME || '';
-const BENEFICIARY_BANK_ID = process.env.STITCH_BENEFICIARY_BANK_ID || 'fnb';
-const BENEFICIARY_ACCOUNT = process.env.STITCH_BENEFICIARY_ACCOUNT_NUMBER || '';
-
+// Express settles into the bank account verified on the account, so unlike the GraphQL
+// API there is no beneficiary to configure here. Credentials are the whole story.
 function isConfigured() {
-  return Boolean(CLIENT_ID && CLIENT_SECRET && (MERCHANT_ID || (BENEFICIARY_NAME && BENEFICIARY_ACCOUNT)));
+  return Boolean(CLIENT_ID && CLIENT_SECRET);
+}
+
+function isTestMode() {
+  return CLIENT_ID.startsWith('test-');
 }
 
 // What is missing, in words, so the admin readiness panel can say something useful.
@@ -36,126 +41,157 @@ function missing() {
   const gaps = [];
   if (!CLIENT_ID) gaps.push('STITCH_CLIENT_ID');
   if (!CLIENT_SECRET) gaps.push('STITCH_CLIENT_SECRET');
-  if (!MERCHANT_ID && !(BENEFICIARY_NAME && BENEFICIARY_ACCOUNT)) {
-    gaps.push('STITCH_MERCHANT_ID, or STITCH_BENEFICIARY_NAME + STITCH_BENEFICIARY_ACCOUNT_NUMBER');
-  }
   if (!WEBHOOK_SECRET) gaps.push('STITCH_WEBHOOK_SECRET');
   return gaps;
 }
 
 /* ---------- client token ---------- */
-// Stitch asks that tokens be cached rather than minted per request.
+// Tokens live 15 minutes and the token endpoint is rate limited to 120/min, so Stitch
+// asks that they be reused rather than minted per request.
 let cached = { token: null, expiresAt: 0 };
 
-async function clientToken() {
-  if (cached.token && Date.now() < cached.expiresAt) return cached.token;
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    scope: SCOPE,
-    audience: TOKEN_URL,
-  });
-  const r = await fetch(TOKEN_URL, {
+async function clientToken(scope = SCOPE) {
+  if (cached.token && cached.scope === scope && Date.now() < cached.expiresAt) return cached.token;
+  const r = await fetch(`${API_BASE}/api/v1/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, scope }),
     signal: AbortSignal.timeout(15000),
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`Stitch token request failed (${r.status}): ${text.slice(0, 300)}`);
-  const data = JSON.parse(text);
-  if (!data.access_token) throw new Error('Stitch token response had no access_token');
-  // Expire a minute early so a token never dies mid-request.
-  cached = { token: data.access_token, expiresAt: Date.now() + (Number(data.expires_in || 3600) - 60) * 1000 };
-  return cached.token;
-}
-
-/* ---------- payment request ---------- */
-const CREATE_PAYMENT = `
-mutation CreatePaymentRequest(
-  $amount: MoneyInput!, $externalReference: String, $payerReference: String!,
-  $beneficiaryReference: String!, $expireAt: Date, $payerInformation: PayerInformationInput,
-  $beneficiary: BeneficiaryInput, $merchantId: String
-) {
-  clientPaymentInitiationRequestCreate(input: {
-    amount: $amount,
-    externalReference: $externalReference,
-    payerReference: $payerReference,
-    beneficiaryReference: $beneficiaryReference,
-    beneficiary: $beneficiary,
-    merchantId: $merchantId,
-    expireAt: $expireAt,
-    payerInformation: $payerInformation,
-    paymentMethods: { card: { enabled: true } }
-  }) {
-    paymentInitiationRequest { id url }
+  if (!r.ok) {
+    // 400 here almost always means the secret was regenerated by someone viewing it in
+    // the dashboard. Say so, because the generic message sends people hunting elsewhere.
+    throw new Error(`Stitch token request failed (${r.status}): ${text.slice(0, 300)}`);
   }
-}`;
-
-// Bank statement references are short and alphanumeric; anything else gets rejected.
-function reference(prefix, orderId) {
-  return `${prefix}${orderId}`.replace(/[^A-Za-z0-9]/g, '').slice(0, 12);
+  const data = JSON.parse(text);
+  const token = data?.data?.accessToken;
+  if (!token) throw new Error('Stitch token response had no accessToken');
+  // Expire a minute early so a token never dies mid-request.
+  cached = { token, scope, expiresAt: Date.now() + (15 * 60 - 60) * 1000 };
+  return token;
 }
 
-async function graphql(query, variables) {
-  const token = await clientToken();
-  const r = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ query, variables }),
+function resetTokenCache() {
+  cached = { token: null, expiresAt: 0 };
+}
+
+async function api(path, { method = 'GET', body, scope } = {}) {
+  const token = await clientToken(scope);
+  const r = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(20000),
   });
   const text = await r.text();
   let data;
   try {
-    data = JSON.parse(text);
+    data = text ? JSON.parse(text) : {};
   } catch {
     throw new Error(`Stitch returned non-JSON (${r.status}): ${text.slice(0, 300)}`);
   }
-  if (data.errors?.length) throw new Error(`Stitch API error: ${data.errors.map((e) => e.message).join('; ')}`);
-  if (!r.ok) throw new Error(`Stitch API failed (${r.status})`);
+  if (!r.ok || data.success === false) {
+    const general = Array.isArray(data.generalErrors) ? data.generalErrors.join('; ') : '';
+    const fields = data.fieldErrors && Object.keys(data.fieldErrors).length
+      ? JSON.stringify(data.fieldErrors) : '';
+    throw new Error(`Stitch ${method} ${path} failed (${r.status}): ${general || fields || text.slice(0, 200)}`);
+  }
   return data.data;
 }
 
-// amountCents -> Stitch wants a decimal amount in rand, e.g. 376.00, not cents.
-async function createPaymentRequest(order, customer, { baseUrl, amountCents }) {
-  const beneficiary = MERCHANT_ID ? undefined : {
-    bankAccount: {
-      name: BENEFICIARY_NAME,
-      bankId: BENEFICIARY_BANK_ID,
-      accountNumber: BENEFICIARY_ACCOUNT,
-    },
-  };
-  const variables = {
-    amount: { quantity: Number((amountCents / 100).toFixed(2)), currency: 'ZAR' },
-    externalReference: String(order.id),
-    payerReference: reference('FreshAF', order.id),
-    beneficiaryReference: reference('Order', order.id),
-    beneficiary,
-    merchantId: MERCHANT_ID || undefined,
-    // A payment page left open forever is a reconciliation problem later.
-    expireAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    payerInformation: {
-      payerId: String(customer.id),
-      fullName: customer.name || undefined,
-      email: customer.email || undefined,
-    },
-  };
-  const data = await graphql(CREATE_PAYMENT, variables);
-  const pr = data?.clientPaymentInitiationRequestCreate?.paymentInitiationRequest;
-  if (!pr?.url) throw new Error('Stitch did not return a payment URL');
+/* ---------- payment links ---------- */
 
-  const redirect = `${baseUrl}/?paid=${order.id}`;
-  const failure = `${baseUrl}/?cancelled=${order.id}`;
-  const url = `${pr.url}?redirect_uri=${encodeURIComponent(redirect)}`
-    + `&failure_redirect_uri=${encodeURIComponent(failure)}`;
-  return { url, requestId: pr.id };
+// merchantReference: alphanumeric, spaces and hyphens only, max 50. It is what comes
+// back on the redirect as ?reference=, so it has to round-trip to an order id.
+const REF_PREFIX = 'FRESHAF-';
+
+function merchantReference(orderId) {
+  return `${REF_PREFIX}${orderId}`;
+}
+
+function orderIdFromReference(reference) {
+  const m = /^FRESHAF-(\d+)$/.exec(String(reference || '').trim());
+  return m ? Number(m[1]) : null;
+}
+
+// payerName must be 3-40 characters. A blank or one-word name is common in our signups,
+// so fall back rather than letting Stitch reject the whole payment.
+function payerName(customer) {
+  const raw = String(customer?.name || '').replace(/[^A-Za-z0-9 '-]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (raw.length >= 3) return raw.slice(0, 40);
+  return 'FreshAF Customer';
+}
+
+// E.164, or leave it out. A malformed number fails the whole create call.
+function payerPhone(customer) {
+  const digits = String(customer?.phone || '').replace(/[^\d+]/g, '');
+  if (/^\+27\d{9}$/.test(digits)) return digits;
+  if (/^0\d{9}$/.test(digits)) return `+27${digits.slice(1)}`;
+  return undefined;
+}
+
+// The return URL must be REGISTERED and matched byte-for-byte, with no trailing slash.
+// Stitch strips a query string and one trailing slash from the incoming URL before
+// comparing; anything else different is a 404 for the customer AFTER they have paid.
+function returnUrl(baseUrl) {
+  return `${String(baseUrl || '').replace(/\/$/, '')}/payment-complete`;
+}
+
+async function createPaymentRequest(order, customer, { baseUrl, amountCents }) {
+  const amount = Math.round(Number(amountCents));
+  if (!Number.isFinite(amount) || amount < 100) {
+    throw new Error(`Stitch will not take ${amount} cents; the minimum is 100 (R1.00)`);
+  }
+  const data = await api('/api/v1/payment-links', {
+    method: 'POST',
+    body: {
+      amount, // CENTS. Do not divide by 100 here.
+      payerName: payerName(customer),
+      merchantReference: merchantReference(order.id),
+      payerEmailAddress: customer?.email || undefined,
+      payerPhoneNumber: payerPhone(customer),
+      // A payment page left open forever is a reconciliation problem later.
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    },
+  });
+  const payment = data?.payment;
+  if (!payment?.link) throw new Error('Stitch did not return a payment link');
+  const url = `${payment.link}?redirect_url=${encodeURIComponent(returnUrl(baseUrl))}`;
+  return { url, requestId: payment.id, reference: payment.merchantReference };
+}
+
+// Full payment record, used to recover the order when a webhook carries no link id.
+async function getPayment(paymentId) {
+  const data = await api(`/api/v1/payment/${encodeURIComponent(paymentId)}`);
+  return data?.payment || null;
+}
+
+async function getPaymentLink(linkId) {
+  const data = await api(`/api/v1/payment-links/${encodeURIComponent(linkId)}`);
+  return data?.payment || null;
+}
+
+async function listRedirectUrls() {
+  const data = await api('/api/v1/redirect-urls');
+  return data?.redirectUrls || [];
+}
+
+async function registerRedirectUrl(url) {
+  const data = await api('/api/v1/redirect-urls', { method: 'POST', body: { redirectUrl: url } });
+  return data?.redirectUrls || [];
+}
+
+async function registerWebhook(url) {
+  return api('/api/v1/webhook', { method: 'POST', body: { url } });
 }
 
 /* ---------- webhooks ---------- */
-// Stitch delivers through Svix. Verify against the RAW body — re-serialised JSON will
-// not match. https://docs.stitch.money/webhooks/using_webhooks
+// Stitch Express delivers through Svix. Verify against the RAW body — re-serialised
+// JSON will not match. https://express.stitch.money/api-docs/webhooks
 function verifyWebhook(rawBody, headers) {
   if (!WEBHOOK_SECRET) return false;
   const id = headers['svix-id'];
@@ -182,20 +218,28 @@ function verifyWebhook(rawBody, headers) {
   });
 }
 
-// Pull the order id and outcome out of a payment webhook payload.
+// payment.paid payload: { amount, id, linkId?, consentId?, subscriptionId?, status, type }
+// Note what is NOT there: our merchantReference. Matching is by the payment link id we
+// stored when we created the link; readPaymentEvent only reports, it does not look up.
 function readPaymentEvent(payload) {
-  const node = payload?.data?.client?.paymentInitiationRequests?.node;
-  if (!node) return null;
-  const state = node.state?.__typename || '';
+  if (!payload || typeof payload !== 'object') return null;
+  const id = payload.id;
+  const status = String(payload.status || '').toUpperCase();
+  if (!id || !status) return null;
   return {
-    orderId: Number(node.externalReference),
-    requestId: node.id,
-    state,
-    paid: state === 'PaymentInitiationRequestCompleted',
+    paymentId: String(id),
+    linkId: payload.linkId ? String(payload.linkId) : null,
+    type: String(payload.type || '').toUpperCase(),
+    amountCents: Number.isFinite(Number(payload.amount)) ? Number(payload.amount) : null,
+    status,
+    // Only PAID and SETTLED are ever delivered; treat both as money received.
+    paid: status === 'PAID' || status === 'SETTLED',
   };
 }
 
 module.exports = {
-  isConfigured, missing, createPaymentRequest, verifyWebhook, readPaymentEvent,
-  clientToken, reference,
+  isConfigured, isTestMode, missing, createPaymentRequest, verifyWebhook, readPaymentEvent,
+  clientToken, resetTokenCache, api, getPayment, getPaymentLink,
+  listRedirectUrls, registerRedirectUrl, registerWebhook,
+  merchantReference, orderIdFromReference, payerName, payerPhone, returnUrl,
 };

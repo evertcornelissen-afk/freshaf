@@ -142,7 +142,11 @@ async function enterApp() {
   const params = new URLSearchParams(window.location.search);
   // Coming back from the payment page. Confirmation arrives by webhook, not from this
   // redirect, so open the tracker and let it update live rather than claiming success.
-  const paidId = params.get('paid');
+  // Stitch returns to /payment-complete?reference=FRESHAF-123&payment_id=... The older
+  // ?paid= / ?cancelled= forms are kept so links already in the wild still work.
+  const reference = params.get('reference');
+  const refMatch = /^FRESHAF-(\d+)$/.exec(String(reference || '').trim());
+  const paidId = refMatch ? refMatch[1] : params.get('paid');
   const cancelledId = params.get('cancelled');
   const trackId = params.get('track') || paidId || cancelledId;
   if (trackId) {
@@ -151,6 +155,11 @@ async function enterApp() {
     if (cancelledId) {
       showError('order-error', 'That payment was not completed. You can pay again, or switch to cash.');
     }
+  } else if (window.location.pathname === '/payment-complete') {
+    // Paid, but the reference did not come back in a shape we recognise. Do not strand
+    // the customer on a blank booking form with no sign their money went anywhere.
+    history.replaceState({}, '', '/');
+    toast('Thanks — we are confirming your payment. Your order will appear in a moment.', 'info');
   }
 }
 

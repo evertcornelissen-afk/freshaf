@@ -9,6 +9,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 
 const SECRET = 'whsec_' + Buffer.from(crypto.randomBytes(24)).toString('base64');
+const LINK_OK = 'LINK-OK-' + Date.now();
+const LINK_SHORT = 'LINK-SHORT-' + Date.now();
 const PORT = 5758;
 const tag = 'stitch-route-' + Date.now();
 
@@ -18,14 +20,16 @@ function seed() {
   const custId = Number(db.prepare(
     `INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, 'x', 'customer')`
   ).run(tag, tag + '@example.test').lastInsertRowid);
-  const orderId = Number(db.prepare(
+  // payment_ref holds the Stitch payment LINK id. The payment.paid payload carries no
+  // merchant reference, so this column is the only thing tying money to an order.
+  const make = (linkId) => Number(db.prepare(
     `INSERT INTO orders (customer_id, service, package, vehicle, address, lat, lng,
        price_cents, supplier_price_cents, platform_fee_cents, callout_fee_cents,
-       payment_method, payment_status, status)
+       payment_method, payment_status, status, payment_ref)
      VALUES (?, 'carwash', 'wash_vac', 'suv', '1 Test Road', -33.93, 18.43,
-             37600, 31300, 6300, 0, 'card', 'unpaid', 'pending_payment')`
-  ).run(custId).lastInsertRowid);
-  return { custId, orderId };
+             37600, 31300, 6300, 0, 'card', 'unpaid', 'pending_payment', ?)`
+  ).run(custId, linkId).lastInsertRowid);
+  return { custId, orderId: make(LINK_OK), shortOrderId: make(LINK_SHORT) };
 }
 
 function sign(body, id, ts) {
@@ -33,16 +37,9 @@ function sign(body, id, ts) {
   return 'v1,' + crypto.createHmac('sha256', key).update(`${id}.${ts}.${body}`).digest('base64');
 }
 
-function payload(orderId, state) {
-  return JSON.stringify({
-    data: { client: { paymentInitiationRequests: { node: {
-      __typename: 'PaymentInitiationRequest',
-      id: 'cGF5cmVxLxxx',
-      externalReference: String(orderId),
-      amount: { currency: 'ZAR', quantity: '376.00' },
-      state: { __typename: state },
-    } } } },
-  });
+// Stitch Express payment.paid. Amounts are CENTS.
+function payload(linkId, status, amount = 37600, paymentId = 'pay_' + linkId) {
+  return JSON.stringify({ amount, id: paymentId, linkId, status, type: 'LINK' });
 }
 
 async function post(body, headers) {
@@ -59,7 +56,7 @@ function paymentStatus(orderId) {
 }
 
 (async () => {
-  const { custId, orderId } = seed();
+  const { custId, orderId, shortOrderId } = seed();
   const server = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], {
     env: { ...process.env, PORT: String(PORT), STITCH_WEBHOOK_SECRET: SECRET, PAYMENT_PROVIDER: 'stitch' },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -82,7 +79,10 @@ function paymentStatus(orderId) {
     }
 
     const ts = Math.floor(Date.now() / 1000);
-    const good = payload(orderId, 'PaymentInitiationRequestCompleted');
+    const send = async (id, body) => post(body, {
+      'svix-id': id, 'svix-timestamp': String(ts), 'svix-signature': sign(body, id, ts),
+    });
+    const good = payload(LINK_OK, 'PAID');
 
     console.log('order before:', paymentStatus(orderId));
 
@@ -93,23 +93,25 @@ function paymentStatus(orderId) {
     const unsigned = await post(good, {});
     check('unsigned webhook is refused', unsigned.status, 400);
 
-    const real = await post(good, {
-      'svix-id': 'msg_real', 'svix-timestamp': String(ts), 'svix-signature': sign(good, 'msg_real', ts),
-    });
+    // Underpayment must never mark an order paid, however valid the signature.
+    const short = payload(LINK_SHORT, 'PAID', 100);
+    check('underpaid webhook acknowledged', (await send('msg_short', short)).status, 200);
+    check('underpaid order NOT marked paid', paymentStatus(shortOrderId).payment_status, 'unpaid');
+
+    const real = await send('msg_real', good);
     check('signed webhook accepted', real.status, 200);
     check('order marked paid', paymentStatus(orderId).payment_status, 'paid');
 
-    const cancelled = payload(orderId, 'PaymentInitiationRequestCancelled');
-    const cancel = await post(cancelled, {
-      'svix-id': 'msg_c', 'svix-timestamp': String(ts), 'svix-signature': sign(cancelled, 'msg_c', ts),
-    });
-    check('cancellation acknowledged, not retried', cancel.status, 200);
+    // Svix retries until it sees a 2xx, so a repeat delivery must be harmless.
+    check('replayed delivery acknowledged', (await send('msg_again', good)).status, 200);
+    check('order still paid exactly once', paymentStatus(orderId).payment_status, 'paid');
 
-    const unknown = payload(999999, 'PaymentInitiationRequestCompleted');
-    const unk = await post(unknown, {
-      'svix-id': 'msg_u', 'svix-timestamp': String(ts), 'svix-signature': sign(unknown, 'msg_u', ts),
-    });
-    check('unknown order acknowledged, not retried', unk.status, 200);
+    const expired = payload(LINK_SHORT, 'EXPIRED');
+    check('non-paid status acknowledged', (await send('msg_c', expired)).status, 200);
+    check('expired left unpaid', paymentStatus(shortOrderId).payment_status, 'unpaid');
+
+    const unknown = payload('LINK-NOT-OURS', 'PAID');
+    check('unknown link acknowledged, not retried', (await send('msg_u', unknown)).status, 200);
 
     const passed = checks.filter(Boolean).length;
     console.log(`\n${passed}/${checks.length} ${passed === checks.length ? 'PASS' : 'FAIL'}`);

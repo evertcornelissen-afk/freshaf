@@ -1,22 +1,18 @@
 #!/usr/bin/env node
-// One command that does every Stitch setup step that does not need a human.
+// One command that does every Stitch Express setup step that does not need a human.
 //
-//   npm run stitch:check      credentials only, changes nothing
-//   npm run stitch:connect    also registers the webhook subscription
-//   npm run stitch:connect -- --test-payment   also creates a R1 payment link
+//   npm run stitch:check      credentials and configuration only, changes nothing
+//   npm run stitch:connect    also registers the return URL and the webhook
+//   npm run stitch:connect -- --test-payment   also creates a R1.00 payment link
 //
-// Why it introspects instead of hardcoding: Stitch's published examples of
-// clientWebhookAdd disagree between API generations (one supplies a secret, a newer one
-// takes filterTypes and returns a Svix secret). Rather than guess which your client
-// speaks, this asks your live schema and adapts.
+// This targets the Stitch EXPRESS REST API (express.stitch.money/api/v1), which is a
+// different product from the Stitch Enterprise GraphQL API at api.stitch.money.
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
-const TOKEN_URL = 'https://secure.stitch.money/connect/token';
-const API_URL = 'https://api.stitch.money/graphql';
+const stitch = require('../server/stitch');
 
-const CLIENT_ID = process.env.STITCH_CLIENT_ID || '';
-const CLIENT_SECRET = process.env.STITCH_CLIENT_SECRET || '';
 const BASE_URL = process.env.BASE_URL || 'https://freshaf.io';
+const RETURN_URL = stitch.returnUrl(BASE_URL);
 const WEBHOOK_URL = `${BASE_URL.replace(/\/$/, '')}/api/payments/stitch/webhook`;
 
 const args = process.argv.slice(2);
@@ -25,187 +21,110 @@ const DO_TEST_PAYMENT = args.includes('--test-payment');
 
 const tick = (s) => console.log(`  \x1b[32mOK\x1b[0m   ${s}`);
 const cross = (s) => console.log(`  \x1b[31mFAIL\x1b[0m ${s}`);
+const warn = (s) => console.log(`  \x1b[33mWARN\x1b[0m ${s}`);
 const info = (s) => console.log(`       ${s}`);
 const head = (s) => console.log(`\n${s}`);
 
-async function token(scope) {
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    scope,
-    audience: TOKEN_URL,
-  });
-  const r = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-    signal: AbortSignal.timeout(20000),
-  });
-  const text = await r.text();
-  if (!r.ok) throw new Error(`${r.status} ${text.slice(0, 300)}`);
-  return JSON.parse(text).access_token;
-}
-
-async function gql(accessToken, query, variables) {
-  const r = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(30000),
-  });
-  const text = await r.text();
-  let json;
-  try { json = JSON.parse(text); } catch { throw new Error(`non-JSON (${r.status}): ${text.slice(0, 300)}`); }
-  if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join('; '));
-  return json.data;
-}
-
-// What does THIS client's schema say clientWebhookAdd takes?
-const INTROSPECT = `
-query { __schema { mutationType { fields {
-  name
-  args { name type { kind name ofType { kind name ofType { kind name } } } }
-} } } }`;
-
-const INPUT_FIELDS = `
-query ($name: String!) { __type(name: $name) {
-  name
-  inputFields { name type { kind name ofType { kind name ofType { kind name } } } }
-} }`;
-
-function typeName(t) {
-  if (!t) return '?';
-  if (t.kind === 'NON_NULL') return `${typeName(t.ofType)}!`;
-  if (t.kind === 'LIST') return `[${typeName(t.ofType)}]`;
-  return t.name || typeName(t.ofType);
-}
-
 async function main() {
-  console.log('\nStitch connection check');
-  console.log(`  target: ${WEBHOOK_URL}`);
+  console.log('\nStitch Express connection check');
+  console.log(`  return URL:  ${RETURN_URL}`);
+  console.log(`  webhook URL: ${WEBHOOK_URL}`);
 
   head('1. Credentials');
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    cross('STITCH_CLIENT_ID / STITCH_CLIENT_SECRET are not set.');
+  const gaps = stitch.missing();
+  if (!stitch.isConfigured()) {
+    cross(`Not configured: ${gaps.join(', ')}`);
     info('Set them in .env locally, or in the Render environment, then run this again.');
     process.exitCode = 1;
     return;
   }
-  let payToken;
   try {
-    payToken = await token(process.env.STITCH_SCOPE || 'client_paymentrequest');
-    tick('client_paymentrequest token issued — client id and secret are valid.');
+    await stitch.clientToken();
+    tick(`Token issued — credentials are valid (${stitch.isTestMode() ? 'TEST mode' : 'LIVE mode'}).`);
   } catch (e) {
-    cross(`Could not get a payment token: ${e.message}`);
-    if (/invalid_client/.test(e.message)) {
-      info('invalid_client: the client id or secret is wrong, or belongs to a different');
-      info('Stitch environment than the one you copied it from.');
-    } else if (/invalid_scope/.test(e.message)) {
-      info(`invalid_scope: Stitch has not enabled "${process.env.STITCH_SCOPE || 'client_paymentrequest'}"`);
-      info('on this client. Ask support to add it, quoting your client id.');
-    } else {
-      info('Check the client id and secret, and that Stitch has finished onboarding you.');
-    }
+    cross(`Could not get a token: ${e.message}`);
+    info('A 400 here almost always means the client secret was regenerated. Stitch');
+    info('regenerates it every time someone clicks "View Client Secret" in the');
+    info('dashboard, which silently breaks the secret already in your environment.');
     process.exitCode = 1;
     return;
   }
+  if (gaps.length) warn(`Still unset: ${gaps.join(', ')}`);
 
-  head('2. Is Card enabled on this client?');
-  // Stitch enables Card per client. Asking the schema is cheaper than a failed payment.
+  head('2. Return URL');
+  // Stitch compares byte-for-byte after stripping the query and ONE trailing slash from
+  // the incoming URL. A registered URL with a trailing slash can never match anything,
+  // and the customer discovers this as a 404 after they have already paid.
+  let registered = [];
   try {
-    const d = await gql(payToken, INPUT_FIELDS, { name: 'PaymentMethodsInput' });
-    const fields = (d.__type?.inputFields || []).map((f) => f.name);
-    if (!d.__type) {
-      info('Could not read PaymentMethodsInput — check it in the Stitch dashboard instead.');
-    } else if (fields.includes('card')) {
-      tick(`Card is present in the schema (payment methods: ${fields.join(', ')}).`);
-      info('Schema visibility is not the same as entitlement — if a real payment is');
-      info('rejected, ask Stitch to enable Card on the client.');
-    } else {
-      cross(`Card not offered on this client. Available: ${fields.join(', ') || 'none'}.`);
-      info('Ask Stitch support to enable the Card feature, quoting your client id.');
-    }
+    registered = await stitch.listRedirectUrls();
+    info(`Registered: ${registered.length ? registered.join(', ') : '(none)'}`);
   } catch (e) {
-    info(`Could not introspect payment methods: ${e.message}`);
+    cross(`Could not list redirect URLs: ${e.message}`);
   }
-
-  head('3. Webhook subscription');
-  let webhookToken = null;
-  try {
-    webhookToken = await token('client_webhook_manage');
-    tick('client_webhook_manage token issued.');
-  } catch (e) {
-    cross(`No webhook-management scope: ${e.message}`);
-    info('Ask Stitch to add client_webhook_manage, or create the subscription by hand');
-    info(`in the dashboard pointing at ${WEBHOOK_URL} for the "payment" event.`);
+  const bad = registered.filter((u) => u.endsWith('/'));
+  if (bad.length) {
+    cross(`These end in a trailing slash and will never match: ${bad.join(', ')}`);
+    info('Delete them in the dashboard and re-add them without the slash.');
   }
-
-  if (webhookToken) {
-    let inputTypeName = null;
+  if (registered.includes(RETURN_URL)) {
+    tick('Our return URL is registered exactly.');
+  } else if (!DO_CONNECT) {
+    warn('Our return URL is NOT registered. Run `npm run stitch:connect` to add it.');
+  } else {
     try {
-      const d = await gql(webhookToken, INTROSPECT, {});
-      const f = (d.__schema?.mutationType?.fields || []).find((x) => x.name === 'clientWebhookAdd');
-      if (!f) {
-        cross('clientWebhookAdd is not in this schema.');
+      const now = await stitch.registerRedirectUrl(RETURN_URL);
+      tick(`Registered. Now: ${now.join(', ')}`);
+    } catch (e) {
+      cross(`Could not register the return URL: ${e.message}`);
+    }
+  }
+
+  head('3. Webhook');
+  if (!DO_CONNECT) {
+    info('Run `npm run stitch:connect` to register the webhook endpoint.');
+    info(process.env.STITCH_WEBHOOK_SECRET
+      ? 'STITCH_WEBHOOK_SECRET is set.'
+      : 'STITCH_WEBHOOK_SECRET is NOT set — every webhook will be rejected.');
+  } else if (process.env.STITCH_WEBHOOK_SECRET) {
+    info('STITCH_WEBHOOK_SECRET is already set; not registering a second endpoint.');
+    info('Registering again would issue a new secret and leave a duplicate delivery.');
+  } else {
+    try {
+      const res = await stitch.registerWebhook(WEBHOOK_URL);
+      tick('Webhook registered.');
+      const secret = res?.secret || res?.signingSecret || res?.webhook?.secret;
+      if (secret) {
+        info('Set this as STITCH_WEBHOOK_SECRET. It cannot be fetched again:');
+        console.log(`\n       ${secret}\n`);
       } else {
-        const arg = f.args[0];
-        inputTypeName = typeName(arg.type).replace(/[!\[\]]/g, '');
-        tick(`clientWebhookAdd(${arg.name}: ${typeName(arg.type)})`);
+        info(`Response: ${JSON.stringify(res).slice(0, 300)}`);
+        info('No secret field recognised — copy it from the webhooks dashboard.');
       }
     } catch (e) {
-      info(`Could not introspect the mutation: ${e.message}`);
-    }
-
-    if (inputTypeName) {
-      try {
-        const d = await gql(webhookToken, INPUT_FIELDS, { name: inputTypeName });
-        const fields = d.__type?.inputFields || [];
-        info(`${inputTypeName} fields: ${fields.map((x) => `${x.name}: ${typeName(x.type)}`).join(', ')}`);
-
-        if (!DO_CONNECT) {
-          info('Run `npm run stitch:connect` to create the subscription.');
-        } else {
-          const names = fields.map((x) => x.name);
-          const input = { url: WEBHOOK_URL };
-          // Newer schema filters by event type; older one takes a secret we supply.
-          if (names.includes('filterTypes')) input.filterTypes = ['payment'];
-          if (names.includes('secret')) {
-            input.secret = process.env.STITCH_WEBHOOK_SECRET
-              || `whsec_${require('crypto').randomBytes(24).toString('base64')}`;
-          }
-          const sel = 'webhook { id url ' + (fields.some((x) => x.name === 'secret') ? '' : 'secret ') + '}';
-          const mutation = `mutation ($input: ${inputTypeName}!) { clientWebhookAdd(input: $input) { ${sel} } }`;
-          const res = await gql(webhookToken, mutation, { input });
-          const wh = res?.clientWebhookAdd?.webhook || {};
-          tick(`Subscription created: ${wh.id || '(no id returned)'}`);
-          const secret = wh.secret || input.secret;
-          if (secret) {
-            info('Set this on Render as STITCH_WEBHOOK_SECRET:');
-            console.log(`\n       ${secret}\n`);
-          } else {
-            info('No signing secret returned — copy it from the Stitch dashboard.');
-          }
-        }
-      } catch (e) {
-        cross(`Webhook step failed: ${e.message}`);
-      }
+      cross(`Could not register the webhook: ${e.message}`);
+      info(`Add it by hand at ${process.env.STITCH_API_BASE || 'https://express.stitch.money'}/webhooks`);
+      info(`pointing at ${WEBHOOK_URL}, subscribed to payment.paid.`);
     }
   }
 
   if (DO_TEST_PAYMENT) {
     head('4. Test payment (R1.00)');
+    if (!stitch.isTestMode()) {
+      warn('These are LIVE credentials. This would create a real R1.00 charge.');
+      info('Re-run with the test- credentials if that is not what you want.');
+    }
     try {
-      const stitch = require('../server/stitch');
-      const { url } = await stitch.createPaymentRequest(
-        { id: 0 }, { id: 0, name: 'Test', email: process.env.ADMIN_NOTIFY_EMAIL || 'admin@freshaf.io' },
+      const { url, requestId } = await stitch.createPaymentRequest(
+        { id: 0 },
+        { id: 0, name: 'FreshAF Test', email: process.env.ADMIN_NOTIFY_EMAIL || 'admin@freshaf.io' },
         { baseUrl: BASE_URL, amountCents: 100 },
       );
-      tick('Payment request created. Open this to test a real R1 card payment:');
+      tick(`Payment link created (${requestId}). Open this to pay R1.00:`);
       console.log(`\n       ${url}\n`);
-      info('Order id 0 does not exist, so the webhook will be acknowledged and ignored.');
+      info('Order 0 does not exist, so the webhook will be acknowledged and ignored.');
     } catch (e) {
-      cross(`Could not create a payment request: ${e.message}`);
+      cross(`Could not create a payment link: ${e.message}`);
     }
   }
 

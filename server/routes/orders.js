@@ -400,7 +400,7 @@ router.post('/payments/payfast/itn', express.urlencoded({ extended: false }), (r
 
 // Stitch webhook (Svix). The status on the browser redirect is attacker-controllable,
 // so this signed callback is the only thing that marks an order paid.
-router.post('/payments/stitch/webhook', (req, res) => {
+router.post('/payments/stitch/webhook', async (req, res) => {
   if (!stitch.verifyWebhook(req.body, req.headers)) {
     console.warn('[FreshAF] Rejected a Stitch webhook with a bad or missing signature.');
     return res.status(400).send('bad signature');
@@ -413,18 +413,47 @@ router.post('/payments/stitch/webhook', (req, res) => {
   }
   const event = stitch.readPaymentEvent(payload);
   // Acknowledge anything we do not act on, or Stitch will keep retrying it.
-  if (!event || !Number.isFinite(event.orderId)) return res.send('ok');
+  if (!event) return res.send('ok');
 
-  if (event.paid) {
-    const order = db.prepare("SELECT * FROM orders WHERE id = ? AND status = 'pending_payment'").get(event.orderId);
-    if (order) {
-      db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(event.orderId);
-      afterPayment(event.orderId);
-      console.log(`[FreshAF] Stitch confirmed payment for order ${event.orderId}.`);
-    }
-  } else {
-    console.log(`[FreshAF] Stitch reported ${event.state} for order ${event.orderId}.`);
+  // The payload carries no merchantReference, so match on the payment link id stored
+  // when the link was created. If it is absent (a terminal or subscription payment,
+  // or a shape change), ask Stitch for the payment and read the reference off it.
+  let order = null;
+  if (event.linkId) {
+    order = db.prepare('SELECT * FROM orders WHERE payment_ref = ?').get(event.linkId);
   }
+  if (!order) {
+    try {
+      const payment = await stitch.getPayment(event.paymentId);
+      const orderId = stitch.orderIdFromReference(payment?.merchantReference);
+      if (orderId) order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    } catch (e) {
+      console.error('[FreshAF] Could not look up Stitch payment', event.paymentId, e.message);
+    }
+  }
+  if (!order) {
+    console.warn(`[FreshAF] Stitch ${event.status} for payment ${event.paymentId} matched no order.`);
+    return res.send('ok');
+  }
+  if (!event.paid) {
+    console.log(`[FreshAF] Stitch reported ${event.status} for order ${order.id}.`);
+    return res.send('ok');
+  }
+
+  // Never mark an order paid for less than it costs. Stitch's hosted page does not let
+  // the customer change the amount, but this is the one place where believing the
+  // payload without checking would cost real money.
+  const expected = order.price_cents - (order.points_used_cents || 0);
+  if (event.amountCents !== null && event.amountCents < expected) {
+    console.error(`[FreshAF] Stitch paid ${event.amountCents}c for order ${order.id}, expected ${expected}c.`);
+    return res.send('ok');
+  }
+
+  // Svix retries until it gets a 2xx, so this has to be safe to run twice.
+  if (order.payment_status === 'paid') return res.send('ok');
+  db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(order.id);
+  if (order.status === 'pending_payment') afterPayment(order.id);
+  console.log(`[FreshAF] Stitch confirmed payment for order ${order.id}.`);
   res.send('ok');
 });
 

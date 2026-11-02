@@ -108,6 +108,10 @@ app.use(express.static(PUBLIC_DIR));
 app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));
+// Where Stitch returns the customer after paying. The URL is registered with Stitch and
+// matched byte-for-byte, so this path must exist exactly as registered — no trailing
+// slash, no redirect. It carries ?reference= and ?payment_id=, which the app reads.
+app.get('/payment-complete', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/terms', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'terms.html')));
 app.get('/contact', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'contact.html')));
 app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));
