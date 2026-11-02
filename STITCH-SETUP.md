@@ -26,6 +26,43 @@ account FreshAF can actually get.
 
 ---
 
+## Verification — where it stands
+
+*3 November 2026. Five steps at https://express.stitch.money/verification. "We save as you go",
+so it can be finished in any order.*
+
+| # | Step | State |
+|---|---|---|
+| 1 | Your business | ✅ **Done.** CIPC lookup on the registration number returned FRESHAF, In Business, both directors. Trading name set to **FreshAF** — this is what customers see. |
+| 2 | Verify yourself | Half done — role confirmed as Evert Cornelissen, Director. **Needs an ID number and a selfie.** |
+| 3 | Directors and shareholders | **Needs both directors' ID numbers**, then "No, that's everyone" to the 25%-owner question. |
+| 4 | Bank account | Bank set to **First National Bank (FNB)**, type **Cheque/Current**. **Needs the account number**, then a bank statement. |
+| 5 | Address | Business address saved, spelling and suburb corrected. **Needs a proof-of-address document.** |
+
+Nikki does **not** need Evert's login — the page says "Waiting on other people. They have their
+own link." Stitch emails her directly.
+
+### ⚠️ The two supporting documents on file do not fit what Stitch asks for
+
+**Proof of address.** The form says *"This must match the document you upload."* The document
+currently on file is for a different address from the one on the application, is in a personal
+name rather than the company's, and is not one of the eleven types Stitch lists.
+
+Accepted types: bank statement, utility bill, municipal rates notice, body corporate letter,
+mobile phone account, home loan statement, insurance policy, motor vehicle registration, tax
+certificate, lease agreement, property management statement. **Under 3 months old**, so dated on
+or after **3 August 2026**.
+
+Decide which address FreshAF declares, then obtain a listed document showing *that* address.
+Changing the declared address means editing step 5 first.
+
+**Bank statement.** Stitch wants a statement **"covering at least 3 months"**. The FNB business
+account is recorded as a new account, so three months of statements may not exist yet. Ask Stitch
+through the Support widget whether an account confirmation letter will do — now, rather than
+discovering it at the end.
+
+---
+
 ## What you do
 
 > 📖 **Read `STITCH-CONTRACT-REVIEW.md` before signing.** Their acquiring terms contain two
@@ -85,13 +122,19 @@ for the field-by-field answers, they transfer directly.
 > ⚠️ Still outstanding from that list: proof of business address under 3 months, both directors'
 > IDs (both sides), and Beneficial Ownership filed at CIPC. Expect Stitch to ask for the same.
 
-### 4. Ask Stitch to switch on two things
+### 4. Card is self-serve — but only after verification
 
-Neither can be done from the dashboard, and **the integration will not work without them**:
+**Corrected 3 November 2026, from the live dashboard.** An earlier version of this document said
+to ask support to enable Card. That is wrong. Card is a toggle you flip yourself, under
+**Payment experience → Payment methods** (it reads "0 of 4 methods on" until you do). The same
+page holds **Branding**, which is where the logo goes.
 
-1. **Enable Card on the client.** Their docs say the card feature is enabled per client.
-2. **Allowlist `https://freshaf.io`** for redirects. Stitch refuses to send a customer back to a
-   domain that is not on the list, and production clients must be https.
+The catch: that entire page is locked behind a "Verify your business to set up your payment
+experience" gate. **Nothing about the payment experience can be configured until verification
+passes** — not the logo, not Card, not Apple Pay or Google Pay.
+
+Redirect allowlisting was not visible anywhere before verification. Check that page once it
+unlocks; if `https://freshaf.io` cannot be allowlisted there, ask support then.
 
 ### 5. Create a webhook subscription — **one command, not by hand**
 
