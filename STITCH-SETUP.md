@@ -180,19 +180,29 @@ anything that is not correctly signed.
 Render → freshaf service → Environment. **Do not paste any of these into chat** — set them
 yourself and just tell me they are in.
 
+**All four values are already in your local `freshaf/.env`.** Open that file and copy them
+across — do not re-view the client secret in the Stitch dashboard, because that
+regenerates it and would break the copy you already have.
+
 | Variable | Value |
 |---|---|
 | `PAYMENT_PROVIDER` | `stitch` |
-| `STITCH_CLIENT_ID` | from the Stitch dashboard |
-| `STITCH_CLIENT_SECRET` | from the Stitch dashboard |
-| `STITCH_WEBHOOK_SECRET` | the `whsec_…` from step 3 |
-| `STITCH_BENEFICIARY_NAME` | `FRESHAF (PTY) LTD` |
-| `STITCH_BENEFICIARY_BANK_ID` | `fnb` |
-| `STITCH_BENEFICIARY_ACCOUNT_NUMBER` | the FNB business account number |
-| `PAYMENTS_LIVE` | **leave unset until a test payment has worked** |
+| `STITCH_CLIENT_ID` | copy from `.env` (starts `test-` while testing) |
+| `STITCH_CLIENT_SECRET` | copy from `.env` |
+| `STITCH_WEBHOOK_SECRET` | copy from `.env` (starts `whsec_`) |
+| `PAYMENTS_LIVE` | `true` — **safe while the credentials are the `test-` pair** |
 
-If Stitch issues a **merchant id** instead, set `STITCH_MERCHANT_ID` and leave the three
-beneficiary variables empty — the two approaches are mutually exclusive in their API.
+Stitch Express settles into the bank account verified on the account, so there are **no
+beneficiary variables**. The older advice to set `STITCH_BENEFICIARY_*` or
+`STITCH_MERCHANT_ID` belonged to the Enterprise GraphQL API and does not apply here.
+
+### Why `PAYMENTS_LIVE=true` is safe right now
+
+Card is off while that is unset, which means the live site cannot exercise the real
+payment path at all — and the webhook is registered against `https://freshaf.io`, so it
+can never be proven from a laptop. Turning it on with the **test** credentials runs the
+whole chain on the real domain while charging nobody. Swap in the live credentials only
+once an end-to-end test has passed.
 
 **While `PAYMENTS_LIVE` is unset, the app stays on cash and sandbox.** Nothing breaks, nothing
 charges anyone. Flipping it to `true` is the single switch that turns card on, and only once
