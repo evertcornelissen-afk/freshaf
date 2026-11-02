@@ -68,7 +68,20 @@ async function boot() {
     me = user;
     setTopbar();
     pricing = await api('/api/pricing');
-    if (!me) { renderHomeServices(); show('view-home'); hideSplash(); return; }
+    if (!me) {
+      renderHomeServices();
+      show('view-home');
+      hideSplash();
+      // A manifest shortcut has to work for someone who has not signed in yet —
+      // that is most of the people tapping it. chooseService remembers the choice
+      // and sends them to sign-up with it still selected.
+      const want = new URLSearchParams(window.location.search).get('service');
+      if (want === 'carwash' || want === 'laundry') {
+        history.replaceState({}, '', '/');
+        chooseService(want);
+      }
+      return;
+    }
     await enterApp();
     hideSplash();
   } catch (e) {
@@ -155,6 +168,12 @@ async function enterApp() {
     if (cancelledId) {
       showError('order-error', 'That payment was not completed. You can pay again, or switch to cash.');
     }
+  } else if (params.get('service') && ['carwash', 'laundry'].includes(params.get('service'))) {
+    // Home-screen shortcuts from the manifest land here. A shortcut that opens the
+    // generic home screen is worse than no shortcut at all.
+    const want = params.get('service');
+    history.replaceState({}, '', '/');
+    chooseService(want);
   } else if (window.location.pathname === '/payment-complete') {
     // Paid, but the reference did not come back in a shape we recognise. Do not strand
     // the customer on a blank booking form with no sign their money went anywhere.

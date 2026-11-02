@@ -11,6 +11,44 @@ doable, but it introduces costs, accounts, and a Mac requirement that don't exis
 the PWA. Recommendation: **launch on the PWA, prove traction, then do the stores** once
 demand justifies ~2-4 weeks of setup. Everything below is what "doing the stores" needs.
 
+## 0. Do Android first, and do it as a TWA — added 3 November 2026
+
+The plan below treats both stores as one job. They are not, and pretending otherwise
+costs weeks.
+
+**Google Play: cheap and quick.** A **Trusted Web Activity** wraps the existing PWA with
+no second codebase, no Capacitor, and no Mac. $25 once, and Bubblewrap generates the
+project from the manifest. The app is the site, so every deploy ships to the store app
+too.
+
+**Apple: expect a fight.** Guideline 4.2 rejects apps that are "just a website". A
+wrapper around freshaf.io with nothing native is the textbook rejection. To pass, iOS
+needs genuine native behaviour — background location for live pro tracking, native push,
+camera for before/after photos — which is real work, $99/year, and a Mac. **Do not start
+it until Play is live and there is demand to point at.**
+
+### Done already (3 November 2026)
+- **Icons fixed.** `icon-192.png` and `icon-512.png` were corrupt files since the first
+  commit; every "Add to home screen" fell back to a browser-drawn icon.
+- **A real maskable icon.** `icon-maskable-512.png` keeps the mark inside the 80% safe
+  zone. The old entry declared the full-bleed mark as maskable, so Android launchers
+  clipped the corners off the A and the F.
+- **Manifest filled out** for store tooling: `id`, `description`, `lang`, `categories`,
+  and two home-screen shortcuts that actually work signed-out.
+- **`/.well-known/assetlinks.json`** is served, with an explicit route rather than
+  relying on static-file dotfile behaviour. **It still needs the real fingerprint** —
+  see below.
+
+### What Play still needs from you
+1. Play Console account, $25 once, **as FRESHAF (PTY) LTD**, with identity verification.
+2. New personal accounts need a **20-tester closed test for 14 days** before production.
+   Organisation accounts are usually exempt — another reason to enrol as the company.
+3. Once Play issues the app signing key, paste its **SHA-256 fingerprint** into
+   `public/.well-known/assetlinks.json` and redeploy. Until then the app opens with a
+   browser address bar across the top, which looks exactly as unfinished as it sounds.
+4. Store listing: screenshots at Play's required sizes, feature graphic, short and full
+   description, Data Safety form, content rating.
+
 ## 1. Accounts & money — ONLY YOU can do these
 | Item | Cost | Notes |
 |---|---|---|
@@ -34,7 +72,7 @@ demand justifies ~2-4 weeks of setup. Everything below is what "doing the stores
 - **Reviewer demo account** — a test login so Apple/Google reviewers can use the app.
 
 ## 4. Compliance items that could bite — worth knowing NOW
-- **Payments: you're fine.** Apple/Google take 15-30% only on *digital* goods. FreshAF sells **real-world services** (car wash, laundry) — the Uber/DoorDash exemption applies, so **PayFast is allowed** and no store commission applies to orders. Rewards for real services are fine too.
+- **Payments: you're fine.** Apple/Google take 15-30% only on *digital* goods. FreshAF sells **real-world services** (car wash, laundry) — the Uber/DoorDash exemption applies, so **Stitch is allowed** and no store commission applies to orders. Rewards for real services are fine too. (PayFast declined FreshAF; the gateway is Stitch Express — see `STITCH-SETUP.md`.)
 - **In-app account deletion** — Apple hard-requires it. **Already built.** ✓
 - **Backend must be reliable** — a store-launched app whose database wipes is a disaster. **Render must be on the paid plan with a persistent disk before store launch** (the "Render card" step).
 - **Company entity** — register the Pty Ltd first so the store accounts, PayFast, and domain all sit under it (partner's workstream).

@@ -138,6 +138,12 @@ app.post('/api/push/subscribe', authRequired(), (req, res) => {
 });
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// Digital Asset Links, for the Play Store wrapper. Served explicitly rather than left
+// to express.static, whose handling of dot-directories is version-dependent: if Android
+// cannot fetch this, the app opens with a browser address bar across the top.
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.type('application/json').sendFile(path.join(PUBLIC_DIR, '.well-known', 'assetlinks.json'));
+});
 app.use(express.static(PUBLIC_DIR));
 app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
