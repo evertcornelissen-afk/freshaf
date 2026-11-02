@@ -118,6 +118,13 @@ function attachAutocomplete(input, onPick) {
   wrap.parentNode.insertBefore(note, wrap.nextSibling);
 
   let timer = null, lastQuery = '';
+  // One session token covers all the typing plus the one lookup that follows, which is
+  // how Google bills a session rather than a charge per keystroke. A new one starts
+  // after each pick.
+  let session = newSession();
+  function newSession() {
+    try { return crypto.randomUUID(); } catch { return String(Math.random()).slice(2) + Date.now(); }
+  }
   function hide() { list.classList.add('hidden'); }
   function setNote(text) {
     note.textContent = text || '';
@@ -131,18 +138,35 @@ function attachAutocomplete(input, onPick) {
     timer = setTimeout(async () => {
       lastQuery = q;
       try {
-        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q));
+        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q)
+          + '&session=' + encodeURIComponent(session));
         if (input.value.trim() !== lastQuery || !results.length) { hide(); return; }
         list.innerHTML = results.map((r, i) =>
           `<div class="ac-item" data-i="${i}">${icon('pin')} <span>${r.label}${
             r.precision === 'street' ? '<em class="ac-hint">street</em>' : ''}</span></div>`).join('');
         list.classList.remove('hidden');
         list.querySelectorAll('.ac-item').forEach((n) => {
-          n.addEventListener('mousedown', (e) => {
+          n.addEventListener('mousedown', async (e) => {
             e.preventDefault();
             const r = results[Number(n.dataset.i)];
             input.value = r.label;
             hide();
+            // Google's suggestions carry a place id, not coordinates. Resolve it before
+            // handing the pick on, or the pin never moves and the order cannot be placed.
+            if (r.place_id && r.lat == null) {
+              setNote('Finding that address…');
+              try {
+                const place = await api('/api/geocode/place?id=' + encodeURIComponent(r.place_id)
+                  + '&session=' + encodeURIComponent(session));
+                r.lat = place.lat; r.lng = place.lng;
+                if (place.label) { r.label = place.label; input.value = place.label; }
+              } catch {
+                setNote('We could not place that address. Drop the pin on the map instead.');
+                return;
+              } finally {
+                session = newSession();
+              }
+            }
             // A street-level hit with no number in the text still needs one from them.
             if (r.precision === 'street' && !/^\s*\d/.test(r.label)) {
               setNote('Add your street number in front, plus any unit or gate details.');

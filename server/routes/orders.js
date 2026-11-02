@@ -5,6 +5,7 @@ const { SERVICE_KEYS, quote, catalog, priceFor, platformFee } = require('../pric
 const payments = require('../payments');
 const stitch = require('../stitch');
 const dispatch = require('../dispatch');
+const maps = require('../maps');
 const realtime = require('../realtime');
 
 const router = express.Router();
@@ -22,19 +23,35 @@ router.get('/pricing', (req, res) => {
 });
 
 // Callout fee: distance from the customer's pin to the nearest online approved provider of that service.
-function computeCallout(lat, lng, service) {
+// The callout fee is real money, so it is worth one Routes call to get the distance
+// right. Straight-line distance picks the candidate (free); the road distance only
+// prices the one pro who would actually drive. Falls back to straight-line if the
+// lookup fails — a slightly wrong fee beats refusing to quote.
+async function computeCallout(lat, lng, service) {
   const sups = db.prepare(
     `SELECT lat, lng FROM suppliers WHERE status = 'approved' AND online = 1 AND lat IS NOT NULL
      AND instr(',' || services || ',', ',' || ? || ',') > 0`).all(service);
   if (!sups.length) return { available: false, fee_cents: 0, distance_km: null };
   let dist = Infinity;
-  for (const s of sups) dist = Math.min(dist, dispatch.haversineKm(lat, lng, s.lat, s.lng));
+  let nearest = null;
+  for (const s of sups) {
+    const d = dispatch.haversineKm(lat, lng, s.lat, s.lng);
+    if (d < dist) { dist = d; nearest = s; }
+  }
+  const road = nearest ? await maps.drivingDistance({ lat: nearest.lat, lng: nearest.lng }, { lat, lng }) : null;
+  const km = road ? road.km : dist;
   const freeKm = Number(getSetting('callout_free_km', '5'));
   const perKm = Number(getSetting('callout_per_km_cents', '1000'));
   const cap = Number(getSetting('callout_cap_cents', '15000'));
-  const extraKm = Math.max(0, dist - freeKm);
+  const extraKm = Math.max(0, km - freeKm);
   const fee = Math.min(cap, Math.round(extraKm * perKm / 100) * 100); // round to whole rand
-  return { available: true, fee_cents: fee, distance_km: +dist.toFixed(1) };
+  return {
+    available: true,
+    fee_cents: fee,
+    distance_km: +km.toFixed(1),
+    by_road: Boolean(road),
+    eta_minutes: road?.minutes ?? null,
+  };
 }
 
 // Available pros near a pin, each with THEIR price for the chosen package + our fee on top.
@@ -171,11 +188,11 @@ router.post('/quote-requests/:id/cancel', authRequired('customer'), (req, res) =
   res.json({ ok: true });
 });
 
-router.get('/quote/callout', authRequired('customer'), (req, res) => {
+router.get('/quote/callout', authRequired('customer'), async (req, res) => {
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   const service = SERVICE_KEYS.includes(req.query.service) ? req.query.service : 'carwash';
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'lat and lng required' });
-  res.json(computeCallout(lat, lng, service));
+  res.json(await computeCallout(lat, lng, service));
 });
 
 // Accept one quote: it becomes the order, at exactly the price that pro quoted.
@@ -284,7 +301,7 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
   const supplierPrice = priceFor(service, pkg, vehicle, chosen.price_cents);
   if (supplierPrice == null) return res.status(400).json({ error: 'Invalid package or size selection' });
 
-  const callout = computeCallout(lat, lng, service);
+  const callout = await computeCallout(lat, lng, service);
   const feePct = Number(getSetting('platform_fee_pct', '20'));
   const fee = platformFee(supplierPrice + callout.fee_cents, feePct);
   // Customer pays the pro's price + callout + our fee on top. The pro keeps their price + callout.

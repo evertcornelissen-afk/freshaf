@@ -7,6 +7,7 @@ const { authRequired } = require('./auth');
 const realtime = require('./realtime');
 const dispatch = require('./dispatch');
 const push = require('./push');
+const maps = require('./maps');
 
 const app = express();
 if (process.env.NODE_ENV === 'production') {
@@ -32,13 +33,30 @@ app.use('/api/admin', require('./routes/admin'));
 
 app.get('/api/events', authRequired(), realtime.sseHandler);
 
-// Address autocomplete — proxies Photon (OpenStreetMap), biased to South Africa. No API key.
+// Address autocomplete. Google Places when a key is configured, because OpenStreetMap
+// rarely knows South African house numbers; Photon (OpenStreetMap) otherwise, so the
+// app still works without a key. The API key stays on the server — a browser key would
+// be scraped off the page and spent by someone else.
 const geoCache = new Map();
 app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 3) return res.json({ results: [] });
   const key = q.toLowerCase();
   if (geoCache.has(key)) return res.json({ results: geoCache.get(key) });
+
+  if (maps.hasGoogle()) {
+    try {
+      const results = await maps.autocomplete(q, req.query.session);
+      if (results.length) {
+        if (geoCache.size > 500) geoCache.clear();
+        geoCache.set(key, results);
+        return res.json({ results });
+      }
+    } catch (e) {
+      // Fall through to Photon rather than leaving the customer with a dead field.
+      console.error('[FreshAF] Google autocomplete failed, using OpenStreetMap:', e.message);
+    }
+  }
   // OpenStreetMap coverage in South Africa is street-level far more often than
   // house-level, so "12 Rivonia Rd" matches nothing while "Rivonia Rd" matches.
   // Search on the street, then put the number the customer typed back on the label.
@@ -89,6 +107,22 @@ app.get('/api/geocode', async (req, res) => {
     res.json({ results: unique });
   } catch {
     res.json({ results: [] }); // autocomplete is best-effort; typing still works
+  }
+});
+
+// Google autocomplete returns place ids, not coordinates. The pin is dropped only once
+// the customer picks a suggestion, which is also the call that closes the billing
+// session opened by their typing.
+app.get('/api/geocode/place', async (req, res) => {
+  const id = String(req.query.id || '').trim();
+  if (!id || !maps.hasGoogle()) return res.status(400).json({ error: 'Unknown place' });
+  try {
+    const place = await maps.placeDetails(id, req.query.session);
+    if (!place) return res.status(404).json({ error: 'Unknown place' });
+    res.json(place);
+  } catch (e) {
+    console.error('[FreshAF] Place details failed:', e.message);
+    res.status(502).json({ error: 'Could not look that address up' });
   }
 });
 
