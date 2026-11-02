@@ -23,9 +23,20 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false # set a strong one BEFORE first boot — the admin account is seeded once
-      - key: PAYFAST_MERCHANT_ID
+      # Stitch Express. Card stays off until PAYMENTS_LIVE is literally "true" AND the
+      # client id and secret are present, so these being set is not enough to charge
+      # anyone by accident.
+      - key: PAYMENT_PROVIDER
+        value: stitch
+      - key: STITCH_CLIENT_ID
         sync: false
-      - key: PAYFAST_MERCHANT_KEY
+      - key: STITCH_CLIENT_SECRET
+        sync: false # regenerated whenever someone views it in the Stitch dashboard
+      - key: STITCH_WEBHOOK_SECRET
         sync: false
-      - key: PAYFAST_PASSPHRASE
+      - key: PAYMENTS_LIVE
+        sync: false
+      # Optional. Without it, address search falls back to OpenStreetMap and the callout
+      # fee falls back to straight-line distance.
+      - key: GOOGLE_MAPS_API_KEY
         sync: false
