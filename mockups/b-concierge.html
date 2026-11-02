@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FreshAF — Direction B: Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfbf9;--card:#fff;--line:#e8e6e0;--ink:#10424f;--muted:#6b7f88;--blue:#1799c2;--warm:#f3efe7}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:40px}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:18px 20px}
+.bar img{height:19px}
+.ghost{border:1px solid var(--line);color:var(--ink);background:#fff;border-radius:999px;padding:7px 15px;font:600 .78rem Inter}
+.kicker{margin:14px 20px 0;font:700 .7rem Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+h1{font-size:2.1rem;line-height:1.08;letter-spacing:-.035em;margin:10px 20px 12px;font-weight:800}
+.sub{margin:0 20px 22px;color:var(--muted);font-size:.97rem;line-height:1.6;max-width:30ch}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px}
+.tile{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:3/4;background:#ddd}
+.tile img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
+.tile .ov{position:absolute;inset:auto 0 0 0;padding:14px 13px;background:linear-gradient(transparent,rgba(8,30,38,.82));color:#fff}
+.tile h2{margin:0 0 2px;font-size:1.02rem;font-weight:700;letter-spacing:-.01em}
+.tile p{margin:0;font-size:.74rem;opacity:.86;line-height:1.35}
+.band{margin:26px 20px 0;background:var(--warm);border-radius:20px;padding:20px}
+.band h3{margin:0 0 8px;font-size:1.08rem;letter-spacing:-.015em}
+.band p{margin:0;color:var(--muted);font-size:.88rem;line-height:1.6}
+.steps{display:flex;gap:18px;margin:16px 20px 0}
+.step{flex:1}
+.step b{display:block;width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font:800 .78rem Inter;display:grid;place-items:center;margin-bottom:8px}
+.step p{margin:0;font-size:.78rem;color:var(--muted);line-height:1.45}
+h4{margin:30px 20px 12px;font-size:1.1rem;letter-spacing:-.015em}
+.pro{display:flex;gap:13px;align-items:center;margin:0 20px 10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.pro img{width:52px;height:52px;border-radius:13px;object-fit:cover;flex:0 0 auto}
+.pro .t{flex:1}
+.pro h5{margin:0 0 2px;font-size:.92rem;font-weight:700}
+.pro p{margin:0;color:var(--muted);font-size:.76rem}
+.pro .amt{text-align:right;font-weight:800;font-size:.95rem}
+.pro .amt small{display:block;font-weight:500;color:var(--muted);font-size:.65rem;margin-top:2px}
+.cta{display:block;width:calc(100% - 40px);margin:22px 20px 0;background:var(--ink);color:#fff;border:0;border-radius:15px;padding:16px;font:700 .97rem Inter}
+.note{text-align:center;color:var(--muted);font-size:.74rem;margin:10px 20px 0}
+</style></head><body>
+<div class="bar"><img src="img/logo.svg" alt="FreshAF"><button class="ghost">Sign in</button></div>
+
+<div class="kicker">Northern Suburbs, Cape Town</div>
+<h1>Consider it done.</h1>
+<p class="sub">A vetted professional comes to you. Your car, or your laundry — one price, agreed before anyone arrives.</p>
+
+<div class="pair">
+  <div class="tile"><img src="img/wash-hero.jpg" alt="">
+    <div class="ov"><h2>Car Wash</h2><p>At home, the office or the gym</p></div></div>
+  <div class="tile"><img src="img/laundry-folded.jpg" alt="">
+    <div class="ov"><h2>Laundry</h2><p>Collected, cleaned, delivered</p></div></div>
+</div>
+
+<div class="band">
+  <h3>You see one price</h3>
+  <p>What the pro charges and what we keep is our business, not your bill. Nothing is added at the door, and nothing is added after.</p>
+</div>
+
+<div class="steps">
+  <div class="step"><b>1</b><p>Tell us where you are</p></div>
+  <div class="step"><b>2</b><p>Pros quote their price</p></div>
+  <div class="step"><b>3</b><p>Pick one and track them</p></div>
+</div>
+
+<h4>Pros near Bellville</h4>
+<div class="pro"><img src="img/pro.jpg" alt=""><div class="t"><h5>Sparkle Mobile</h5><p>★ 4.9 · 212 washes · 2.4 km</p></div><div class="amt">R240<small>all in</small></div></div>
+<div class="pro"><img src="img/wash-car.jpg" alt=""><div class="t"><h5>Shine On Wheels</h5><p>★ 4.8 · 96 washes · 3.1 km</p></div><div class="amt">R265<small>all in</small></div></div>
+<div class="pro"><img src="img/laundry-shirts.jpg" alt=""><div class="t"><h5>FreshFold Laundry</h5><p>★ 5.0 · 48 loads · 1.8 km</p></div><div class="amt">R180<small>all in</small></div></div>
+
+<button class="cta">Get my prices</button>
+<p class="note">Free to ask. No card needed until you choose.</p>
+</body></html>

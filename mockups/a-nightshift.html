@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FreshAF — Direction A: Nightshift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b1419;--surface:#122029;--line:#1e3440;--ink:#eaf3f7;--muted:#9fb7c2;--blue:#21b1d8;--blue-ink:#042029}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:72px}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+.bar img{height:20px}
+.ghost{border:1px solid var(--line);color:var(--ink);background:none;border-radius:999px;padding:7px 14px;font:600 .78rem Inter;cursor:pointer}
+.hero{position:relative;margin:0 16px;border-radius:20px;overflow:hidden;aspect-ratio:16/11}
+.hero img{width:100%;height:100%;object-fit:cover;display:block}
+.hero .tag{position:absolute;top:12px;left:12px;background:rgba(4,22,30,.78);backdrop-filter:blur(6px);color:#fff;font:700 .68rem Inter;letter-spacing:.06em;text-transform:uppercase;padding:6px 11px;border-radius:999px}
+h1{font-size:1.72rem;line-height:1.14;letter-spacing:-.02em;margin:20px 16px 8px;font-weight:800}
+h1 em{font-style:normal;color:var(--blue)}
+.sub{margin:0 16px 16px;color:var(--muted);font-size:.93rem;line-height:1.5}
+.addr{margin:0 16px;display:flex;gap:9px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.addr span{color:var(--muted);font-size:.92rem}
+.cta{margin:10px 16px 0;display:block;width:calc(100% - 32px);background:var(--blue);color:var(--blue-ink);border:0;border-radius:14px;padding:15px;font:800 .97rem Inter;cursor:pointer}
+.alt{background:none;color:var(--muted);border:1px solid var(--line);font-weight:600;margin-top:9px}
+h2{font-size:1.06rem;margin:28px 16px 12px;font-weight:700;letter-spacing:-.01em}
+.rail{display:flex;gap:12px;overflow-x:auto;padding:0 16px 4px;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.card{flex:0 0 164px;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.card img{width:100%;height:104px;object-fit:cover;display:block}
+.card .b{padding:10px 11px 12px}
+.card h3{margin:0 0 3px;font-size:.88rem;font-weight:700}
+.card p{margin:0;color:var(--muted);font-size:.74rem;line-height:1.4}
+.price{display:block;margin-top:7px;color:var(--blue);font-weight:800;font-size:.85rem}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:0 16px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:.8rem;color:var(--muted);font-weight:600}
+.chip.on{background:var(--blue);color:var(--blue-ink);border-color:var(--blue)}
+.strip{margin:26px 16px 0;background:linear-gradient(135deg,#143a47,#0e2630);border:1px solid var(--line);border-radius:18px;padding:18px}
+.strip h3{margin:0 0 5px;font-size:1rem}
+.strip p{margin:0;color:var(--muted);font-size:.82rem;line-height:1.5}
+.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(11,20,25,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:9px 0 13px}
+.tabs div{flex:1;text-align:center;font-size:.67rem;color:var(--muted);font-weight:600}
+.tabs div.on{color:var(--blue)}
+.tabs i{display:block;font-size:1.05rem;font-style:normal;margin-bottom:3px}
+</style></head><body>
+<div class="bar"><img src="img/logo-dark.svg" alt="FreshAF"><button class="ghost">Sign in</button></div>
+
+<div class="hero">
+  <img src="img/wash-hero.jpg" alt="">
+  <div class="tag">R50 off your first wash</div>
+</div>
+
+<h1>Your car, washed<br>where it <em>stands.</em></h1>
+<p class="sub">Vetted pros across the Northern Suburbs. Most jobs start within the hour.</p>
+
+<div class="addr">📍 <span>Enter your address</span></div>
+<button class="cta">Find pros near me</button>
+<button class="cta alt">Use my current location</button>
+
+<h2>Pick a service</h2>
+<div class="chips">
+  <div class="chip on">Car wash</div><div class="chip">Laundry</div>
+  <div class="chip">Full valet</div><div class="chip">Duvets</div><div class="chip">Ironing</div>
+</div>
+
+<h2>Popular right now</h2>
+<div class="rail">
+  <div class="card"><img src="img/wash-car.jpg" alt=""><div class="b"><h3>Wash &amp; Vac</h3><p>Exterior wash, interior vacuum</p><span class="price">from R180</span></div></div>
+  <div class="card"><img src="img/shine.jpg" alt=""><div class="b"><h3>Full Valet</h3><p>Inside and out, polished</p><span class="price">from R420</span></div></div>
+  <div class="card"><img src="img/laundry-shirts.jpg" alt=""><div class="b"><h3>Wash &amp; Iron</h3><p>Collected and returned</p><span class="price">from R150</span></div></div>
+</div>
+
+<div class="strip">
+  <h3>Pay cash or card</h3>
+  <p>One price, nothing added at the door. Track your pro from accepted to done.</p>
+</div>
+
+<div class="tabs">
+  <div class="on"><i>🏠</i>Home</div><div><i>🧾</i>Orders</div><div><i>🎁</i>Rewards</div><div><i>👤</i>Account</div>
+</div>
+</body></html>
