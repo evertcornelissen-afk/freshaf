@@ -140,10 +140,17 @@ async function enterApp() {
     },
   });
   const params = new URLSearchParams(window.location.search);
-  const trackId = params.get('track');
+  // Coming back from the payment page. Confirmation arrives by webhook, not from this
+  // redirect, so open the tracker and let it update live rather than claiming success.
+  const paidId = params.get('paid');
+  const cancelledId = params.get('cancelled');
+  const trackId = params.get('track') || paidId || cancelledId;
   if (trackId) {
     history.replaceState({}, '', '/');
     openTrack(Number(trackId));
+    if (cancelledId) {
+      showError('order-error', 'That payment was not completed. You can pay again, or switch to cash.');
+    }
   }
 }
 

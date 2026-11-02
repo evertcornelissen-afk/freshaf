@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "test": "node test/stitch-signature.test.js && node test/stitch-webhook-route.test.js"
+    "test": "node test/stitch-signature.test.js && node test/stitch-webhook-route.test.js",
+    "stitch:check": "node scripts/stitch-connect.js",
+    "stitch:connect": "node scripts/stitch-connect.js --connect"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

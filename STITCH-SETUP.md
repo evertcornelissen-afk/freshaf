@@ -93,7 +93,32 @@ Neither can be done from the dashboard, and **the integration will not work with
 2. **Allowlist `https://freshaf.io`** for redirects. Stitch refuses to send a customer back to a
    domain that is not on the list, and production clients must be https.
 
-### 5. Create a webhook subscription
+### 5. Create a webhook subscription — **one command, not by hand**
+
+Once the client id and secret are set (locally in `.env`, or on Render), run:
+
+```bash
+npm run stitch:check
+```
+
+It reaches Stitch's live token endpoint and tells you, in order: whether the credentials
+work, whether **Card is enabled on your client**, and what your schema's `clientWebhookAdd`
+actually takes. It changes nothing. Then:
+
+```bash
+npm run stitch:connect
+```
+
+That registers the subscription against `https://freshaf.io/api/payments/stitch/webhook` and
+**prints the signing secret** to paste into Render. Add `-- --test-payment` to also get a live
+R1.00 card link you can pay yourself to prove the whole chain.
+
+It introspects your live schema rather than assuming a shape, because Stitch's published
+examples of this mutation disagree between API generations.
+
+<details><summary>If the scope is missing, do it by hand instead</summary>
+
+### 5b. Manual webhook subscription
 
 Point it at:
 
@@ -104,6 +129,8 @@ https://freshaf.io/api/payments/stitch/webhook
 Subscribe to the **`payment`** event type. Stitch returns a **signing secret** beginning `whsec_`
 — that is `STITCH_WEBHOOK_SECRET` below. **The route is already built and tested**; it rejects
 anything that is not correctly signed.
+
+</details>
 
 ### 6. Set these on Render, then tell me
 
