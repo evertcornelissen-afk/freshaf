@@ -415,7 +415,7 @@ function updateTotal() {
 /* ---------- map ---------- */
 function initMap() {
   if (map) return;
-  const startLat = me?.home_lat ?? -26.1076, startLng = me?.home_lng ?? 28.0567;
+  const startLat = me?.home_lat ?? -33.8903, startLng = me?.home_lng ?? 18.6292;
   map = L.map('map').setView([startLat, startLng], 12);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',

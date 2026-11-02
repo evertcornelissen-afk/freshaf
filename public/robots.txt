@@ -1,0 +1,11 @@
+# FreshAF — https://freshaf.io
+User-agent: *
+Allow: /
+
+# Nothing useful to a search engine, and the first two are behind a login anyway.
+Disallow: /admin
+Disallow: /pay/
+Disallow: /payment-complete
+Disallow: /api/
+
+Sitemap: https://freshaf.io/sitemap.xml

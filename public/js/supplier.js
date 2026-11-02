@@ -351,7 +351,7 @@ function ping() {
 
 function initMap() {
   if (map) return;
-  map = L.map('sup-map').setView([loc.lat ?? -26.1076, loc.lng ?? 28.0567], 12);
+  map = L.map('sup-map').setView([loc.lat ?? -33.8903, loc.lng ?? 18.6292], 12);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
   map.on('click', (e) => setPin(e.latlng.lat, e.latlng.lng));
   if (loc.lat != null) setPin(loc.lat, loc.lng);

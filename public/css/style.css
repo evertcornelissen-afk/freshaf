@@ -846,3 +846,13 @@ button:active { transform: translateY(0) scale(.975); }
   .steps::before { transform: scaleX(1) !important; }
   .scroll-progress { display: none; }
 }
+
+/* Footer copy. This is the only text in the HTML on every view, so it carries the
+   service-area wording search engines need — kept quiet so it reads as a footer,
+   not as a keyword list. */
+.footer-blurb, .footer-areas {
+  max-width: 62ch; margin: 0 auto .5rem; font-size: .76rem; line-height: 1.55;
+  color: var(--faint); text-align: center;
+}
+.footer-areas { font-size: .72rem; margin-bottom: 1rem; }
+.footer-blurb strong, .footer-areas strong { color: var(--muted); font-weight: 600; }

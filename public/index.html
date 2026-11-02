@@ -3,9 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FreshAF — On-demand car wash &amp; laundry</title>
-<meta name="description" content="Vetted pros wash your car and handle your laundry, on demand. Consider it done.">
+<title>Mobile Car Wash &amp; Laundry — Northern Suburbs, Cape Town | FreshAF</title>
+<meta name="description" content="FreshAF sends vetted pros to wash your car and collect your laundry across Bellville, Durbanville, Brackenfell, Parow and the rest of Cape Town's Northern Suburbs. Book in under a minute, pay by card or cash.">
+<link rel="canonical" href="https://freshaf.io/">
 <meta name="theme-color" content="#1799c2">
+
+<!-- Most of this gets shared as a WhatsApp link, which reads these and nothing else. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FreshAF">
+<meta property="og:url" content="https://freshaf.io/">
+<meta property="og:title" content="Mobile car wash &amp; laundry, at your door">
+<meta property="og:description" content="Vetted pros wash your car where it stands and collect your laundry from your door. Across Cape Town's Northern Suburbs.">
+<meta property="og:image" content="https://freshaf.io/img/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_ZA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mobile car wash &amp; laundry, at your door">
+<meta name="twitter:description" content="Vetted pros across Cape Town's Northern Suburbs. Book in under a minute.">
+<meta name="twitter:image" content="https://freshaf.io/img/og-card.png">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/img/logo-mark.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/img/icon-180.png">
@@ -18,6 +34,46 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'light';</script>
 <link rel="stylesheet" href="/css/style.css">
+<!-- Structured data. Deliberately no street address: the registered address is a
+     director's home, and search results are not the place to publish it. areaServed
+     is what a local search actually needs. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "@id": "https://freshaf.io/#business",
+  "name": "FreshAF",
+  "legalName": "FRESHAF (PTY) LTD",
+  "url": "https://freshaf.io/",
+  "logo": "https://freshaf.io/img/icon-512.png",
+  "image": "https://freshaf.io/img/og-card.png",
+  "email": "admin@freshaf.io",
+  "description": "On-demand mobile car wash and laundry. Vetted professionals come to you.",
+  "priceRange": "RR",
+  "currenciesAccepted": "ZAR",
+  "paymentAccepted": "Card, Cash",
+  "address": { "@type": "PostalAddress", "addressLocality": "Cape Town", "addressRegion": "Western Cape", "addressCountry": "ZA" },
+  "areaServed": [
+    { "@type": "City", "name": "Cape Town" },
+    { "@type": "Place", "name": "Bellville" }, { "@type": "Place", "name": "Durbanville" },
+    { "@type": "Place", "name": "Brackenfell" }, { "@type": "Place", "name": "Kraaifontein" },
+    { "@type": "Place", "name": "Kuils River" }, { "@type": "Place", "name": "Parow" },
+    { "@type": "Place", "name": "Goodwood" }, { "@type": "Place", "name": "Tygervalley" },
+    { "@type": "Place", "name": "Plattekloof" }, { "@type": "Place", "name": "Welgemoed" },
+    { "@type": "Place", "name": "Edgemead" }, { "@type": "Place", "name": "Bothasig" },
+    { "@type": "Place", "name": "Monte Vista" }, { "@type": "Place", "name": "Vredekloof" },
+    { "@type": "Place", "name": "Stikland" }
+  ],
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "FreshAF services",
+    "itemListElement": [
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Mobile car wash", "serviceType": "Mobile car wash", "description": "A vetted washer comes to your car at home, the office or the gym." } },
+      { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Laundry collection and delivery", "serviceType": "Laundry service", "description": "Collected from your door, professionally cleaned and delivered back." } }
+    ]
+  }
+}
+</script>
 </head>
 <body>
 <div id="splash">
@@ -47,7 +103,7 @@
       <div class="glow"></div>
       <span class="eyebrow">On-demand car wash &amp; laundry</span>
       <h1>Consider it <em>done.</em></h1>
-      <p>Vetted professionals come to you — your car washed at your parking spot, your laundry collected, cleaned and delivered back. Choose what you need.</p>
+      <p>Vetted professionals come to you across Cape Town's Northern Suburbs — your car washed at your parking spot, your laundry collected, cleaned and delivered back. Choose what you need.</p>
     </div>
 
     <!-- The front door: pick a service first, account second. -->
@@ -113,7 +169,7 @@
     <div class="hero" style="padding:34px 16px 26px">
       <div class="aurora"><span></span><span></span><span></span></div>
       <div class="glow"></div>
-      <h1 style="font-size:clamp(1.6rem,3.6vw,2.3rem)">What can we <em>take off your hands?</em></h1>
+      <h2 style="font-size:clamp(1.6rem,3.6vw,2.3rem)">What can we <em>take off your hands?</em></h2>
       <p>Choose a service to get started.</p>
     </div>
     <div class="cat-grid" id="cat-grid" data-stagger="110">
@@ -229,6 +285,19 @@
   </div>
 
   <footer class="site-footer">
+    <!-- The app is a single page behind a splash, so this is the one block of text that
+         is in the HTML on every view. It is also the only place the service area is
+         stated, which is what a "mobile car wash near me" search needs to match. -->
+    <p class="footer-blurb">
+      <strong>FreshAF</strong> is an on-demand mobile car wash and laundry service in Cape Town.
+      A vetted pro comes to your car wherever it is parked, or collects your laundry from your
+      door and delivers it back clean.
+    </p>
+    <p class="footer-areas">
+      <strong>Areas we serve:</strong> Bellville, Durbanville, Brackenfell, Kraaifontein,
+      Kuils River, Parow, Goodwood, Tygervalley, Plattekloof, Welgemoed, Edgemead, Bothasig,
+      Monte Vista, Vredekloof and Stikland.
+    </p>
     <div class="footer-tag">FreshAF &middot; Fresh and Fast</div>
     <a href="/terms">Terms &amp; Conditions</a>
     <a href="/privacy">Privacy Policy</a>
