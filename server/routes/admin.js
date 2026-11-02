@@ -157,10 +157,23 @@ const fs = require('fs');
 const multer = require('multer');
 const { checkpoint, DB_FILE, RESTORE_FILE, DATA_DIR } = require('../db');
 
+// Streaming the live database file can hand back a torn copy: a write landing midway
+// through the read produces a file that opens fine and is quietly missing rows. VACUUM
+// INTO asks SQLite for a consistent snapshot instead, and this file is the one thing a
+// server migration depends on being correct.
 router.get('/backup', (req, res) => {
-  checkpoint(); // fold the write-ahead log in, or the file is missing recent writes
+  checkpoint(); // fold the write-ahead log in first
   const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-  res.download(DB_FILE, `freshaf-backup-${stamp}.db`);
+  const snapshot = path.join(DATA_DIR, `snapshot-${Date.now()}.db`);
+  const cleanup = () => { try { fs.unlinkSync(snapshot); } catch {} };
+  try {
+    db.exec(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`);
+  } catch (e) {
+    cleanup();
+    console.error('[FreshAF] Snapshot failed, sending the live file instead:', e.message);
+    return res.download(DB_FILE, `freshaf-backup-${stamp}.db`);
+  }
+  res.download(snapshot, `freshaf-backup-${stamp}.db`, cleanup);
 });
 
 const restoreUpload = multer({

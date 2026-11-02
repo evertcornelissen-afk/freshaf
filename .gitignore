@@ -5,3 +5,4 @@ data/
 
 # Local Netlify folder
 .netlify
+backups/
