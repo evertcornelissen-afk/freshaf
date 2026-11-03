@@ -304,7 +304,16 @@ const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 
 if (!adminExists) {
   db.prepare('INSERT INTO users (role, name, email, password_hash) VALUES (?, ?, ?, ?)')
     .run('admin', 'FreshAF Admin', ADMIN_EMAIL, bcrypt.hashSync(ADMIN_PASSWORD, 10));
-  console.log(`[FreshAF] Admin account created: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD} — change ADMIN_PASSWORD in .env for production.`);
+  // Never print the password. On a hosted service this line goes into the deploy log,
+  // which is retained and readable by anyone with dashboard access — so logging it
+  // handed the admin login to every one of them, permanently. Printing it was only ever
+  // reasonable on a laptop.
+  const usingDefault = !process.env.ADMIN_PASSWORD;
+  console.log(`[FreshAF] Admin account created for ${ADMIN_EMAIL}.`
+    + (usingDefault
+      ? ' WARNING: using the built-in default password, which is published in .env.example.'
+        + ' Set ADMIN_PASSWORD and redeploy.'
+      : ' Password taken from ADMIN_PASSWORD.'));
 }
 
 // In WAL mode almost everything written lives in freshaf.db-wal until SQLite folds it

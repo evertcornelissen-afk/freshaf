@@ -10,7 +10,7 @@ param(
   [Parameter(Mandatory = $true)]
   [ValidateSet('STITCH_CLIENT_SECRET', 'STITCH_WEBHOOK_SECRET', 'STITCH_CLIENT_ID',
                'GOOGLE_MAPS_API_KEY', 'JWT_SECRET', 'BACKUP_PASSWORD', 'ADMIN_PASSWORD',
-               'SMTP_PASS')]
+               'ADMIN_EMAIL', 'ADMIN_API_KEY', 'DATA_KEY', 'SMTP_PASS')]
   [string]$Name
 )
 
