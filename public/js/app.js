@@ -62,7 +62,11 @@ async function boot() {
     decorate();
     const { user } = await api('/api/auth/me');
     if (user && user.role !== 'customer') {
-      window.location.href = user.role === 'supplier' ? '/supplier' : '/admin';
+      if (user.role === 'supplier') { window.location.href = '/supplier'; return; }
+      // Admin lives in the desktop app now, not on this site.
+      await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+      alert('Admin accounts sign in through the FreshAF Admin app on your own computer.');
+      window.location.href = '/';
       return;
     }
     me = user;
@@ -489,7 +493,8 @@ el('reg-address').addEventListener('input', () => { regGeo = null; }); // typed 
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
-    if (user.role !== 'customer') { window.location.href = user.role === 'supplier' ? '/supplier' : '/admin'; return; }
+    if (user.role === 'supplier') { window.location.href = '/supplier'; return; }
+    if (user.role !== 'customer') { window.location.href = '/'; return; }
     me = user; setTopbar(); await enterApp();
     toast(`Welcome back, ${user.name.split(' ')[0]}`, 'ok');
   } catch (e) { showError('login-error', e.message); }

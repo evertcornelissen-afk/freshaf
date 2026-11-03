@@ -10,6 +10,32 @@ const balance = require('../balance');
 const mailer = require('../mailer');
 
 const router = express.Router();
+
+// Second factor for the whole admin surface.
+//
+// Taking the dashboard off the public site hides the page, not the API — anyone can
+// still POST to /api/admin/* if they guess an admin password. This closes that: when
+// ADMIN_API_KEY is set, every admin call must also carry it, and the key lives only in
+// the operator's desktop app. A stolen password on its own opens nothing.
+//
+// Compared in constant time, because a plain !== leaks the key one character at a time
+// to anyone willing to measure.
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+if (!ADMIN_API_KEY) {
+  console.warn('[FreshAF] ADMIN_API_KEY is not set — the admin API is protected by the '
+    + 'admin password alone. Set it on Render and in admin-app/.env.');
+}
+router.use((req, res, next) => {
+  if (!ADMIN_API_KEY) return next();
+  const given = String(req.get('x-admin-key') || '');
+  const a = Buffer.from(given);
+  const b = Buffer.from(ADMIN_API_KEY);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).send('Not found'); // 404, not 403: do not confirm this exists
+  }
+  next();
+});
+
 router.use(authRequired('admin'));
 
 // Bulk-import pre-approved suppliers. Each row: { name, email, phone, business_name,

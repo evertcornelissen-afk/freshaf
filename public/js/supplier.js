@@ -117,7 +117,7 @@ async function boot() {
   try {
     decorate();
     const { user } = await api('/api/auth/me');
-    if (user && user.role !== 'supplier') { window.location.href = user.role === 'admin' ? '/admin' : '/'; return; }
+    if (user && user.role !== 'supplier') { window.location.href = '/'; return; }
     me = user;
     setWho();
     if (!me) { show('view-auth'); hideSplash(); return; }
@@ -624,7 +624,7 @@ async function refreshEarnings() {
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
-    if (user.role !== 'supplier') { window.location.href = user.role === 'admin' ? '/admin' : '/'; return; }
+    if (user.role !== 'supplier') { window.location.href = '/'; return; }
     me = user; setWho(); route();
   } catch (e) { showError('login-error', e.message); }
 }); };

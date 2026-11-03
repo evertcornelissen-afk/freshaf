@@ -146,7 +146,24 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 });
 app.use(express.static(PUBLIC_DIR));
 app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
+// The admin dashboard is NOT served from the public site. It runs on the operator's own
+// machine, from admin-app/, and talks to the API over HTTPS. See admin-app/README.md.
+//
+// Honest note on what that buys: hiding the page does not hide the API. The real
+// protection is ADMIN_API_KEY below — an admin password alone no longer opens anything.
+
+// Public reliability signal. Deliberately tiny: whether data outlived a restart, and
+// since when. No counts, no names, nothing an attacker can use — but it is the one
+// question ("are customer accounts being wiped?") that has to be answerable without
+// logging in, and the admin UI is no longer on this site to answer it.
+app.get('/api/health', (req, res) => {
+  const { persistence } = require('./db');
+  res.json({
+    ok: true,
+    data_persisted: Number(persistence?.boots || 0) > 1,
+    since: persistence?.firstBoot || null,
+  });
+});
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));
 // Where Stitch returns the customer after paying. The URL is registered with Stitch and
 // matched byte-for-byte, so this path must exist exactly as registered — no trailing
