@@ -342,12 +342,17 @@ button.small { padding: 8px 14px; font-size: .8rem; border-radius: 9px; }
   transition: border-color .2s, transform .2s var(--ease), box-shadow .2s, background .2s;
 }
 .pkg:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow); }
-.pkg.selected { border-color: var(--accent); background: rgba(33, 172, 207, .05); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+/* Selected state is coral, everywhere it appears. Cyan stays the colour of actions
+   (buttons, links); coral is the colour of "this one". Keeping those two jobs apart
+   is what stops an accent turning into decoration. */
+.pkg.selected { border-color: var(--coral); background: rgba(255, 107, 74, .06); box-shadow: 0 0 0 1px var(--coral), var(--shadow); }
+.pkg.selected .price { color: var(--coral-text); }
+.pkg.selected .pkg-icon { color: var(--coral-text); }
 .pkg .tick {
   position: absolute; top: 12px; right: 12px;
   width: 22px; height: 22px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--accent); color: #fff;
+  background: var(--coral); color: var(--coral-ink);
   opacity: 0; transform: scale(.4);
   transition: opacity .2s, transform .25s var(--ease);
 }
@@ -664,7 +669,8 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
   cursor: pointer; background: var(--panel); transition: border-color .2s, background .2s, transform .18s var(--ease);
 }
 .pro-opt:hover { border-color: var(--accent); transform: translateX(2px); }
-.pro-opt.selected { border-color: var(--accent); background: rgba(33,172,207,.06); box-shadow: 0 0 0 1px var(--accent); }
+.pro-opt.selected { border-color: var(--coral); background: rgba(255,107,74,.06); box-shadow: 0 0 0 1px var(--coral); }
+.pro-opt.selected .amt strong { color: var(--coral-text); }
 .pro-opt .who { font-weight: 700; color: var(--petrol); font-size: .93rem; }
 .pro-opt .meta { color: var(--muted); font-size: .78rem; margin-top: 3px; }
 .pro-opt .amt { text-align: right; white-space: nowrap; }
@@ -869,27 +875,31 @@ button:active { transform: translateY(0) scale(.975); }
 
 /* ============ Direction A: photography, and the coral accent ============ */
 
-/* Hero photograph. A fixed aspect ratio and explicit width/height on the <img> so the
-   page does not jump while it loads — layout shift on first paint is the cheapest
-   thing to get wrong and the most obvious once you see it. */
+/* Hero band: two halves, equal weight.
+   A single large car photograph made the cover an advert for car washing, when half the
+   business is laundry. Two narrow frames -- a clean wet surface and clean linen -- say
+   "cleaning" without picking a side, and are short enough that the headline and the two
+   service cards still land above the fold on a phone. Both frames are deliberately
+   abstract: no badges, no number plates, no faces. */
 .hero-shot {
   position: relative; margin: 10px 0 0; border-radius: var(--radius);
-  overflow: hidden; aspect-ratio: 16 / 10; background: var(--panel-2);
+  overflow: hidden; background: var(--panel-2);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+  height: clamp(116px, 27vw, 168px);
 }
 .hero-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .hero-shot .shade {
   position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(6, 18, 24, .12) 0%, rgba(6, 18, 24, 0) 42%, var(--bg) 99%);
+  background: linear-gradient(180deg, rgba(6, 18, 24, .20) 0%, rgba(6, 18, 24, 0) 45%, var(--bg) 100%);
 }
 .promo-badge {
-  position: absolute; top: 12px; right: 12px;
+  position: absolute; top: 10px; right: 10px;
   background: var(--coral); color: var(--coral-ink);
-  font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
-  padding: 6px 12px; border-radius: 99px;
+  font-size: .66rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  padding: 5px 11px; border-radius: 99px; white-space: nowrap;
   box-shadow: 0 6px 18px -6px rgba(255, 107, 74, .7);
 }
-/* The hero text sits directly under the photo, so it does not need its own top padding. */
-.hero-shot + .hero { padding-top: 18px; }
+.hero-shot + .hero { padding-top: 16px; }
 
 /* Service cards lead with the photograph.
    The photo is INSET inside the card's existing padding rather than full-bleed. A
@@ -921,3 +931,12 @@ button:active { transform: translateY(0) scale(.975); }
 @media (max-width: 560px) {
   .hero-shot { aspect-ratio: 16 / 11; margin-top: 6px; }
 }
+
+/* "Verified professional" — the one piece of coral that is not about selection.
+   It marks the thing a customer is actually nervous about: who is coming to the house. */
+.verified-pro {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--coral-text); font-size: .74rem; font-weight: 700;
+  letter-spacing: .01em; margin-top: 6px;
+}
+.verified-pro svg { width: 14px; height: 14px; flex: 0 0 auto; }
