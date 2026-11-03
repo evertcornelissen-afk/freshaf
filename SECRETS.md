@@ -49,8 +49,15 @@ is a working copy that can be regenerated or re-pasted.**
 | Live admin password | Password manager | nowhere | Reset through the database |
 | Google Maps API key | Password manager | Render | Regenerate in Google Cloud |
 | SMTP password | Password manager | Render | Reset in the mail provider |
+| **`DATA_KEY`** | Password manager | Render, `.env` | **Nothing can recover the data.** See below |
 
-The webhook signing secret is the only one on that list that is genuinely
+`DATA_KEY` is the one whose loss destroys data rather than access. It encrypts every
+supplier's ID number and bank account in the database. Lose it and those fields are
+gone — not just from the live database but from every backup, because the backups
+contain the same ciphertext. No reset, no support ticket, no recovery. **Put it in
+the password manager before it goes anywhere near Render.**
+
+The webhook signing secret is the only *access* credential that is genuinely
 **unrecoverable**. Everything else can be reissued. Put it in the password manager the
 moment it appears on screen, before you do anything else.
 
@@ -106,3 +113,27 @@ in a shared folder, and if you put it in cloud storage, put it somewhere only yo
 read.
 
 `npm run backup` is the only thing that produces one. See `MIGRATION.md`.
+
+---
+
+## What is encrypted, and what is not
+
+Supplier **ID numbers** and **bank account and branch numbers** are encrypted in the
+database with AES-256-GCM, and shown masked (`••••••••0087`) on admin screens. Verified
+by searching the raw database file: the plain values are not in it.
+
+Names, emails, phone numbers and addresses are **not** encrypted. That is a deliberate
+line, not an oversight. Every one of them is used in a lookup or shown on a dispatch
+screen many times a minute, so encrypting them would break the app while buying little —
+an attacker holding the database already has the orders those addresses belong to. The
+boundary is: encrypt what is dangerous on its own.
+
+Under POPIA FreshAF is the responsible party for all of it. The practical consequences:
+
+- **Backups contain personal information.** `Desktop\FreshAFackups\` is not a neutral
+  folder of files. Do not email one, do not put it in a shared drive.
+- **Masking is not access control.** An admin can still see full numbers through the API
+  if they need to; masking stops them leaking into screenshots and support threads.
+- **A breach of ID numbers or bank details is reportable** to the Information Regulator
+  and to the people affected. Encryption at rest is what makes that unlikely rather than
+  inevitable.

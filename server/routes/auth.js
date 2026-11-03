@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const { db } = require('../db');
 const { setAuthCookie, clearAuthCookie, readToken, authRequired } = require('../auth');
 const mailer = require('../mailer');
+const secrets = require('../secrets');
 
 const router = express.Router();
 
@@ -111,9 +112,10 @@ router.post('/register', (req, res) => {
     db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
                 bank_name, bank_account, bank_branch, vehicles_json, equipment_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(userId, business_name.trim(), id_number.trim(), vehicleSummary,
+      .run(userId, business_name.trim(), secrets.encryptField(id_number.trim()), vehicleSummary,
         service_area?.trim() || null, equipmentSummary, supplierServices.join(','),
-        bank_name?.trim() || null, bank_account?.trim() || null, bank_branch?.trim() || null,
+        bank_name?.trim() || null, secrets.encryptField(bank_account?.trim() || null),
+        secrets.encryptField(bank_branch?.trim() || null),
         JSON.stringify(cleanVehicles), JSON.stringify(cleanEquipment));
     mailer.proApplicationReceived({ to: cleanEmail, name: name.trim() }).catch(() => {});
     mailer.adminNewPro({ name: name.trim(), business: business_name.trim(), email: cleanEmail,

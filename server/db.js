@@ -322,4 +322,11 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 process.on('exit', checkpoint);
 checkpoint(); // fold in whatever the last run left behind
 
+// Encrypt any ID or bank details written before a key existed. No-op once clean.
+try {
+  require('./secrets').migrate(db);
+} catch (e) {
+  console.error('[FreshAF] Could not encrypt existing supplier details:', e.message);
+}
+
 module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence };

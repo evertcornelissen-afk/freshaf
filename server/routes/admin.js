@@ -7,6 +7,7 @@ const { authRequired } = require('../auth');
 const realtime = require('../realtime');
 const push = require('../push');
 const balance = require('../balance');
+const secrets = require('../secrets');
 const mailer = require('../mailer');
 
 const router = express.Router();
@@ -65,7 +66,7 @@ router.post('/suppliers/import', (req, res) => {
     const userId = Number(info.lastInsertRowid);
     db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')`)
-      .run(userId, r.business_name.trim(), r.id_number.trim(), r.vehicle_reg?.trim() || null,
+      .run(userId, r.business_name.trim(), secrets.encryptField(r.id_number.trim()), r.vehicle_reg?.trim() || null,
         r.service_area?.trim() || null, r.equipment_notes?.trim() || null, services.join(','));
     results.push({ email, status: 'created', temp_password: tempPassword, user_id: userId });
   }
@@ -83,12 +84,16 @@ router.get('/suppliers', (req, res) => {
   res.json({
     suppliers: rows.map((r) => ({
       user_id: r.user_id, name: r.name, email: r.email, phone: r.phone,
-      business_name: r.business_name, id_number: r.id_number, vehicle_reg: r.vehicle_reg,
+      business_name: r.business_name,
+      // Masked by default. A full ID or account number is almost never needed on a list
+      // screen, and anything sent to a browser ends up in screenshots and support threads.
+      id_number: secrets.maskTail(r.id_number), vehicle_reg: r.vehicle_reg,
       service_area: r.service_area, equipment_notes: r.equipment_notes,
       services: (r.services || 'carwash').split(','),
       vehicles: JSON.parse(r.vehicles_json || '[]'),
       equipment: JSON.parse(r.equipment_json || 'null'),
-      bank_name: r.bank_name, bank_account: r.bank_account, bank_branch: r.bank_branch,
+      bank_name: r.bank_name, bank_account: secrets.maskTail(r.bank_account),
+      bank_branch: secrets.maskTail(r.bank_branch),
       documents: db.prepare('SELECT id, kind, original_name FROM supplier_docs WHERE user_id = ?').all(r.user_id),
       status: r.status, status_reason: r.status_reason, online: !!r.online,
       ...balance.status(r.user_id),
@@ -263,6 +268,10 @@ router.get('/readiness', (req, res) => {
           : diskLooksPersistent
             ? 'A separate volume is mounted, but nothing has restarted yet to prove it. Restart the service once and check again.'
             : 'NOT PROVEN. The data folder was empty on this boot. If that happens again after a deploy, every customer login and every order is being wiped. Mount a disk at /opt/render/project/src/data.' },
+      { key: 'data_encryption', label: 'ID and bank details encrypted at rest', ok: secrets.isConfigured(),
+        detail: secrets.isConfigured()
+          ? 'Supplier ID numbers and bank accounts are encrypted in the database and masked on screen.'
+          : 'DATA_KEY is not set, so ID numbers and bank account numbers sit in the database as plain text. Anyone with the file, or with one of the backups, can read them.' },
       { key: 'jwt_secret', label: 'Login secret pinned', ok: !!process.env.JWT_SECRET,
         detail: process.env.JWT_SECRET ? 'Sessions survive deploys.'
           : 'JWT_SECRET is not set, so every deploy signs everyone out.' },

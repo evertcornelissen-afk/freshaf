@@ -40,3 +40,12 @@ services:
       # fee falls back to straight-line distance.
       - key: GOOGLE_MAPS_API_KEY
         sync: false
+      # Encrypts supplier ID numbers and bank details at rest. Without it they
+      # are plain text in the database and in every backup.
+      - key: DATA_KEY
+        sync: false
+      # Required by every admin API call, on top of the admin login.
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
