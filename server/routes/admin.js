@@ -223,13 +223,20 @@ router.get('/readiness', (req, res) => {
     const parent = fs.statSync(require('path').join(DATA_DIR, '..'));
     diskLooksPersistent = st.dev !== parent.dev; // different device = separate volume
   } catch { /* leave false */ }
+  // The empirical signal: a boot counter stored next to the database. Above one
+  // means the folder outlived a restart, which is the only thing that matters.
+  const { persistence } = require('../db');
+  const survivedARestart = Number(persistence?.boots || 0) > 1;
 
   const approvedPros = db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved'").get().c;
   res.json({
     checks: [
-      { key: 'persistent_disk', label: 'Persistent disk attached', ok: diskLooksPersistent,
-        detail: diskLooksPersistent ? 'Data survives restarts.'
-          : 'Data is wiped on every restart and deploy. Upgrade to Starter and mount a disk at /opt/render/project/src/data.' },
+      { key: 'persistent_disk', label: 'Customer accounts survive a restart', ok: survivedARestart,
+        detail: survivedARestart
+          ? `Proven: the data folder has survived ${persistence.boots - 1} restart(s) since ${persistence.firstBoot.slice(0, 10)}.`
+          : diskLooksPersistent
+            ? 'A separate volume is mounted, but nothing has restarted yet to prove it. Restart the service once and check again.'
+            : 'NOT PROVEN. The data folder was empty on this boot. If that happens again after a deploy, every customer login and every order is being wiped. Mount a disk at /opt/render/project/src/data.' },
       { key: 'jwt_secret', label: 'Login secret pinned', ok: !!process.env.JWT_SECRET,
         detail: process.env.JWT_SECRET ? 'Sessions survive deploys.'
           : 'JWT_SECRET is not set, so every deploy signs everyone out.' },

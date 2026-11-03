@@ -1,0 +1,23 @@
+{
+  "outDir": "../../mockups/gen/icons",
+  "defaults": {
+    "width": 768,
+    "height": 768,
+    "model": "flux",
+    "suffix": "Flat vector illustration, bold simple geometric shapes, thick clean outlines, limited palette of teal #1799C2, deep navy #10424F, white and one warm accent. Centred subject on a plain white background, generous margin, no text, no letters, no logos, no gradients, no photorealism, no people. Modern mobile app icon style, crisp edges."
+  },
+  "images": [
+    { "file": "svc-carwash.png",  "seed": 11, "prompt": "A clean modern car in three-quarter view with a few soap suds and a water droplet sparkle." },
+    { "file": "svc-laundry.png",  "seed": 12, "prompt": "A neat stack of three folded towels with a single soap bubble above them." },
+    { "file": "svc-valet.png",    "seed": 13, "prompt": "A car with a polishing shine sparkle on the bonnet and a small microfibre cloth." },
+    { "file": "svc-duvet.png",    "seed": 14, "prompt": "A folded duvet and a pillow stacked neatly." },
+    { "file": "svc-iron.png",     "seed": 15, "prompt": "A shirt on a hanger beside a simple iron with a small steam puff." },
+    { "file": "svc-rinse.png",    "seed": 16, "prompt": "A bucket with a sponge resting on the rim and a water hose curl." },
+    { "file": "step-pin.png",     "seed": 21, "prompt": "A map location pin with a small house beneath it." },
+    { "file": "step-quote.png",   "seed": 22, "prompt": "Two speech bubbles, one containing a simple price tag shape." },
+    { "file": "step-track.png",   "seed": 23, "prompt": "A simple route line with a car at one end and a destination pin at the other." },
+    { "file": "badge-vetted.png", "seed": 24, "prompt": "A shield with a tick mark inside it." },
+    { "file": "badge-cash.png",   "seed": 25, "prompt": "A banknote and a coin side by side." },
+    { "file": "badge-card.png",   "seed": 26, "prompt": "A bank card with a contactless wave symbol." }
+  ]
+}

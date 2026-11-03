@@ -29,6 +29,36 @@ const db = new DatabaseSync(DB_FILE);
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
+// Proof, rather than inference, that customer accounts survive a restart.
+//
+// Comparing device ids tells you whether data/ LOOKS like a separate mount. It cannot
+// tell you whether anything actually survived, and "did my customers keep their logins"
+// is not a question to answer by inference. This counts boots in a file next to the
+// database: if the count is above one, the file outlived a restart, and so did the
+// database beside it.
+const MARKER_FILE = path.join(DATA_DIR, 'persistence.json');
+let persistence = { firstBoot: null, boots: 0, lastBoot: null };
+try {
+  if (fs.existsSync(MARKER_FILE)) {
+    persistence = { ...persistence, ...JSON.parse(fs.readFileSync(MARKER_FILE, 'utf8')) };
+  }
+} catch { /* a corrupt marker just starts the count again */ }
+const bootedAt = new Date().toISOString();
+persistence.firstBoot = persistence.firstBoot || bootedAt;
+persistence.boots = Number(persistence.boots || 0) + 1;
+persistence.lastBoot = bootedAt;
+try {
+  fs.writeFileSync(MARKER_FILE, JSON.stringify(persistence, null, 2));
+} catch (e) {
+  console.error('[FreshAF] Could not write the persistence marker:', e.message);
+}
+if (persistence.boots === 1) {
+  console.warn('[FreshAF] data/ was EMPTY on this boot. Either this is the first ever start, '
+    + 'or there is no persistent disk and every account was just wiped.');
+} else {
+  console.log(`[FreshAF] data/ has survived ${persistence.boots - 1} restart(s) since ${persistence.firstBoot}.`);
+}
+
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -292,4 +322,4 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 process.on('exit', checkpoint);
 checkpoint(); // fold in whatever the last run left behind
 
-module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE };
+module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence };

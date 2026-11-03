@@ -9,6 +9,10 @@
   --bg:#0a1217;--surface:#101e26;--raise:#16272f;--line:#1d343e;
   --ink:#edf5f8;--muted:#9ab2bd;--faint:#6b8793;
   --blue:#25b8dd;--blue-deep:#1799c2;--on-blue:#031a22;--good:#3ecf8e;--warn:#f0b429;
+  /* Electric Coral. Accent only: promos, the selected state, and verification.
+     White on coral is 2.8:1 and fails, so anything sitting ON coral is near-black.
+     Coral AS text on the dark surfaces is 6.0-6.7:1 and passes. */
+  --coral:#ff6b4a;--on-coral:#2b0c04;
   --r:18px;
 }
 *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
@@ -32,7 +36,7 @@ body{margin:0;background:#070f13;color:var(--ink);font-family:Inter,system-ui,sa
 .hero{position:relative;border-radius:var(--r);overflow:hidden;aspect-ratio:16/11}
 .hero img{width:100%;height:100%;object-fit:cover;display:block}
 .hero .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,14,18,.15),rgba(5,14,18,.85))}
-.badge{position:absolute;top:11px;left:11px;background:var(--warn);color:#2a1d00;font:800 .64rem Inter;letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:999px}
+.badge{position:absolute;top:11px;right:11px;background:var(--coral);color:var(--on-coral);font:800 .64rem Inter;letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:999px}
 .hero .cap2{position:absolute;left:14px;right:14px;bottom:12px}
 .hero h2{margin:0;font-size:1.3rem;line-height:1.14;font-weight:800;letter-spacing:-.025em}
 .hero p{margin:4px 0 0;font-size:.76rem;color:#c6dbe3}
@@ -71,7 +75,9 @@ h3 i{font-style:normal;color:var(--blue)}
 .row .amt{text-align:right}
 .row .amt b{font-size:.98rem;font-weight:800;display:block}
 .row .amt small{font-size:.6rem;color:var(--faint)}
-.row.pick{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,184,221,.14)}
+.row.pick{border-color:var(--coral);box-shadow:0 0 0 3px rgba(255,107,74,.16)}
+.row.pick .amt b{color:var(--coral)}
+.vtick{color:var(--coral);font-weight:800;margin-right:3px}
 
 .opt{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:8px}
 .opt.on{border-color:var(--blue);background:#0f2b35}
@@ -169,9 +175,9 @@ h3 i{font-style:normal;color:var(--blue)}
       <p>Best price so far. All in — travel included, nothing added at the door.</p>
     </div>
     <div class="sechead"><h4>Choose your pro</h4><a>Sort: price</a></div>
-    <div class="row pick"><img src="img2/card-mirror.jpg" alt=""><div class="t"><h5>Sparkle Mobile</h5><p>★ 4.9 · 212 jobs · 2.4 km · here by 10:15</p></div><div class="amt"><b>R376</b><small>all in</small></div></div>
-    <div class="row"><img src="img2/card-taillight.jpg" alt=""><div class="t"><h5>Shine On Wheels</h5><p>★ 4.8 · 96 jobs · 3.1 km · here by 10:40</p></div><div class="amt"><b>R395</b><small>all in</small></div></div>
-    <div class="row"><img src="img2/card-drops.jpg" alt=""><div class="t"><h5>GleamPro CT</h5><p>★ 5.0 · 41 jobs · 4.0 km · here by 11:05</p></div><div class="amt"><b>R410</b><small>all in</small></div></div>
+    <div class="row pick"><img src="img2/card-mirror.jpg" alt=""><div class="t"><h5>Sparkle Mobile</h5><p><span class="vtick">✔</span>Verified · ★ 4.9 · 212 jobs · 2.4 km · here by 10:15</p></div><div class="amt"><b>R376</b><small>all in</small></div></div>
+    <div class="row"><img src="img2/card-taillight.jpg" alt=""><div class="t"><h5>Shine On Wheels</h5><p><span class="vtick">✔</span>Verified · ★ 4.8 · 96 jobs · 3.1 km · here by 10:40</p></div><div class="amt"><b>R395</b><small>all in</small></div></div>
+    <div class="row"><img src="img2/card-drops.jpg" alt=""><div class="t"><h5>GleamPro CT</h5><p><span class="vtick">✔</span>Verified · ★ 5.0 · 41 jobs · 4.0 km · here by 11:05</p></div><div class="amt"><b>R410</b><small>all in</small></div></div>
     <button class="btn">Book Sparkle Mobile · R376</button>
     <p class="note">Prices hold for 15 minutes.</p>
   </div>
