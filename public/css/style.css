@@ -17,6 +17,13 @@
   --accent-ink: #ffffff;
   --danger: #d64257;
   --warn: #cf8420;
+  /* Electric Coral. Accent only: promotions, the selected state, verification.
+     Measured, not guessed: white on coral is 2.82:1 and fails, so anything sitting
+     ON coral uses --coral-ink (6.44:1). On light backgrounds coral as TEXT is only
+     2.72:1, so --coral-text darkens it to stay readable there. */
+  --coral: #ff6b4a;
+  --coral-ink: #2b0c04;
+  --coral-text: #c6401f;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 10px 28px -14px rgba(16, 51, 61, .18);
@@ -43,6 +50,9 @@
   --accent-ink: #04222d;
   --danger: #f4586b;
   --warn: #e9a63f;
+  --coral: #ff6b4a;
+  --coral-ink: #2b0c04;
+  --coral-text: #ff8163;
   --shadow: 0 10px 28px -14px rgba(0, 0, 0, .55);
   --shadow-lift: 0 20px 44px -16px rgba(0, 0, 0, .65);
 }
@@ -856,3 +866,58 @@ button:active { transform: translateY(0) scale(.975); }
 }
 .footer-areas { font-size: .72rem; margin-bottom: 1rem; }
 .footer-blurb strong, .footer-areas strong { color: var(--muted); font-weight: 600; }
+
+/* ============ Direction A: photography, and the coral accent ============ */
+
+/* Hero photograph. A fixed aspect ratio and explicit width/height on the <img> so the
+   page does not jump while it loads — layout shift on first paint is the cheapest
+   thing to get wrong and the most obvious once you see it. */
+.hero-shot {
+  position: relative; margin: 10px 0 0; border-radius: var(--radius);
+  overflow: hidden; aspect-ratio: 16 / 10; background: var(--panel-2);
+}
+.hero-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hero-shot .shade {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 18, 24, .12) 0%, rgba(6, 18, 24, 0) 42%, var(--bg) 99%);
+}
+.promo-badge {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--coral); color: var(--coral-ink);
+  font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: 99px;
+  box-shadow: 0 6px 18px -6px rgba(255, 107, 74, .7);
+}
+/* The hero text sits directly under the photo, so it does not need its own top padding. */
+.hero-shot + .hero { padding-top: 18px; }
+
+/* Service cards lead with the photograph.
+   The photo is INSET inside the card's existing padding rather than full-bleed. A
+   full-bleed image needs the card's padding zeroed, and `.cat-grid .cat-card` sets
+   padding at mobile with two classes of specificity — so a flat `.cat-card { padding: 0 }`
+   silently loses and the image ends up floating short of the edges. Insetting it needs
+   no knowledge of that padding at all, at any breakpoint. */
+.cat-shot {
+  position: relative; aspect-ratio: 16 / 9; margin: 0 0 14px;
+  border-radius: var(--radius-sm); overflow: hidden; background: var(--panel-2);
+}
+.cat-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cat-card .cat-ico { margin-bottom: 12px; }
+.cat-card:hover .cat-shot img { transform: scale(1.04); }
+.cat-shot img { transition: transform .45s var(--ease); }
+
+/* Selected state, in coral. Border plus a ring rather than a fill, so the card's own
+   content keeps its contrast. */
+.is-selected, .cat-card.is-selected {
+  border-color: var(--coral) !important;
+  box-shadow: 0 0 0 3px rgba(255, 107, 74, .16), var(--shadow) !important;
+}
+.is-selected .price, .is-selected .amt, .price-coral { color: var(--coral-text); }
+
+/* Verification mark. Coral carries "checked by us" everywhere it appears. */
+.verified { color: var(--coral-text); font-weight: 700; }
+.verified svg { width: 1em; height: 1em; vertical-align: -.12em; margin-right: 3px; }
+
+@media (max-width: 560px) {
+  .hero-shot { aspect-ratio: 16 / 11; margin-top: 6px; }
+}
