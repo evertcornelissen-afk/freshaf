@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FreshAF — headline sheen options</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,700;0,800;1,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c151b; --panel:#13202a; --border:#2d4553;
+  --petrol:#e2edf4; --muted:#94aab9; --faint:#65798a;
+  --accent:#21b1d8; --accent-strong:#3ec4e6;
+  --coral:#ff6b4a; --coral-strong:#ff8f74;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--petrol);font-family:Inter,system-ui,sans-serif;
+     -webkit-font-smoothing:antialiased;padding:30px 22px 60px}
+.intro{max-width:72ch;margin:0 auto 26px}
+.intro h1{font-size:1.2rem;margin:0 0 6px;font-weight:800;letter-spacing:-.02em}
+.intro p{margin:0;color:var(--faint);font-size:.85rem;line-height:1.6}
+.opt{max-width:72ch;margin:0 auto 14px;background:var(--panel);border:1px solid var(--border);
+     border-radius:16px;padding:24px 24px 26px;position:relative;overflow:hidden}
+.tag{font:700 .64rem Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+     display:block;margin-bottom:12px}
+.opt h2{font-size:clamp(1.9rem,4.4vw,2.6rem);font-weight:800;letter-spacing:-.035em;
+        line-height:1.12;margin:0 0 10px;color:var(--petrol)}
+.opt h2 em{font-style:italic;-webkit-background-clip:text;background-clip:text;color:transparent;
+           background-size:260% 100%;padding-right:.1em;animation:sheen 7s var(--ease) infinite}
+.note{color:var(--muted);font-size:.8rem;line-height:1.55;margin:0}
+@keyframes sheen{0%,62%,100%{background-position:100% 0}30%{background-position:0 0}}
+
+/* Current: cyan flanks, brighter cyan peak. */
+.a h2 em{background-image:linear-gradient(92deg,var(--petrol) 0%,var(--accent) 40%,var(--accent-strong) 50%,var(--accent) 60%,var(--petrol) 100%)}
+
+/* 1 — coral peak, cyan flanks. The literal reading of the brief: the bright core of the
+      sweep becomes coral, and the colour it passes through stays cyan. */
+.b h2 em{background-image:linear-gradient(92deg,var(--petrol) 0%,var(--accent) 40%,var(--coral) 50%,var(--accent) 60%,var(--petrol) 100%)}
+
+/* 2 — coral sweep, cyan arriving behind it. Coral owns the whole travelling highlight
+      and cyan sits on either shoulder, so the two never blend into brown mid-sweep. */
+.c h2 em{background-image:linear-gradient(92deg,var(--petrol) 0%,var(--accent) 30%,var(--coral) 46%,var(--coral-strong) 52%,var(--coral) 58%,var(--accent) 72%,var(--petrol) 100%)}
+
+/* 3 — coral only. Cyan removed from the headline entirely. */
+.d h2 em{background-image:linear-gradient(92deg,var(--petrol) 0%,var(--coral) 40%,var(--coral-strong) 50%,var(--coral) 60%,var(--petrol) 100%)}
+
+/* 4 — two passes: coral leads, cyan follows a beat later. Two distinct shines rather
+      than one gradient with two stops. */
+.e h2 em{background-image:linear-gradient(92deg,var(--petrol) 0%,var(--coral-strong) 22%,var(--petrol) 38%,var(--accent-strong) 58%,var(--petrol) 78%)}
+</style></head><body>
+
+<div class="intro">
+  <h1>The sheen on &ldquo;done.&rdquo; &mdash; five versions</h1>
+  <p>The highlight sweeps across every seven seconds. Watch one full pass before choosing; they look alike when the sweep is parked at the edge. Nothing here is applied to the app yet.</p>
+</div>
+
+<div class="opt a"><span class="tag">Now &mdash; cyan peak, cyan flanks</span>
+  <h2>Consider it <em>done.</em></h2>
+  <p class="note">What is on the site today.</p></div>
+
+<div class="opt b"><span class="tag">1 &mdash; coral peak, cyan flanks</span>
+  <h2>Consider it <em>done.</em></h2>
+  <p class="note">Exactly what you asked for: the bright core of the sweep turns coral, the colour it travels through stays cyan.</p></div>
+
+<div class="opt c"><span class="tag">2 &mdash; coral sweep, cyan shoulders</span>
+  <h2>Consider it <em>done.</em></h2>
+  <p class="note">Coral owns the whole travelling highlight with cyan on either side, so the two never blend into a muddy middle as the sweep passes.</p></div>
+
+<div class="opt d"><span class="tag">3 &mdash; coral only</span>
+  <h2>Consider it <em>done.</em></h2>
+  <p class="note">Cyan out of the headline altogether. Boldest, but it puts coral on the home page, which you wanted kept quiet.</p></div>
+
+<div class="opt e"><span class="tag">4 &mdash; two shines, coral then cyan</span>
+  <h2>Consider it <em>done.</em></h2>
+  <p class="note">Two separate highlights in one pass rather than one gradient with two stops &mdash; coral leads, cyan follows a beat behind.</p></div>
+
+</body></html>
