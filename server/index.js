@@ -174,6 +174,11 @@ app.get('/api/health', (req, res) => {
     since: persistence?.firstBoot || null,
     data_dir: DATA_DIR,
     file_count: fileCount,
+    // The exact string the app will hand Stitch as the return URL. Stitch matches
+    // registered redirect URLs byte-for-byte, so if BASE_URL on the host is not
+    // exactly the public address, customers get a 404 AFTER paying — money gone,
+    // no order. Worth being able to read from outside before switching card on.
+    return_url: require('./stitch').returnUrl(process.env.BASE_URL || ''),
   });
 });
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));
