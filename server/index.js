@@ -157,11 +157,23 @@ app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.
 // question ("are customer accounts being wiped?") that has to be answerable without
 // logging in, and the admin UI is no longer on this site to answer it.
 app.get('/api/health', (req, res) => {
-  const { persistence } = require('./db');
+  const { persistence, DATA_DIR } = require('./db');
+  // data_dir and the file list are here to answer one question that cannot be answered
+  // from outside: is the folder the app writes to actually the folder the host mounted?
+  // A disk attached at a path the app never writes to looks identical to no disk at all.
+  let files = null;
+  try {
+    files = require('fs').readdirSync(DATA_DIR).slice(0, 12);
+  } catch (e) {
+    files = [`unreadable: ${e.code || e.message}`];
+  }
   res.json({
     ok: true,
     data_persisted: Number(persistence?.boots || 0) > 1,
+    boots: Number(persistence?.boots || 0),
     since: persistence?.firstBoot || null,
+    data_dir: DATA_DIR,
+    files,
   });
 });
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));
