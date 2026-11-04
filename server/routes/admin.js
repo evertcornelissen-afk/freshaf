@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const { db, getSetting, setSetting } = require('../db');
+const { db, getSetting, setSetting, DEFAULT_ADMIN_PASSWORD } = require('../db');
 const { authRequired } = require('../auth');
 const realtime = require('../realtime');
 const push = require('../push');
@@ -283,8 +283,16 @@ router.get('/readiness', (req, res) => {
         detail: require('../mailer').configured() ? 'Sending from admin@freshaf.io.' : 'Dry run — set SMTP_PASS (the admin@freshaf.io mailbox password) on Render.' },
       { key: 'suppliers', label: 'Approved pros on the platform', ok: approvedPros > 0,
         detail: `${approvedPros} approved. Nothing else matters without supply.` },
-      { key: 'admin_password', label: 'Admin password changed from default', ok: !!process.env.ADMIN_PASSWORD,
-        detail: process.env.ADMIN_PASSWORD ? 'Set from the environment.' : 'Using the built-in default.' },
+      // Checked against the real default, not merely "is the variable set". Someone
+      // pasting the published default into ADMIN_PASSWORD would otherwise turn this
+      // green while the published password still opened the dashboard.
+      { key: 'admin_password', label: 'Admin password changed from default',
+        ok: !!process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD !== DEFAULT_ADMIN_PASSWORD,
+        detail: !process.env.ADMIN_PASSWORD
+          ? 'Using the built-in default, which is published in .env.example.'
+          : process.env.ADMIN_PASSWORD === DEFAULT_ADMIN_PASSWORD
+            ? 'ADMIN_PASSWORD is set to the published default. Choose a different one.'
+            : 'Set from the environment, and applied on every boot.' },
     ],
     approved_pros: approvedPros,
     online_pros: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved' AND online = 1").get().c,

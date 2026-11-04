@@ -299,8 +299,9 @@ if (!getSetting('callout_cap_cents')) setSetting('callout_cap_cents', '15000');
 
 // Seed admin account
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@freshaf.co.za';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'FreshAF!Admin2026';
-const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
+const DEFAULT_ADMIN_PASSWORD = 'FreshAF!Admin2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+const adminExists = db.prepare("SELECT id, email, password_hash FROM users WHERE role = 'admin' LIMIT 1").get();
 if (!adminExists) {
   db.prepare('INSERT INTO users (role, name, email, password_hash) VALUES (?, ?, ?, ?)')
     .run('admin', 'FreshAF Admin', ADMIN_EMAIL, bcrypt.hashSync(ADMIN_PASSWORD, 10));
@@ -314,6 +315,36 @@ if (!adminExists) {
       ? ' WARNING: using the built-in default password, which is published in .env.example.'
         + ' Set ADMIN_PASSWORD and redeploy.'
       : ' Password taken from ADMIN_PASSWORD.'));
+} else {
+  // ADMIN_EMAIL and ADMIN_PASSWORD used to apply ONLY at creation. Once the account
+  // existed, changing them did nothing -- and because the app has no change-password
+  // screen either, there was no way whatsoever to rotate the admin password. That is
+  // not a theoretical gap: the first password was printed into a deploy log, where it
+  // is readable by anyone with dashboard access, permanently, and it could not be
+  // changed. Making the environment authoritative is the whole fix.
+  //
+  // Safe to run on every boot: nothing else can change these, so there is no edit to
+  // overwrite, and a matching value is left alone rather than re-hashed.
+  if (process.env.ADMIN_PASSWORD
+      && !bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password_hash)) {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .run(bcrypt.hashSync(ADMIN_PASSWORD, 10), adminExists.id);
+    console.log('[FreshAF] Admin password updated to match ADMIN_PASSWORD.');
+  }
+  if (process.env.ADMIN_EMAIL && ADMIN_EMAIL !== adminExists.email) {
+    // Refuse rather than crash on the UNIQUE constraint if a customer already signed
+    // up with that address: locking the operator out of their own dashboard over a
+    // config typo is worse than ignoring the change and saying so.
+    const taken = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?')
+      .get(ADMIN_EMAIL, adminExists.id);
+    if (taken) {
+      console.error(`[FreshAF] ADMIN_EMAIL is ${ADMIN_EMAIL}, but another account already`
+        + ` uses it. The admin sign-in stays ${adminExists.email}.`);
+    } else {
+      db.prepare('UPDATE users SET email = ? WHERE id = ?').run(ADMIN_EMAIL, adminExists.id);
+      console.log(`[FreshAF] Admin sign-in address updated to ${ADMIN_EMAIL}.`);
+    }
+  }
 }
 
 // In WAL mode almost everything written lives in freshaf.db-wal until SQLite folds it
@@ -338,4 +369,4 @@ try {
   console.error('[FreshAF] Could not encrypt existing supplier details:', e.message);
 }
 
-module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence };
+module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence, DEFAULT_ADMIN_PASSWORD };
