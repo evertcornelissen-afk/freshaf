@@ -200,6 +200,9 @@ app.listen(PORT, () => {
   console.log(`[FreshAF] Fresh and Fast — running at http://localhost:${PORT}`);
   console.log(`[FreshAF] Customer app:    http://localhost:${PORT}/`);
   console.log(`[FreshAF] Supplier portal: http://localhost:${PORT}/supplier`);
-  console.log(`[FreshAF] Admin dashboard: http://localhost:${PORT}/admin`);
+  // No /admin line here: that route was removed and the dashboard now runs from
+  // admin-app/ on the operator's own machine. Advertising a dead path in the boot log
+  // of a production service invites someone to go looking for it.
+  console.log('[FreshAF] Admin dashboard: run admin-app/ locally (see admin-app/README.md)');
   dispatch.resumeSearchingOrders();
 });
