@@ -161,11 +161,11 @@ app.get('/api/health', (req, res) => {
   // data_dir and the file list are here to answer one question that cannot be answered
   // from outside: is the folder the app writes to actually the folder the host mounted?
   // A disk attached at a path the app never writes to looks identical to no disk at all.
-  let files = null;
+  let fileCount = null;
   try {
-    files = require('fs').readdirSync(DATA_DIR).slice(0, 12);
+    fileCount = require('fs').readdirSync(DATA_DIR).length;
   } catch (e) {
-    files = [`unreadable: ${e.code || e.message}`];
+    fileCount = `unreadable: ${e.code || e.message}`;
   }
   res.json({
     ok: true,
@@ -173,7 +173,7 @@ app.get('/api/health', (req, res) => {
     boots: Number(persistence?.boots || 0),
     since: persistence?.firstBoot || null,
     data_dir: DATA_DIR,
-    files,
+    file_count: fileCount,
   });
 });
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));
