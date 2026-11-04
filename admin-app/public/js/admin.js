@@ -4,6 +4,26 @@ let me = null;
 const VIEWS = ['view-auth', 'view-dash'];
 const show = (view) => switchView(VIEWS, view);
 
+// Say which site is being read, before anything is read. A dashboard pointed at a dev
+// database shows real numbers from the wrong place and looks perfectly healthy doing it.
+(async function showTarget() {
+  const tag = document.getElementById('admin-target');
+  if (!tag) return;
+  try {
+    const r = await fetch('/_admin/target');
+    const t = await r.json();
+    tag.textContent = t.host;
+    tag.classList.toggle('target-live', Boolean(t.live));
+    tag.classList.toggle('target-other', !t.live);
+    tag.title = t.live
+      ? 'Reading the LIVE site. Changes here affect real customers and pros.'
+      : `NOT the live site - reading ${t.target}. Numbers here are not freshaf.io.`;
+  } catch {
+    tag.textContent = 'target unknown';
+    tag.classList.add('target-other');
+  }
+})();
+
 function decorate() {
   el('h-admin').insertAdjacentHTML('afterbegin', icon('lock'));
   el('h-overview').insertAdjacentHTML('afterbegin', icon('signal'));

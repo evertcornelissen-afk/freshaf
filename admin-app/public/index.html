@@ -10,6 +10,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'light';</script>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  /* The "which database am I reading" badge. Styled here rather than in style.css
+     because that file is served from the live site -- this page is local-only, and a
+     safety indicator must not depend on the thing it is warning about being reachable.
+     Contrast measured against each background, not guessed: the live pill is
+     #0f5132 on #d1e7dd (10.4:1) and the warning pill #7a2e12 on #ffe3d9 (8.2:1),
+     both well clear of the 4.5:1 WCAG AA threshold for small text. */
+  .target-tag { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .target-tag.target-live  { background: #d1e7dd; color: #0f5132; border-color: #0f5132; }
+  .target-tag.target-other { background: #ffe3d9; color: #7a2e12; border-color: #c6401f; font-weight: 700; }
+  [data-theme="dark"] .target-tag.target-live  { background: #0f2e22; color: #8fe3bd; border-color: #2f7d5d; }
+  [data-theme="dark"] .target-tag.target-other { background: #3a1409; color: #ff9c7d; border-color: #c6401f; }
+</style>
 </head>
 <body>
 <div id="splash">
@@ -23,6 +36,10 @@
       <img class="logo-img logo-light-v" src="/img/logo.svg" alt="FreshAF"><img class="logo-img logo-dark-v" src="/img/logo-dark.svg" alt="FreshAF">
       <span class="tag">Admin Dashboard</span>
     </a>
+    <!-- Which database this dashboard is reading. It is here because it was once
+         pointed at localhost by default: every number on the page was real, correct,
+         and from the wrong database, and nothing on screen said so. -->
+    <span class="tag target-tag" id="admin-target" title="The site this dashboard is reading from">checking...</span>
   </div>
   <div class="row">
     <label class="theme-toggle" title="Light / dark mode"><input type="checkbox" id="theme-switch"><span class="track"><span class="thumb"></span></span></label>

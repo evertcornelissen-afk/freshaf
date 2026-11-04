@@ -31,6 +31,13 @@ app.disable('x-powered-by');
 // then falls through to the live site for shared assets (css, images, icons).
 app.use(express.static(path.join(__dirname, 'public')));
 
+// What this dashboard is actually reading. The header shows it, because a dashboard
+// pointed at the wrong database looks exactly like one pointed at the right database.
+app.get('/_admin/target', (req, res) => {
+  const live = /^https:\/\/(www\.)?freshaf\.io$/i.test(TARGET);
+  res.json({ target: TARGET, live, host: TARGET.replace(/^https?:\/\//, '') });
+});
+
 // One hop: browser -> this process -> freshaf.io. Bodies are streamed through as raw
 // bytes so uploads (the database restore) and JSON both work without special cases.
 app.use(async (req, res) => {
