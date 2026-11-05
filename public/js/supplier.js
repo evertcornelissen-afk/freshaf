@@ -149,7 +149,7 @@ async function renderDocs() {
       </div>
       <div>
         <input type="file" id="file-${kind}" accept=".jpg,.jpeg,.png,.pdf" class="hidden">
-        <button class="secondary small" onclick="document.getElementById('file-${kind}').click()">${doc ? 'Replace' : 'Upload'}</button>
+        <button class="secondary small" data-action="openFilePicker" data-arg="file-${kind}">${doc ? 'Replace' : 'Upload'}</button>
       </div>
     </div>`;
   }).join('');
@@ -426,8 +426,8 @@ async function refreshOffers() {
       <p class="small-text" style="margin-top:5px">${o.order.package.replace(/_/g, ' ')} · ${o.order.vehicle} · ${o.order.payment_method === 'cash' ? `Collect ${rand(o.order.amount_due_cents)} cash` : 'Paid online'}${o.order.callout_fee_cents > 0 ? ` · incl. ${rand(o.order.callout_fee_cents)} callout` : ''}</p>
       ${o.order.notes ? `<p class="muted small-text">Note: ${o.order.notes}</p>` : ''}
       <div class="row mt">
-        <button class="small" onclick="acceptOffer(${o.offer_id})">Accept job</button>
-        <button class="ghost small" onclick="declineOffer(${o.offer_id})">Decline</button>
+        <button class="small" data-action="acceptOffer" data-arg="${o.offer_id}">Accept job</button>
+        <button class="ghost small" data-action="declineOffer" data-arg="${o.offer_id}">Decline</button>
       </div>
     </div>`).join('');
 }
@@ -446,7 +446,56 @@ window.declineOffer = async (id) => {
 
 const NEXT_LABEL = {
   carwash: { accepted: 'Start driving — en route', en_route: 'Arrived — start wash', in_progress: 'Finish job' },
-  laundry: { accepted: 'Start collection run', en_route: 'Collected — start laundering', in_progress: 'Delivered — finish job' },
+  laundry: { accepted: 'Start collection run', en_route: 'Collected — start laundering', in_progress: 'Laundered — out for delivery' },
+};
+// Turn-by-turn in the phone's own maps app.
+const navLink = (lat, lng, label) => (lat == null ? '' : `<a class="btn secondary small" target="_blank" rel="noopener"
+  href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving">${icon('pin')} ${label}</a>`);
+
+// Where this job goes next: the collection until it is collected, then the drop-off.
+function jobAddresses(o) {
+  const dropOff = o.return_to || { address: o.address, lat: o.lat, lng: o.lng };
+  const collecting = ['accepted', 'en_route'].includes(o.status);
+  let html = `<p class="muted small-text" style="margin-top:8px">${icon('pin')} ${o.service === 'laundry' ? '<strong>Collect:</strong> ' : ''}${escapeHtml(o.address)}</p>`;
+  if (o.return_to) {
+    const r = o.return_to;
+    html += `<p class="muted small-text">${icon('pin')} <strong>Return to:</strong> ${escapeHtml(r.address)}</p>
+      <p class="muted small-text">Receiver: ${escapeHtml(r.receiver || '')}${r.window_start ? ` · from ${escapeHtml(r.window_start)}` : ''}${r.notes ? ` · ${escapeHtml(r.notes)}` : ''}</p>`;
+  }
+  html += `<div class="row mt">${collecting
+    ? navLink(o.lat, o.lng, o.service === 'laundry' ? 'Navigate to collection' : 'Navigate')
+    : o.service === 'laundry' ? navLink(dropOff.lat, dropOff.lng, 'Navigate to drop-off') : ''}</div>`;
+  return html;
+}
+
+// The laundry drop-off: a photo and who took it. Closes the job.
+function handoverForm(o) {
+  return `<div class="mt" data-handover="${o.id}">
+    <label>Photo of the handover</label>
+    <input type="file" accept="image/*" capture="environment" class="ho-photo">
+    <label>Who received it?</label>
+    <input class="ho-receiver" maxlength="80" value="${escapeHtml(o.return_to?.receiver || '')}" placeholder="Name of the person who took it">
+    <div class="mt"><button data-action="submitHandover" data-arg="${o.id}">Handed over — finish job</button></div>
+  </div>`;
+}
+window.submitHandover = async (orderId) => {
+  const box = document.querySelector(`[data-handover="${orderId}"]`);
+  const photo = box.querySelector('.ho-photo').files[0];
+  const receiver = box.querySelector('.ho-receiver').value.trim();
+  if (!photo) { showError('dash-error', 'Take a photo of the laundry being handed over'); return; }
+  if (!receiver) { showError('dash-error', 'Enter the name of the person who received it'); return; }
+  const fd = new FormData();
+  fd.append('receiver', receiver);
+  fd.append('photo', photo);
+  try {
+    const res = await fetch(apiUrl(`/api/supplier/jobs/${orderId}/handover`), {
+      method: 'POST', body: fd, headers: authHeaders(), credentials: API_CREDENTIALS,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not save the handover');
+    toast('Handed over — job complete, the customer has been told', 'ok');
+    await Promise.all([refreshJobs(), refreshEarnings()]);
+  } catch (e) { showError('dash-error', e.message); }
 };
 const svcBadge = (s) => `<span class="pill ${s === 'laundry' ? 'ok' : 'warn'}" style="margin-right:6px">${serviceName(s)}</span>`;
 
@@ -461,10 +510,12 @@ async function refreshJobs() {
           <strong>${svcBadge(o.service)} Order #${o.id} — ${rand(o.price_cents)}</strong>
           <span class="pill warn live">${statusLabel(o.status, o.service)}</span>
         </div>
-        <p class="muted small-text" style="margin-top:8px">${icon('pin')} ${o.address}</p>
-        <p class="small-text" style="margin-top:5px">${o.package.replace(/_/g, ' ')} · ${o.vehicle} · ${o.payment_method === 'cash' ? `Collect ${rand(o.amount_due_cents)} cash on completion` : 'Paid online'}${o.callout_fee_cents > 0 ? ` · incl. ${rand(o.callout_fee_cents)} callout` : ''}</p>
-        ${o.notes ? `<p class="muted small-text">Note: ${o.notes}</p>` : ''}
-        <div class="mt"><button onclick="advanceJob(${o.id})">${(NEXT_LABEL[o.service] || NEXT_LABEL.carwash)[o.status] || 'Update'}</button></div>
+        ${jobAddresses(o)}
+        <p class="small-text" style="margin-top:5px">${o.package.replace(/_/g, ' ')} · ${o.vehicle} · ${o.payment_method === 'cash' ? `Collect ${rand(o.amount_due_cents)} cash on completion` : 'Paid online'}${o.callout_fee_cents > 0 ? ` · incl. ${rand(o.callout_fee_cents)} callout` : ''}${o.return_leg_fee_cents > 0 ? ` · incl. ${rand(o.return_leg_fee_cents)} return trip` : ''}</p>
+        ${o.notes ? `<p class="muted small-text">Note: ${escapeHtml(o.notes)}</p>` : ''}
+        ${o.status === 'out_for_delivery'
+          ? handoverForm(o)
+          : `<div class="mt"><button data-action="advanceJob" data-arg="${o.id}">${(NEXT_LABEL[o.service] || NEXT_LABEL.carwash)[o.status] || 'Update'}</button></div>`}
       </div>`).join('<hr class="divider">');
   }
   if (!history.length) {
@@ -570,6 +621,7 @@ async function refreshRequests() {
           <div class="muted small-text">${escapeHtml(r.unit_name)} · ${r.distance_km} km away</div>
           <div class="muted small-text">${escapeHtml(r.address)}</div>
           ${r.notes ? `<div class="muted small-text">Note: ${escapeHtml(r.notes)}</div>` : ''}
+          ${r.return_to ? `<div class="muted small-text"><strong>Return to:</strong> ${escapeHtml(r.return_to.address)} (${r.return_to.distance_km} km from you) · from ${escapeHtml(r.return_to.window_start || '')}</div>` : ''}
         </div>
         <span class="pill ${quoted ? 'ok' : 'warn'}">${quoted ? 'You quoted ' + rand(r.my_quote.price_cents) : 'Awaiting your price'}</span>
       </div>
@@ -587,6 +639,7 @@ async function refreshRequests() {
         </div>
       </div>
       ${r.callout_fee_cents ? `<p class="muted small-text mt">Plus ${rand(r.callout_fee_cents)} callout, also yours.</p>` : ''}
+      ${r.return_leg_fee_cents ? `<p class="muted small-text">Plus ${rand(r.return_leg_fee_cents)} for the return trip to the second address, also yours.</p>` : ''}
       <div class="row mt">
         <button class="small q-send">${quoted ? 'Update my price' : 'Send my price'}</button>
         <button class="ghost small q-skip">Not interested</button>

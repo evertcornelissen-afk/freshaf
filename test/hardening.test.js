@@ -48,6 +48,15 @@ const BASE = `http://127.0.0.1:${PORT}`;
     // would break in a browser but still pass a naive "is the header present" check.
     check('inline scripts are hashed into script-src',
       (csp.match(/'sha256-/g) || []).length > 0, true);
+    // The CSP blocks inline event handlers, so one anywhere in the pages or in HTML built
+    // by the scripts is a dead button. Use data-action + the delegated handler in common.js.
+    const fs = require('fs');
+    const pub = path.join(ROOT, 'public');
+    const files = [...fs.readdirSync(pub).filter((f) => f.endsWith('.html')).map((f) => path.join(pub, f)),
+      ...fs.readdirSync(path.join(pub, 'js')).filter((f) => f.endsWith('.js')).map((f) => path.join(pub, 'js', f))];
+    const inline = files.flatMap((f) => (fs.readFileSync(f, 'utf8').match(/\son(click|change|input|submit|load|error|keydown|keyup)\s*=\s*["']/gi) || [])
+      .map((m) => `${path.basename(f)}:${m.trim()}`));
+    check('no inline event handlers in the pages or scripts (the CSP blocks them)', inline, []);
     check('nosniff is set', home.headers.get('x-content-type-options'), 'nosniff');
     check('framing denied', home.headers.get('x-frame-options'), 'DENY');
     check('referrer policy set', home.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');

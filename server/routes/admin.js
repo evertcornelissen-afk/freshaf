@@ -214,6 +214,12 @@ router.post('/orders/:id/refunded', (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/orders/:id/handover-photo', (req, res) => {
+  const o = db.prepare('SELECT handover_photo FROM orders WHERE id = ?').get(req.params.id);
+  if (!o?.handover_photo) return res.status(404).json({ error: 'No handover photo' });
+  res.sendFile(path.join(__dirname, '..', '..', 'data', 'uploads', o.handover_photo));
+});
+
 router.get('/orders', (req, res) => {
   const rows = db.prepare(`
     SELECT o.*, cu.name AS customer_name, su.name AS supplier_name
@@ -349,6 +355,11 @@ router.get('/readiness', (req, res) => {
           : 'JWT_SECRET is not set, so every deploy signs everyone out.' },
       { key: 'card_payments', label: 'Card payments live', ok: payments.LIVE,
         detail: payments.statusDetail() },
+      { key: 'return_leg_price', label: 'Laundry return-trip price set',
+        ok: getSetting('return_leg_price_set', '0') === '1',
+        detail: getSetting('return_leg_price_set', '0') === '1'
+          ? `Return to a different address: first ${getSetting('return_leg_free_km', '5')} km free, then R${(Number(getSetting('return_leg_per_km_cents', '1000')) / 100).toFixed(2)}/km, capped at R${(Number(getSetting('return_leg_cap_cents', '15000')) / 100).toFixed(2)}.`
+          : 'NOT SET BY YOU YET. Laundry returned to a different address is charging the call-out rule as a stand-in (first 5 km free, then R10/km, capped at R150). Set it under Settings.' },
       { key: 'native_push', label: 'App push notifications live (iOS + Android)',
         ok: require('../native-push').configured().ios && require('../native-push').configured().android,
         detail: (() => {
@@ -413,12 +424,17 @@ router.get('/settings', (req, res) => {
     callout_free_km: Number(getSetting('callout_free_km', '5')),
     callout_per_km_cents: Number(getSetting('callout_per_km_cents', '1000')),
     callout_cap_cents: Number(getSetting('callout_cap_cents', '15000')),
+    return_leg_free_km: Number(getSetting('return_leg_free_km', '5')),
+    return_leg_per_km_cents: Number(getSetting('return_leg_per_km_cents', '1000')),
+    return_leg_cap_cents: Number(getSetting('return_leg_cap_cents', '15000')),
+    return_leg_price_set: getSetting('return_leg_price_set', '0') === '1',
   });
 });
 
 router.post('/settings', (req, res) => {
   const { platform_fee_pct, dispatch_radius_km, offer_timeout_sec,
-    points_earn_pct, callout_free_km, callout_per_km_cents, callout_cap_cents } = req.body || {};
+    points_earn_pct, callout_free_km, callout_per_km_cents, callout_cap_cents,
+    return_leg_free_km, return_leg_per_km_cents, return_leg_cap_cents } = req.body || {};
   const checks = [
     ['platform_fee_pct', platform_fee_pct, 0, 50],
     ['dispatch_radius_km', dispatch_radius_km, 1, 200],
@@ -427,6 +443,9 @@ router.post('/settings', (req, res) => {
     ['callout_free_km', callout_free_km, 0, 100],
     ['callout_per_km_cents', callout_per_km_cents, 0, 10000],
     ['callout_cap_cents', callout_cap_cents, 0, 100000],
+    ['return_leg_free_km', return_leg_free_km, 0, 100],
+    ['return_leg_per_km_cents', return_leg_per_km_cents, 0, 10000],
+    ['return_leg_cap_cents', return_leg_cap_cents, 0, 100000],
   ];
   for (const [key, val, min, max] of checks) {
     if (val === undefined) continue;
@@ -435,6 +454,10 @@ router.post('/settings', (req, res) => {
       return res.status(400).json({ error: `${key} must be between ${min} and ${max}` });
     }
     setSetting(key, n);
+  }
+  // Saving any return-trip figure is the owner deciding that price.
+  if ([return_leg_free_km, return_leg_per_km_cents, return_leg_cap_cents].some((v) => v !== undefined)) {
+    setSetting('return_leg_price_set', '1');
   }
   res.json({ ok: true });
 });

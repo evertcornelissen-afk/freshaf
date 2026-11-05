@@ -154,6 +154,13 @@ function adminNewPro({ name, business, email, phone, services }) {
 }
 
 const rand = (cents) => `R${(Math.round(Number(cents) || 0) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`;
+// The database stores UTC ("2026-11-06 08:15:00"); people read South African time.
+const sast = (utc) => {
+  if (!utc) return '';
+  const d = new Date(String(utc).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(utc) ? '' : 'Z'));
+  if (Number.isNaN(d.getTime())) return String(utc);
+  return d.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+};
 const firstName = (name) => esc(String(name || '').split(' ')[0] || 'there');
 const row = (k, v) => `<tr><td style="padding:4px 14px 4px 0;color:#5b7480;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0">${v}</td></tr>`;
 
@@ -173,8 +180,13 @@ function bookingConfirmed(o) {
         row('Order', `#${o.orderId}`),
         row('Service', esc(`${o.service}: ${o.pkg}, ${o.unit}`)),
         row('Pro', esc(o.proName || 'Your FreshAF pro')),
-        row('Where', esc(o.address)),
+        row(o.returnAddress ? 'Collect from' : 'Where', esc(o.address)),
         row('When', when),
+        ...(o.returnAddress ? [
+          row('Return to', esc(o.returnAddress)),
+          row('Received by', esc(o.returnReceiver || '')),
+          row('Return from', esc(o.returnWindow || '')),
+        ] : []),
         row('Price', pay),
       ].join('')}</table>`,
       'Need to change something? Reply to this email or cancel in the app before your pro is on the way.',
@@ -191,10 +203,12 @@ function receipt(o) {
   const paid = o.totalCents - o.pointsUsedCents;
   const lines = [
     row('Receipt for order', `#${o.orderId}`),
-    row('Date', esc(String(o.completedAt || '').slice(0, 16) || new Date().toISOString().slice(0, 16).replace('T', ' '))),
+    row('Date', esc(sast(o.completedAt || new Date().toISOString()))),
     row('Service', esc(`${o.service}: ${o.pkg}, ${o.unit}`)),
     row('Done by', esc(o.proName || 'Your FreshAF pro')),
-    row('Where', esc(o.address)),
+    row(o.returnAddress ? 'Collected from' : 'Where', esc(o.address)),
+    ...(o.returnAddress ? [row('Returned to', esc(o.returnAddress))] : []),
+    ...(o.handoverReceiver ? [row('Received by', `${esc(o.handoverReceiver)}${o.handoverAt ? `, ${esc(sast(o.handoverAt))}` : ''}`)] : []),
     row('Price', rand(o.totalCents)),
   ];
   if (o.pointsUsedCents > 0) lines.push(row('Rewards used', `-${rand(o.pointsUsedCents)}`));
@@ -208,6 +222,7 @@ function receipt(o) {
       `Hi ${firstName(o.name)},`,
       'Thank you for using FreshAF. Your job is complete.',
       `<table cellpadding="0" cellspacing="0" style="font-size:14px">${lines.join('')}</table>`,
+      ...(o.hasHandoverPhoto ? ['Your pro took a photo at the handover. You can see it on your order in the app.'] : []),
       'How did it go? Rate your pro in the app. It helps the best pros get more work.',
       '<span style="font-size:12px;color:#5b7480">FreshAF (Pty) Ltd, registration 2026/683087/07. FreshAF sells this service to you and pays the pro who carried it out.</span>',
     ],

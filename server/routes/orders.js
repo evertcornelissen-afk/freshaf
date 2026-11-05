@@ -126,18 +126,81 @@ function catalogHas(service, pkg, unit) {
   return !!(svc && svc.packages[pkg] && svc.units[unit]);
 }
 
-// Accepts "2026-08-22T09:00" from a datetime-local input. Stored as local wall time —
-// South Africa has one timezone and no daylight saving, so there is nothing to convert.
+// Booking times are South African wall-clock time ("2026-08-22 09:00"), stored as typed;
+// South Africa has one timezone and no daylight saving. They are compared in that frame:
+// both sides are read as if they were UTC, so the server's own timezone (UTC on Render,
+// SAST on a laptop) never shifts a check by two hours, as it used to.
+function wallMs(text) {
+  const m = String(text || '').trim().match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  if (!m) return NaN;
+  return Date.parse(`${m[1]}T${m[2]}:00Z`);
+}
+function wallNowMs() {
+  const s = new Date().toLocaleString('sv-SE', { timeZone: 'Africa/Johannesburg' }); // "2026-11-06 10:15:00"
+  return Date.parse(`${s.replace(' ', 'T').slice(0, 16)}:00Z`);
+}
+const wallText = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+
+// Accepts "2026-08-22T09:00" from a datetime-local input.
 function parseScheduledFor(raw) {
   if (!raw) return { value: null };
   const m = String(raw).trim().match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
   if (!m) return { error: 'That date and time could not be read' };
-  const when = new Date(`${m[1]}T${m[2]}`);
+  const when = { getTime: () => wallMs(raw) };
   if (Number.isNaN(when.getTime())) return { error: 'That date and time could not be read' };
-  const now = Date.now();
+  const now = wallNowMs();
   if (when.getTime() < now + 15 * 60 * 1000) return { error: 'Choose a time at least 15 minutes from now' };
   if (when.getTime() > now + 30 * 24 * 3600 * 1000) return { error: 'You can book up to 30 days ahead' };
   return { value: `${m[1]} ${m[2]}` };
+}
+
+// The return leg of a laundry job, when the customer wants it back somewhere else. The
+// window opens once the package's turnaround has passed since collection, and can be set
+// up to RETURN_WINDOW_DAYS after that. Returns { value } (null when not asked for) or
+// { error }.
+const RETURN_WINDOW_DAYS = 7;
+const RETURN_WINDOW_HOURS = 2; // the customer picks the start of a two-hour slot
+const RETURN_DAY = [7, 18];     // drop-offs start between 07:00 and 18:00, SA time
+// The first daytime moment at or after ms (wall time in the UTC frame, see wallMs).
+function nextDaytime(ms) {
+  const d = new Date(ms);
+  const mins = d.getUTCHours() * 60 + d.getUTCMinutes();
+  if (mins < RETURN_DAY[0] * 60) { d.setUTCHours(RETURN_DAY[0], 0, 0, 0); return d.getTime(); }
+  if (mins > RETURN_DAY[1] * 60) { d.setUTCDate(d.getUTCDate() + 1); d.setUTCHours(RETURN_DAY[0], 0, 0, 0); return d.getTime(); }
+  return ms;
+}
+function parseReturn(body, service, pkg, scheduledFor) {
+  const r = body?.return_to;
+  if (!r || !r.enabled) return { value: null };
+  if (service !== 'laundry') return { error: 'Returning to a different address is for laundry only' };
+  const address = String(r.address || '').trim();
+  if (!address || typeof r.lat !== 'number' || typeof r.lng !== 'number') {
+    return { error: 'Drop the return pin on the second map and enter the return address' };
+  }
+  const receiver = String(r.receiver || '').trim();
+  if (!receiver) return { error: 'Say who will receive the laundry, for example Reception or a name' };
+  const turnaround = SERVICES.laundry.packages[pkg]?.turnaround_h ?? 48;
+  const collect = scheduledFor ? wallMs(scheduledFor) : wallNowMs();
+  const earliest = nextDaytime(collect + turnaround * 3600_000);
+  const latest = earliest + RETURN_WINDOW_DAYS * 24 * 3600_000;
+  const start = wallMs(r.window_start);
+  if (Number.isNaN(start)) return { error: 'Choose when you want it back' };
+  // Five minutes' grace for the time it takes to press the button.
+  if (start < earliest - 5 * 60_000) {
+    return { error: `This package needs ${turnaround} hours, so the earliest return is ${wallText(earliest)}` };
+  }
+  if (start > latest) return { error: `Choose a return time within ${RETURN_WINDOW_DAYS} days of the earliest` };
+  const startMins = new Date(start).getUTCHours() * 60 + new Date(start).getUTCMinutes();
+  if (startMins < RETURN_DAY[0] * 60 || startMins > RETURN_DAY[1] * 60) {
+    return { error: `Returns are between ${RETURN_DAY[0]}:00 and ${RETURN_DAY[1]}:00. Choose a time in that window` };
+  }
+  return {
+    value: {
+      address: address.slice(0, 200), lat: r.lat, lng: r.lng,
+      notes: String(r.notes || '').trim().slice(0, 300) || null,
+      receiver: receiver.slice(0, 80), window_start: wallText(start),
+    },
+  };
 }
 
 router.post('/quote-requests', authRequired('customer'), (req, res) => {
@@ -149,6 +212,8 @@ router.post('/quote-requests', authRequired('customer'), (req, res) => {
   }
   const sched = parseScheduledFor(scheduled_for);
   if (sched.error) return res.status(400).json({ error: sched.error });
+  const ret = parseReturn(req.body, service, pkg, sched.value);
+  if (ret.error) return res.status(400).json({ error: ret.error });
 
   // One open request per service — otherwise pros get the same job twice.
   const existing = db.prepare(`SELECT id FROM quote_requests
@@ -165,6 +230,12 @@ router.post('/quote-requests', authRequired('customer'), (req, res) => {
     .run(req.user.id, service, pkg, vehicle, address.trim(), lat, lng,
       (notes || '').slice(0, 300) || null, sched.value, windowMin);
 
+  if (ret.value) {
+    db.prepare(`UPDATE quote_requests SET return_address = ?, return_lat = ?, return_lng = ?,
+      return_notes = ?, return_receiver = ?, return_window_start = ? WHERE id = ?`)
+      .run(ret.value.address, ret.value.lat, ret.value.lng, ret.value.notes, ret.value.receiver,
+        ret.value.window_start, Number(info.lastInsertRowid));
+  }
   const request = quotes.getRequest(Number(info.lastInsertRowid));
   const { asked, auto } = quotes.openRequest(request);
   res.json({
@@ -210,7 +281,8 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
   if (!['card', 'cash'].includes(payment_method)) return res.status(400).json({ error: 'Choose a payment method' });
 
   const q = db.prepare(`SELECT q.*, r.customer_id, r.service, r.package, r.vehicle,
-      r.address, r.lat, r.lng, r.notes, r.scheduled_for, r.status AS request_status, r.id AS request_id
+      r.address, r.lat, r.lng, r.notes, r.scheduled_for, r.status AS request_status, r.id AS request_id,
+      r.return_address, r.return_lat, r.return_lng, r.return_notes, r.return_receiver, r.return_window_start
     FROM quotes q JOIN quote_requests r ON r.id = q.request_id
     WHERE q.id = ? AND r.customer_id = ?`).get(req.params.id, req.user.id);
   if (!q) return res.status(404).json({ error: 'Quote not found' });
@@ -262,6 +334,12 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
       (isCash || paidByPoints) ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
       q.scheduled_for);
   const orderId = Number(info.lastInsertRowid);
+  if (q.return_address) {
+    db.prepare(`UPDATE orders SET return_address = ?, return_lat = ?, return_lng = ?, return_notes = ?,
+      return_receiver = ?, return_window_start = ?, return_leg_fee_cents = ? WHERE id = ?`)
+      .run(q.return_address, q.return_lat, q.return_lng, q.return_notes, q.return_receiver,
+        q.return_window_start, q.return_leg_fee_cents || 0, orderId);
+  }
 
   db.prepare("UPDATE quotes SET status = 'accepted' WHERE id = ?").run(q.id);
   db.prepare("UPDATE quotes SET status = 'declined' WHERE request_id = ? AND id != ? AND status = 'open'")
@@ -518,6 +596,13 @@ router.post('/payments/stitch/webhook', async (req, res) => {
 router.get('/orders', authRequired('customer'), (req, res) => {
   const rows = db.prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY id DESC LIMIT 50').all(req.user.id);
   res.json({ orders: rows.map(dispatch.orderPublic) });
+});
+
+router.get('/orders/:id/handover-photo', authRequired('customer'), (req, res) => {
+  const o = db.prepare('SELECT handover_photo FROM orders WHERE id = ? AND customer_id = ?').get(req.params.id, req.user.id);
+  if (!o?.handover_photo) return res.status(404).json({ error: 'No handover photo' });
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.sendFile(require('path').join(__dirname, '..', '..', 'data', 'uploads', o.handover_photo));
 });
 
 router.get('/orders/:id', authRequired('customer'), (req, res) => {

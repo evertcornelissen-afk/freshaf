@@ -149,6 +149,16 @@
         <div><label>Callout cap (R)</label><input id="set-callout-cap" type="number" min="0" max="1000" style="width:130px"></div>
       </div>
       <div class="mt"><button class="small" id="btn-save-settings">Save settings</button></div>
+      <hr class="divider">
+      <h3 style="margin-top:0">Laundry: return to a different address</h3>
+      <p class="muted small-text">The second trip, when a customer wants laundry brought back somewhere else. Paid to the pro, with FreshAF's margin on top, inside the one price the customer sees.</p>
+      <div class="msg error" id="return-price-flag">Not set by you yet. Until you save it, the call-out rule is used as a stand-in: first 5 km free, then R10/km, capped at R150.</div>
+      <div class="row">
+        <div><label>Free return trip (km)</label><input id="set-return-free" type="number" min="0" max="100" style="width:130px"></div>
+        <div><label>Return R per km</label><input id="set-return-rate" type="number" min="0" max="100" style="width:130px"></div>
+        <div><label>Return cap (R)</label><input id="set-return-cap" type="number" min="0" max="1000" style="width:130px"></div>
+      </div>
+      <div class="mt"><button class="small" id="btn-save-return">Save return-trip price</button></div>
     </div>
   </div>
 </div>

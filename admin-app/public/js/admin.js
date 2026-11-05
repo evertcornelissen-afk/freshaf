@@ -363,11 +363,11 @@ async function refreshOrders() {
     </tr></thead><tbody>` + orders.map((o) => `<tr>
       <td>#${o.id}</td>
       <td><span class="pill ${o.service === 'laundry' ? 'ok' : 'warn'}">${serviceName(o.service)}</span></td>
-      <td>${o.customer_name}</td><td>${o.supplier_name || '—'}</td>
+      <td>${o.customer_name}${o.return_address ? `<div class="muted small-text">Return: ${escapeHtml(o.return_address)} · to ${escapeHtml(o.return_receiver || '')}</div>` : ''}${o.handover_receiver ? `<div class="muted small-text">Handed to ${escapeHtml(o.handover_receiver)}${o.handover_photo ? ` · <a href="/api/admin/orders/${o.id}/handover-photo" target="_blank">photo</a>` : ''}</div>` : ''}</td><td>${o.supplier_name || '—'}</td>
       <td>${o.package.replace(/_/g, ' ')} / ${o.vehicle}</td>
       <td>${rand(o.price_cents)}</td><td>${o.commission_cents ? rand(o.commission_cents) : '—'}</td>
       <td class="muted small-text">${o.payment_method} · ${o.payment_status.replace(/_/g, ' ')}</td>
-      <td><span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status, o.service)}</span>
+      <td><span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status === 'in_progress' && o.out_for_delivery_at ? 'out_for_delivery' : o.status, o.service)}</span>
         ${o.refund_due_cents > 0 ? `<br><span class="pill bad" style="margin-top:5px">refund due ${rand(o.refund_due_cents)}</span>` : ''}
         ${o.status === 'cancelled' && o.cancelled_by ? `<div class="muted small-text">by ${escapeHtml(o.cancelled_by)}${o.cancel_reason ? `: ${escapeHtml(o.cancel_reason)}` : ''}</div>` : ''}</td>
       <td><div class="row" style="flex-wrap:nowrap">
@@ -386,7 +386,26 @@ async function loadSettings() {
   el('set-callout-free').value = s.callout_free_km;
   el('set-callout-rate').value = s.callout_per_km_cents / 100;
   el('set-callout-cap').value = s.callout_cap_cents / 100;
+  el('set-return-free').value = s.return_leg_free_km;
+  el('set-return-rate').value = s.return_leg_per_km_cents / 100;
+  el('set-return-cap').value = s.return_leg_cap_cents / 100;
+  el('return-price-flag').classList.toggle('hidden', !!s.return_leg_price_set);
 }
+
+el('btn-save-return').onclick = async () => {
+  try {
+    await api('/api/admin/settings', {
+      method: 'POST',
+      body: {
+        return_leg_free_km: el('set-return-free').value,
+        return_leg_per_km_cents: Number(el('set-return-rate').value) * 100,
+        return_leg_cap_cents: Number(el('set-return-cap').value) * 100,
+      },
+    });
+    toast('Return-trip price saved', 'ok');
+    await Promise.all([loadSettings(), refreshReadiness()]);
+  } catch (e) { toast(e.message, 'error'); }
+};
 
 el('btn-save-settings').onclick = async () => {
   try {

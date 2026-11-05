@@ -213,6 +213,31 @@
       <input id="order-address" placeholder="e.g. 12 Main Road, Suburb, City — complex gate code 1234">
       <label id="notes-label">Notes for the pro (optional)</label>
       <input id="order-notes" placeholder="e.g. White Hilux, keys with security">
+
+      <!-- Laundry only: bring it back somewhere else (an office, a parent's house). -->
+      <div id="return-block" class="hidden">
+        <label class="row" style="margin:18px 0 0;cursor:pointer;gap:10px">
+          <input type="checkbox" id="return-toggle" style="width:auto">
+          <span><strong>Return to a different address</strong></span>
+        </label>
+        <div id="return-fields" class="hidden">
+          <p class="muted small-text" style="margin-top:6px">We collect from the pin above and bring it back here. The return trip is priced into your total before you pay.</p>
+          <div id="map-return" class="map mt"></div>
+          <div class="row mt">
+            <button class="secondary small" id="btn-return-geolocate" type="button">Use my location</button>
+            <span id="return-pin-status" class="muted small-text">No return pin set</span>
+          </div>
+          <label for="return-address">Return address</label>
+          <input id="return-address" placeholder="e.g. 5 Main Road, Suburb, City">
+          <label for="return-notes">Delivery notes (building, floor, reception or contact)</label>
+          <input id="return-notes" maxlength="300" placeholder="e.g. Block C, 3rd floor, ask at reception">
+          <label for="return-receiver">Who receives it?</label>
+          <input id="return-receiver" maxlength="80" placeholder="e.g. Reception, or the person's name">
+          <label for="return-window">Bring it back from</label>
+          <input type="datetime-local" id="return-window" step="1800">
+          <p class="muted small-text" id="return-window-hint"></p>
+        </div>
+      </div>
       <h3><span class="step-num">4</span>When do you want it?</h3>
       <div class="seg" id="when-seg">
         <label><input type="radio" name="when" value="asap" checked><span id="seg-asap">As soon as possible</span></label>

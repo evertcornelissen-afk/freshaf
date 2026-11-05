@@ -31,15 +31,27 @@ function orderPublic(order) {
       lat: s.lat, lng: s.lng,
     };
   }
+  // "Out for delivery" is recorded by time (see db.js) and shown as a status of its own.
+  const shownStatus = status === 'in_progress' && order.out_for_delivery_at ? 'out_for_delivery' : status;
   return { id, service, package: pkg, vehicle, price_cents, address, lat, lng, notes,
-    payment_method, payment_status, status, created_at, accepted_at, completed_at, supplier,
+    payment_method, payment_status, status: shownStatus, created_at, accepted_at, completed_at, supplier,
+    return_to: order.return_address ? {
+      address: order.return_address, lat: order.return_lat, lng: order.return_lng,
+      notes: order.return_notes || null, receiver: order.return_receiver || null,
+      window_start: order.return_window_start || null,
+    } : null,
+    return_leg_fee_cents: order.return_leg_fee_cents || 0,
+    out_for_delivery_at: order.out_for_delivery_at || null,
+    handover: order.handover_at ? {
+      receiver: order.handover_receiver, at: order.handover_at, has_photo: !!order.handover_photo,
+    } : null,
     scheduled_for: scheduled_for || null,
     callout_fee_cents: callout_fee_cents || 0,
     points_used_cents: points_used_cents || 0,
     points_earned_cents: points_earned_cents || 0,
     supplier_price_cents: supplier_price_cents || 0,
     platform_fee_cents: platform_fee_cents || 0,
-    supplier_earns_cents: (supplier_price_cents || 0) + (callout_fee_cents || 0),
+    supplier_earns_cents: (supplier_price_cents || 0) + (callout_fee_cents || 0) + (order.return_leg_fee_cents || 0),
     amount_due_cents: price_cents - (points_used_cents || 0) };
 }
 
@@ -76,6 +88,12 @@ function emailCustomer(order) {
       pointsEarnedCents: fresh.points_earned_cents || 0,
       paymentMethod: fresh.payment_method,
       completedAt: fresh.completed_at,
+      returnAddress: fresh.return_address || null,
+      returnReceiver: fresh.return_receiver || null,
+      returnWindow: fresh.return_window_start || null,
+      handoverReceiver: fresh.handover_receiver || null,
+      handoverAt: fresh.handover_at || null,
+      hasHandoverPhoto: !!fresh.handover_photo,
     };
     const mailer = require('./mailer');
     const send = fresh.status === 'accepted' ? mailer.bookingConfirmed

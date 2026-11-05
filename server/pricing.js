@@ -22,9 +22,11 @@ const SERVICES = {
     providerNoun: 'laundry pro',
     unitLabel: 'Load size',
     packages: {
-      wash_fold: { key: 'wash_fold', name: 'Wash & Fold',       desc: 'Washed, tumble-dried and neatly folded',            base: 22000, eta: '24–48 h turnaround' },
-      wash_iron: { key: 'wash_iron', name: 'Wash, Dry & Iron',  desc: 'Full wash plus professional ironing, ready to wear', base: 32000, eta: '48 h turnaround' },
-      bedding:   { key: 'bedding',   name: 'Duvets & Bedding',  desc: 'Duvets, blankets, linen — deep washed and dried',    base: 38000, eta: '48 h turnaround' },
+      // turnaround_h: the earliest a load can come back after it is collected. It is what
+      // the "return" window on a laundry booking is measured from.
+      wash_fold: { key: 'wash_fold', name: 'Wash & Fold',       desc: 'Washed, tumble-dried and neatly folded',            base: 22000, eta: '24–48 h turnaround', turnaround_h: 24 },
+      wash_iron: { key: 'wash_iron', name: 'Wash, Dry & Iron',  desc: 'Full wash plus professional ironing, ready to wear', base: 32000, eta: '48 h turnaround', turnaround_h: 48 },
+      bedding:   { key: 'bedding',   name: 'Duvets & Bedding',  desc: 'Duvets, blankets, linen — deep washed and dried',    base: 38000, eta: '48 h turnaround', turnaround_h: 48 },
     },
     units: {
       small:  { key: 'small',  name: 'Small load (up to 8 kg)',   mult: 1.0 },

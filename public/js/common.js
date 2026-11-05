@@ -81,6 +81,24 @@ async function signOut() {
   window.location.reload();
 }
 
+// Buttons built in JavaScript carry data-action="name" data-arg="value" instead of an
+// inline onclick. The site's Content-Security-Policy (rightly) has no 'unsafe-inline', so
+// the browser refuses to run inline handlers at all: from 5 Nov 2026, when the policy went
+// live, every such button (accept / decline a job, advance a job, upload a document, view
+// an order) silently did nothing. Only the names listed here can be triggered.
+const CLICK_ACTIONS = new Set(['acceptOffer', 'declineOffer', 'advanceJob', 'submitHandover',
+  'openTrack', 'openFilePicker']);
+window.openFilePicker = (id) => { const f = document.getElementById(id); if (f) f.click(); };
+document.addEventListener('click', (e) => {
+  const t = e.target && e.target.closest && e.target.closest('[data-action]');
+  if (!t || !CLICK_ACTIONS.has(t.dataset.action)) return;
+  const fn = window[t.dataset.action];
+  if (typeof fn !== 'function') return;
+  e.preventDefault();
+  const arg = t.dataset.arg;
+  fn(arg != null && /^-?\d+$/.test(arg) ? Number(arg) : arg);
+});
+
 // Disable a button and show progress text while an async action runs.
 async function withBusy(btn, busyLabel, fn) {
   const orig = btn.innerHTML;
@@ -457,7 +475,7 @@ const STATUS_LABELS = {
   laundry: {
     pending_payment: 'Awaiting payment', searching: 'Finding your laundry pro',
     accepted: 'Laundry pro assigned', en_route: 'Collecting your laundry',
-    in_progress: 'Laundering', completed: 'Delivered',
+    in_progress: 'Laundering', out_for_delivery: 'Out for delivery', completed: 'Delivered',
     cancelled: 'Cancelled', no_providers: 'No laundry pros available',
   },
 };

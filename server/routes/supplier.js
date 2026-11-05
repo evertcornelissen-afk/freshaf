@@ -177,31 +177,87 @@ router.post('/offers/:id/decline', requireApproved, (req, res) => {
 
 const STATUS_FLOW = { accepted: 'en_route', en_route: 'in_progress', in_progress: 'completed' };
 
+// Closing a job: FreshAF's revenue recorded, cash collected, rewards earned. Used by the
+// advance button for car washes and by the laundry handover.
+function completeOrder(order, extra = {}) {
+  const commission = order.platform_fee_cents || 0;
+  const payment = order.payment_method === 'cash' ? 'collected' : order.payment_status;
+  const earnPct = Number(getSetting('points_earn_pct', '5'));
+  const earned = Math.round(order.price_cents * earnPct / 100);
+  db.prepare(`UPDATE orders SET status = 'completed', completed_at = datetime('now'),
+    commission_cents = ?, payment_status = ?, points_earned_cents = ?,
+    handover_receiver = COALESCE(?, handover_receiver), handover_photo = COALESCE(?, handover_photo),
+    handover_at = CASE WHEN ? IS NOT NULL THEN datetime('now') ELSE handover_at END WHERE id = ?`)
+    .run(commission, payment, earned, extra.receiver || null, extra.photo || null, extra.receiver || null, order.id);
+  if (earned > 0) {
+    db.prepare('UPDATE users SET points_cents = points_cents + ? WHERE id = ?').run(earned, order.customer_id);
+  }
+}
+
 router.post('/jobs/:orderId/advance', requireApproved, (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ? AND supplier_id = ?').get(req.params.orderId, req.user.id);
   if (!order) return res.status(404).json({ error: 'Job not found' });
   const next = STATUS_FLOW[order.status];
   if (!next) return res.status(400).json({ error: 'Job cannot be advanced from its current status' });
 
-  if (next === 'completed') {
-    // Our fee was already added on top at booking — record it as the platform's revenue.
-    const commission = order.platform_fee_cents || 0;
-    const payment = order.payment_method === 'cash' ? 'collected' : order.payment_status;
-    // Money-back rewards: customer earns a % of the full order value on completion.
-    const earnPct = Number(getSetting('points_earn_pct', '5'));
-    const earned = Math.round(order.price_cents * earnPct / 100);
-    db.prepare(`UPDATE orders SET status = 'completed', completed_at = datetime('now'),
-      commission_cents = ?, payment_status = ?, points_earned_cents = ? WHERE id = ?`)
-      .run(commission, payment, earned, order.id);
-    if (earned > 0) {
-      db.prepare('UPDATE users SET points_cents = points_cents + ? WHERE id = ?').run(earned, order.customer_id);
+  // Laundry: laundered -> out for delivery -> handed over (with a photo and a name, below).
+  if (order.service === 'laundry' && order.status === 'in_progress') {
+    if (order.out_for_delivery_at) {
+      return res.status(400).json({ error: 'Take a photo of the handover and enter who received it' });
     }
+    db.prepare("UPDATE orders SET out_for_delivery_at = datetime('now') WHERE id = ?").run(order.id);
+  } else if (next === 'completed') {
+    completeOrder(order); // FreshAF's fee was added on top at booking; recorded as revenue here
   } else {
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(next, order.id);
   }
   const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
   dispatch.notifyCustomer(updated);
   res.json({ order: dispatch.orderPublic(updated) });
+});
+
+// The laundry drop-off: a photo of what was handed over and the name of who took it.
+// Closes the job, and the customer is told at once (live, push, and the receipt email).
+const handoverUpload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      cb(null, `handover-${req.params.orderId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
+    .includes(path.extname(file.originalname).toLowerCase()) || /^image\//.test(file.mimetype)),
+});
+
+router.post('/jobs/:orderId/handover', requireApproved, handoverUpload.single('photo'), (req, res) => {
+  const drop = () => { if (req.file) { try { fs.unlinkSync(req.file.path); } catch {} } };
+  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND supplier_id = ?').get(req.params.orderId, req.user.id);
+  if (!order) { drop(); return res.status(404).json({ error: 'Job not found' }); }
+  if (order.service !== 'laundry' || order.status !== 'in_progress' || !order.out_for_delivery_at) {
+    drop();
+    return res.status(400).json({ error: 'Mark the job out for delivery first' });
+  }
+  const receiver = String(req.body?.receiver || '').trim().slice(0, 80);
+  if (!req.file) return res.status(400).json({ error: 'Take a photo of the laundry being handed over' });
+  if (!receiver) { drop(); return res.status(400).json({ error: 'Enter the name of the person who received it' }); }
+
+  completeOrder(order, { receiver, photo: req.file.filename });
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  dispatch.notifyCustomer(updated); // live update + receipt email with the handover in it
+  require('../push').sendToUser(order.customer_id, {
+    title: 'Your laundry has been delivered',
+    body: `Received by ${receiver}${order.return_address ? ` at ${order.return_address}` : ''}.`,
+    url: `/?track=${order.id}`, tag: `order-${order.id}`,
+  }).catch(() => {});
+  res.json({ order: dispatch.orderPublic(updated) });
+});
+
+router.get('/jobs/:orderId/handover-photo', (req, res) => {
+  const o = db.prepare('SELECT handover_photo FROM orders WHERE id = ? AND supplier_id = ?').get(req.params.orderId, req.user.id);
+  if (!o?.handover_photo) return res.status(404).json({ error: 'No handover photo' });
+  res.sendFile(path.join(UPLOAD_DIR, o.handover_photo));
 });
 
 router.get('/jobs', (req, res) => {
@@ -259,6 +315,13 @@ router.get('/quote-requests', requireApproved, (req, res) => {
       unit_label: svc?.unitLabel || '',
       address: r.address,
       notes: r.notes,
+      return_to: r.return_address ? {
+        address: r.return_address, notes: r.return_notes, receiver: r.return_receiver,
+        window_start: r.return_window_start,
+        distance_km: +dispatch.haversineKm(r.return_lat, r.return_lng, me.lat, me.lng).toFixed(1),
+      } : null,
+      return_leg_fee_cents: r.return_address
+        ? quotes.returnLegFor(dispatch.haversineKm(r.return_lat, r.return_lng, me.lat, me.lng)) : 0,
       scheduled_for: r.scheduled_for || null,
       when_label: quotes.whenLabel(r.scheduled_for),
       distance_km: +distance.toFixed(1),
@@ -302,17 +365,21 @@ router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
   const distance = dispatch.haversineKm(request.lat, request.lng, me.lat, me.lng);
   if (distance > limit) return res.status(403).json({ error: 'That job is outside your travel radius' });
 
+  const returnKm = request.return_lat != null
+    ? dispatch.haversineKm(request.return_lat, request.return_lng, me.lat, me.lng) : null;
   const total = quotes.insertQuote({
     requestId: request.id,
     supplierId: req.user.id,
     supplierPrice: cents,
     distanceKm: distance,
+    returnDistanceKm: returnKm,
     availability: String(req.body?.availability || '').slice(0, 80) || null,
     note: String(req.body?.note || '').slice(0, 200) || null,
     source: 'manual',
   });
   quotes.notifyCustomer(request);
-  res.json({ ok: true, total_cents: total, you_earn_cents: cents + quotes.calloutFor(distance) });
+  res.json({ ok: true, total_cents: total,
+    you_earn_cents: cents + quotes.calloutFor(distance) + quotes.returnLegFor(returnKm) });
 });
 
 // Not interested — stop showing it to me.

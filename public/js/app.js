@@ -11,9 +11,14 @@ let disconnectSse = null;
 
 const VIEWS = ['view-home', 'view-login', 'view-register', 'view-service', 'view-order', 'view-track'];
 const STEPS = ['searching', 'accepted', 'en_route', 'in_progress', 'completed'];
+// Laundry has a drop-off of its own between laundering and delivered.
+const STEPS_BY_SERVICE = {
+  carwash: STEPS,
+  laundry: ['searching', 'accepted', 'en_route', 'in_progress', 'out_for_delivery', 'completed'],
+};
 const STEP_LABELS = {
   carwash: { searching: 'Searching', accepted: 'Accepted', en_route: 'En route', in_progress: 'Washing', completed: 'Done' },
-  laundry: { searching: 'Searching', accepted: 'Accepted', en_route: 'Collecting', in_progress: 'Laundering', completed: 'Delivered' },
+  laundry: { searching: 'Searching', accepted: 'Accepted', en_route: 'Collecting', in_progress: 'Laundering', out_for_delivery: 'Out for delivery', completed: 'Delivered' },
 };
 const PKG_ICONS = {
   express: 'droplet', wash_vac: 'spark', full_valet: 'shield',
@@ -196,6 +201,9 @@ function setService(key) {
   el('unit-heading').textContent = pricing.services[key].unitLabel;
   el('where-heading').textContent = copy.where;
   el('order-notes').placeholder = copy.notesPh;
+  // Return to a different address is a laundry option; switching away turns it off.
+  el('return-block').classList.toggle('hidden', key !== 'laundry');
+  if (key !== 'laundry' && el('return-toggle').checked) { el('return-toggle').checked = false; refreshReturnBlock(); }
   renderPickers();
   if (sel.lat != null) refreshCallout();
   updateTotal();
@@ -267,6 +275,7 @@ function renderPickers() {
 function refreshSel() {
   document.querySelectorAll('#pkg-grid .pkg').forEach((n) => n.classList.toggle('selected', n.dataset.pkg === sel.package));
   document.querySelectorAll('#veh-grid .pkg').forEach((n) => n.classList.toggle('selected', n.dataset.unit === sel.unit));
+  refreshReturnWindow(); // a different package has a different turnaround
   invalidateQuotes();
   updateTotal();
 }
@@ -281,8 +290,81 @@ let quotesList = [];
 let chosenQuote = null;
 
 function quotesReady() {
-  return !!(sel.package && sel.unit && sel.lat != null && el('order-address').value.trim());
+  return !!(sel.package && sel.unit && sel.lat != null && el('order-address').value.trim() && returnReady());
 }
+
+/* ---------- laundry: return to a different address ---------- */
+const ret = { lat: null, lng: null };
+const RETURN_HOURS = [7, 18]; // daytime drop-offs only; the server holds the same rule
+let returnMap = null;
+const returnOn = () => svc === 'laundry' && el('return-toggle').checked;
+function returnReady() {
+  if (!returnOn()) return true;
+  return ret.lat != null && el('return-address').value.trim() && el('return-receiver').value.trim()
+    && el('return-window').value;
+}
+function turnaroundHours() {
+  const p = pricing?.services?.laundry?.packages?.find((x) => x.key === sel.package);
+  return p?.turnaround_h ?? 48;
+}
+// The earliest return is collection time plus the package's turnaround; the window can
+// be set up to a week after that. Recomputed when the package or the collection time changes.
+function refreshReturnWindow() {
+  if (!returnOn()) return;
+  const collect = scheduledValue() ? new Date(scheduledValue()) : new Date();
+  const earliest = new Date(collect.getTime() + turnaroundHours() * 3600 * 1000);
+  earliest.setMinutes(Math.ceil(earliest.getMinutes() / 30) * 30, 0, 0);
+  // Returns happen in the day (RETURN_HOURS); a turnaround that ends at night rolls on
+  // to the next morning.
+  if (earliest.getHours() < RETURN_HOURS[0]) earliest.setHours(RETURN_HOURS[0], 0, 0, 0);
+  if (earliest.getHours() * 60 + earliest.getMinutes() > RETURN_HOURS[1] * 60) {
+    earliest.setDate(earliest.getDate() + 1);
+    earliest.setHours(RETURN_HOURS[0], 0, 0, 0);
+  }
+  const input = el('return-window');
+  input.min = localStamp(earliest);
+  input.max = localStamp(new Date(earliest.getTime() + 7 * 24 * 3600 * 1000));
+  if (!input.value || input.value < input.min || input.value > input.max) input.value = input.min;
+  const pkgName = pricing.services.laundry.packages.find((x) => x.key === sel.package)?.name;
+  el('return-window-hint').textContent = `${pkgName ? `${pkgName} takes ${turnaroundHours()} hours, so the` : 'The'} earliest return is ${whenLabel(input.min.replace('T', ' '))}. Returns are between ${RETURN_HOURS[0]}:00 and ${RETURN_HOURS[1]}:00, and we aim to arrive within two hours of the time you choose.`;
+}
+function setReturnPin(lat, lng) {
+  ret.lat = lat; ret.lng = lng;
+  returnMap.pin(lat, lng);
+  el('return-pin-status').innerHTML = `${icon('pin')} Return pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  invalidateQuotes();
+}
+function refreshReturnBlock() {
+  const on = returnOn();
+  el('return-fields').classList.toggle('hidden', !on);
+  if (on && !returnMap) {
+    const start = sel.lat != null ? [sel.lat, sel.lng] : [-29.0, 24.5];
+    returnMap = FreshMap.create('map-return', start, sel.lat != null ? 13 : 5, setReturnPin);
+  }
+  if (on && returnMap) setTimeout(() => returnMap.invalidateSize(), 60);
+  if (on) refreshReturnWindow();
+  invalidateQuotes();
+  updateTotal();
+}
+el('return-toggle').onchange = refreshReturnBlock;
+['return-notes', 'return-receiver', 'return-window'].forEach((id) => el(id).addEventListener('change', invalidateQuotes));
+el('btn-return-geolocate').onclick = () => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      returnMap.showMe(lat, lng, accuracy);
+      setReturnPin(lat, lng);
+      returnMap.flyTo(lat, lng, 17);
+    },
+    () => showError('order-error', 'Could not get your location — tap the second map instead.'),
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+  );
+};
+attachAutocomplete(el('return-address'), (r) => {
+  if (!returnMap) return;
+  setReturnPin(r.lat, r.lng);
+  returnMap.flyTo(r.lat, r.lng, 16);
+});
 
 function resetQuotes(message) {
   quoteRequestId = null; quotesList = []; chosenQuote = null;
@@ -326,7 +408,7 @@ function renderQuotes() {
 // "2026-08-22 09:00" -> "Sat 22 Aug, 09:00"
 function whenLabel(scheduledFor) {
   if (!scheduledFor) return 'As soon as possible';
-  const d = new Date(String(scheduledFor).replace(' ', 'T'));
+  const d = scheduledFor instanceof Date ? scheduledFor : new Date(String(scheduledFor).replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return String(scheduledFor);
   return d.toLocaleString('en-ZA', {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -356,13 +438,16 @@ document.querySelectorAll('input[name=when]').forEach((r) => r.onchange = () => 
   const scheduled = r.value === 'scheduled' && r.checked;
   el('when-picker').classList.toggle('hidden', !scheduled);
   if (scheduled) refreshWhenBounds();
+  refreshReturnWindow();
   invalidateQuotes(); // a different time is a different job — old prices no longer apply
 });
-el('scheduled-for').addEventListener('change', invalidateQuotes);
+el('scheduled-for').addEventListener('change', () => { refreshReturnWindow(); invalidateQuotes(); });
 
 el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros…', async () => {
   if (!quotesReady()) {
-    showError('order-error', 'Pick a package, a size, your location and an address first.');
+    showError('order-error', returnOn() && !returnReady()
+      ? 'For the return: drop the second pin, enter the return address, who receives it and when.'
+      : 'Pick a package, a size, your location and an address first.');
     return;
   }
   try {
@@ -373,6 +458,11 @@ el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros
         address: el('order-address').value, lat: sel.lat, lng: sel.lng,
         notes: el('order-notes').value,
         scheduled_for: scheduledValue(),
+        return_to: returnOn() ? {
+          enabled: true, address: el('return-address').value, lat: ret.lat, lng: ret.lng,
+          notes: el('return-notes').value, receiver: el('return-receiver').value,
+          window_start: el('return-window').value,
+        } : null,
       },
     });
     quoteRequestId = r.request_id;
@@ -433,7 +523,9 @@ function updateTotal() {
   const usePoints = el('use-points').checked;
   const discount = usePoints ? Math.min(me?.points_cents || 0, q.total_cents) : 0;
   animateRand(el('order-total'), q.total_cents - discount);
-  const notes = [`${q.business_name} · travel ${svc === 'laundry' ? 'and collection ' : ''}included`];
+  const notes = [returnOn()
+    ? `${q.business_name} · collection and return to your second address included`
+    : `${q.business_name} · travel ${svc === 'laundry' ? 'and collection ' : ''}included`];
   if (discount > 0) notes.push(`rewards −${rand(discount)}`);
   el('price-note').textContent = notes.join(' · ');
 }
@@ -621,7 +713,7 @@ async function refreshOrders() {
       <div class="row" style="flex-wrap:nowrap">
         <span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status, o.service)}</span>
         <strong>${rand(o.price_cents)}</strong>
-        <button class="secondary small" onclick="openTrack(${o.id})">View</button>
+        <button class="secondary small" data-action="openTrack" data-arg="${o.id}">View</button>
       </div>
     </div>`;
   };
@@ -649,11 +741,12 @@ function renderTrack(order) {
   el('track-title').innerHTML = `${icon(order.service === 'laundry' ? 'shirt' : 'droplet')} ${serviceName(order.service)} order #${order.id}`;
   const pill = el('track-pill');
   pill.textContent = statusLabel(order.status, order.service);
-  pill.className = `pill ${statusPillClass(order.status)}${['searching', 'en_route', 'in_progress'].includes(order.status) ? ' live' : ''}`;
+  pill.className = `pill ${statusPillClass(order.status)}${['searching', 'en_route', 'in_progress', 'out_for_delivery'].includes(order.status) ? ' live' : ''}`;
 
-  const idx = STEPS.indexOf(order.status);
+  const steps = STEPS_BY_SERVICE[order.service] || STEPS;
+  const idx = steps.indexOf(order.status);
   const labels = STEP_LABELS[order.service] || STEP_LABELS.carwash;
-  el('track-timeline').innerHTML = STEPS.map((s, i) => {
+  el('track-timeline').innerHTML = steps.map((s, i) => {
     const cls = idx < 0 ? '' : i < idx ? 'done' : i === idx ? 'current' : '';
     return `<div class="step ${cls}">${labels[s]}</div>`;
   }).join('');
@@ -668,7 +761,19 @@ function renderTrack(order) {
   if (order.scheduled_for) {
     body += `<p class="mt" style="color:var(--accent-dim);font-weight:700">${icon('clock')} Booked for ${whenLabel(order.scheduled_for)}</p>`;
   }
-  body += `<p class="muted">${icon('pin')} ${order.address}</p>
+  if (order.return_to) {
+    const r = order.return_to;
+    body += `<p class="muted">${icon('pin')} <strong>Collect from:</strong> ${escapeHtml(order.address)}</p>
+      <p class="muted">${icon('pin')} <strong>Return to:</strong> ${escapeHtml(r.address)}</p>
+      <p class="muted small-text" style="margin-left:22px">Received by ${escapeHtml(r.receiver || '')}${r.window_start ? ` · from ${whenLabel(r.window_start)}` : ''}${r.notes ? ` · ${escapeHtml(r.notes)}` : ''}</p>`;
+  }
+  if (order.handover) {
+    body += `<p class="mt" style="color:var(--accent-dim);font-weight:600">${icon('check')} Handed over to ${escapeHtml(order.handover.receiver)}${order.handover.at ? `, ${whenLabel(new Date(order.handover.at.replace(' ', 'T') + 'Z'))}` : ''}</p>`;
+    if (order.handover.has_photo) {
+      body += `<img src="${apiUrl(`/api/orders/${order.id}/handover-photo`)}" alt="Photo taken at the handover" style="max-width:260px;width:100%;border-radius:12px;margin-top:8px;border:1px solid var(--border)">`;
+    }
+  }
+  body += `<p class="muted"${order.return_to ? ' hidden' : ''}>${icon('pin')} ${order.address}</p>
     <p class="mt"><strong>${rand(order.amount_due_cents)}</strong> <span class="muted">· ${order.payment_method === 'cash' ? 'Cash on completion' : 'Paid by card'}${breakdown.length ? ' · ' + breakdown.join(' · ') : ''}</span></p>`;
   if (order.status === 'completed' && order.points_earned_cents > 0) {
     body += `<p class="mt" style="color:var(--accent-dim);font-weight:600">${icon('wallet')} You earned ${rand(order.points_earned_cents)} back in rewards.</p>`;
@@ -695,6 +800,7 @@ function renderTrack(order) {
   if (prevStatus && prevStatus !== order.status) {
     if (order.status === 'accepted') toast(`A ${noun} accepted your order`, 'ok');
     if (order.status === 'en_route') toast(order.service === 'laundry' ? 'Your laundry pro is on the way to collect' : 'Your washer is on the way', 'info');
+    if (order.status === 'out_for_delivery') toast('Your laundry is on its way back', 'info');
     if (order.status === 'completed') {
       toast(order.points_earned_cents > 0
         ? `Order complete — you earned ${rand(order.points_earned_cents)} in rewards`

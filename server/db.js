@@ -393,6 +393,33 @@ CREATE VIEW real_suppliers AS
   SELECT * FROM suppliers WHERE user_id NOT IN (SELECT id FROM users WHERE is_demo = 1);
 `);
 
+// Laundry "return to a different address". The collection address stays in address/lat/
+// lng; the drop-off, who receives it and the window go here, on the request, the quote
+// (its own trip fee) and the order. All additive, so nothing existing changes shape.
+addColumn('quote_requests', 'return_address TEXT');
+addColumn('quote_requests', 'return_lat REAL');
+addColumn('quote_requests', 'return_lng REAL');
+addColumn('quote_requests', 'return_notes TEXT');
+addColumn('quote_requests', 'return_receiver TEXT');
+addColumn('quote_requests', 'return_window_start TEXT');
+addColumn('quotes', 'return_leg_fee_cents INTEGER NOT NULL DEFAULT 0');
+addColumn('quotes', 'return_distance_km REAL');
+addColumn('orders', 'return_address TEXT');
+addColumn('orders', 'return_lat REAL');
+addColumn('orders', 'return_lng REAL');
+addColumn('orders', 'return_notes TEXT');
+addColumn('orders', 'return_receiver TEXT');
+addColumn('orders', 'return_window_start TEXT');
+addColumn('orders', 'return_leg_fee_cents INTEGER NOT NULL DEFAULT 0');
+// "Out for delivery" sits between laundering and delivered. orders.status has a CHECK list
+// that cannot change without rebuilding the live table, so the stage is recorded by time
+// and shown as its own status by dispatch.orderPublic.
+addColumn('orders', 'out_for_delivery_at TEXT');
+// Drop-off handover: who took the laundry, the pro's photo of it, and when.
+addColumn('orders', 'handover_receiver TEXT');
+addColumn('orders', 'handover_photo TEXT');
+addColumn('orders', 'handover_at TEXT');
+
 // Native app push tokens (APNs / FCM); see server/native-push.js.
 db.exec(`
 CREATE TABLE IF NOT EXISTS device_tokens (

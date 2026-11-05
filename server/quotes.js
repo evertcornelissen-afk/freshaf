@@ -21,7 +21,19 @@ function settings() {
     perKm: Number(getSetting('callout_per_km_cents', '1000')),
     cap: Number(getSetting('callout_cap_cents', '15000')),
     windowMin: Number(getSetting('quote_window_min', '30')),
+    // The second trip of a laundry job returned to a different address. Same shape as the
+    // call-out rule and defaulting to it, but set separately in the admin app, because
+    // the owner has not priced it yet (return_leg_price_set stays 0 until they do).
+    returnFreeKm: Number(getSetting('return_leg_free_km', '5')),
+    returnPerKm: Number(getSetting('return_leg_per_km_cents', '1000')),
+    returnCap: Number(getSetting('return_leg_cap_cents', '15000')),
   };
+}
+
+function returnLegFor(distanceKm) {
+  if (distanceKm == null || !Number.isFinite(distanceKm)) return 0;
+  const { returnFreeKm, returnPerKm, returnCap } = settings();
+  return Math.min(returnCap, Math.round(Math.max(0, distanceKm - returnFreeKm) * returnPerKm / 100) * 100);
 }
 
 function calloutFor(distanceKm) {
@@ -74,6 +86,8 @@ function quotePublic(q) {
     // what we keep, is our cost of sale and our margin — not the customer's business,
     // and itemising it on their bill is what made us look like a payment intermediary.
     total_cents: q.total_cents,
+    // Included in total_cents; shown so the customer can see their return trip is in it.
+    return_leg_fee_cents: q.return_leg_fee_cents || 0,
     availability: q.availability,
     note: q.note,
     source: q.source,
@@ -92,15 +106,21 @@ function listQuotes(requestId) {
   return rows.map(quotePublic);
 }
 
-function insertQuote({ requestId, supplierId, supplierPrice, distanceKm, availability, note, source }) {
+// returnDistanceKm: the pro's distance to a separate return address, when the customer
+// asked for one. That trip is paid to the pro like the call-out, and FreshAF's margin
+// applies to it the same way, so the customer still sees one all-in total.
+function insertQuote({ requestId, supplierId, supplierPrice, distanceKm, returnDistanceKm = null,
+  availability, note, source }) {
   const { feePct } = settings();
   const callout = calloutFor(distanceKm);
-  const fee = platformFee(supplierPrice + callout, feePct);
-  const total = supplierPrice + callout + fee;
+  const returnLeg = returnLegFor(returnDistanceKm);
+  const fee = platformFee(supplierPrice + callout + returnLeg, feePct);
+  const total = supplierPrice + callout + returnLeg + fee;
   db.prepare(`
     INSERT INTO quotes (request_id, supplier_id, supplier_price_cents, callout_fee_cents,
-      platform_fee_cents, total_cents, distance_km, availability, note, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      platform_fee_cents, total_cents, distance_km, availability, note, source,
+      return_leg_fee_cents, return_distance_km)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(request_id, supplier_id) DO UPDATE SET
       supplier_price_cents = excluded.supplier_price_cents,
       callout_fee_cents = excluded.callout_fee_cents,
@@ -109,11 +129,20 @@ function insertQuote({ requestId, supplierId, supplierPrice, distanceKm, availab
       availability = excluded.availability,
       note = excluded.note,
       source = excluded.source,
+      return_leg_fee_cents = excluded.return_leg_fee_cents,
+      return_distance_km = excluded.return_distance_km,
       status = 'open',
       created_at = datetime('now')`)
     .run(requestId, supplierId, supplierPrice, callout, fee, total,
-      +distanceKm.toFixed(1), availability || null, note || null, source);
+      +distanceKm.toFixed(1), availability || null, note || null, source,
+      returnLeg, returnDistanceKm == null ? null : +returnDistanceKm.toFixed(1));
   return total;
+}
+
+// How far a pro is from the request's return address, or null when there is none.
+function returnDistanceFor(request, proLat, proLng) {
+  if (request.return_lat == null || request.return_lng == null || proLat == null) return null;
+  return dispatch.haversineKm(request.return_lat, request.return_lng, proLat, proLng);
 }
 
 // Tell the customer their quote list changed, so it fills in live.
@@ -151,6 +180,7 @@ function openRequest(request) {
       insertQuote({
         requestId: request.id, supplierId: pro.user_id, supplierPrice: listed,
         distanceKm: pro.distance,
+        returnDistanceKm: returnDistanceFor(request, pro.lat, pro.lng),
         // For a booked slot the useful thing to show is the slot, not where the price came from.
         availability: request.scheduled_for ? whenLabel(request.scheduled_for) : 'From your published price list',
         note: null, source: 'auto',
@@ -167,6 +197,7 @@ function openRequest(request) {
       package: request.package,
       vehicle: request.vehicle,
       address: request.address,
+      return_address: request.return_address || null,
       distance_km: +pro.distance.toFixed(1),
       scheduled_for: request.scheduled_for,
       auto_quoted: listed != null,
@@ -177,7 +208,8 @@ function openRequest(request) {
   for (const pro of asked) {
     push.sendToUser(pro.user_id, {
       title: `New ${serviceLabel(request.service).toLowerCase()} request — send your price`,
-      body: `${whenLabel(request.scheduled_for)} · ${pro.distance.toFixed(1)} km away\n${request.address}\nOpen FreshAF Pro to quote.`,
+      body: `${whenLabel(request.scheduled_for)} · ${pro.distance.toFixed(1)} km away\n${request.address}`
+        + `${request.return_address ? `\nReturn to: ${request.return_address}` : ''}\nOpen FreshAF Pro to quote.`,
       url: '/supplier',
       tag: `quote-${request.id}`,
     }).catch(() => {});
@@ -219,6 +251,7 @@ const staleTimer = setInterval(expireStale, 60 * 1000);
 staleTimer.unref?.();
 
 module.exports = {
+  returnLegFor,
   openRequest, listQuotes, insertQuote, notifyCustomer, getRequest,
   eligiblePros, calloutFor, settings, expireStale, quotePublic, serviceLabel, whenLabel,
 };
