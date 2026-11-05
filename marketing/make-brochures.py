@@ -3,6 +3,8 @@ import base64, os, subprocess, sys
 ROOT = r"C:\Users\Evert\Desktop\local Session\freshaf"
 OUT = r"C:\Users\Evert\AppData\Local\Temp\brochure"
 DESK = r"C:\Users\Evert\Desktop"
+FORMS = os.path.join(ROOT, "forms")
+os.makedirs(FORMS, exist_ok=True)
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 def b64(rel, mime):
@@ -175,7 +177,7 @@ def brochure(kind):
 
   <div class="money">
     <div><div class="big">You name the price</div><div class="small">Set your own rates. What you quote is what you earn.</div></div>
-    <div><div class="big">Our 10% is on top</div><div class="small">Added to the customer's bill — never taken out of your money.</div></div>
+    <div><div class="big">No cut of your money</div><div class="small">We buy the job at your price and pay it in full. No commission, no platform fee, nothing deducted.</div></div>
     <div><div class="big">Free to join</div><div class="small">No signup fee, no monthly fee, no contract, no lock-in.</div></div>
   </div>
 
@@ -208,7 +210,7 @@ for kind, name in jobs:
     hp = os.path.join(OUT, f"{kind}.html")
     with open(hp, "w", encoding="utf-8") as f:
         f.write(html)
-    pdf = os.path.join(DESK, f"{name}.pdf")
+    pdf = os.path.join(FORMS, f"{name}.pdf")
     if os.path.exists(pdf):
         os.remove(pdf)
     subprocess.run([CHROME, "--headless", "--disable-gpu", "--no-sandbox",
