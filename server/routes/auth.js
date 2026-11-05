@@ -1,8 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { db } = require('../db');
-const { setAuthCookie, clearAuthCookie, readToken, authRequired, signUser, wantsToken,
-  signSseTicket, rotateSession } = require('../auth');
+const crypto = require('crypto');
+const { setAuthCookie, clearAuthCookie, readSession, renewIfStale, authRequired, signUser,
+  wantsToken, signSseTicket, rotateSession } = require('../auth');
 const mailer = require('../mailer');
 const secrets = require('../secrets');
 const { rateLimit, forgive } = require('../ratelimit');
@@ -37,6 +38,29 @@ const deleteLimit = rateLimit({
   name: 'delete-account', windowMs: 15 * 60_000, max: 10,
   message: 'Too many attempts. Wait a few minutes and try again.',
 });
+
+// Password reset. Asking is throttled per connection AND per address: the second stops
+// someone flooding one person's inbox from many machines.
+const forgotByIp = rateLimit({
+  name: 'forgot-ip', windowMs: 60 * 60_000, max: 10,
+  message: 'Too many reset requests from this connection. Try again later.',
+});
+const forgotByEmail = rateLimit({
+  name: 'forgot-email', windowMs: 60 * 60_000, max: 3,
+  keyBy: (req) => String(req.body?.email || '').trim().toLowerCase() || 'none',
+  message: 'A reset link was sent recently. Check your inbox and spam folder before asking for another.',
+});
+// A reset token is 256 random bits, so this is about load, not guessing.
+const resetLimit = rateLimit({
+  name: 'reset', windowMs: 15 * 60_000, max: 20,
+  message: 'Too many attempts. Wait a few minutes and try again.',
+});
+
+const RESET_TTL_MIN = 30;
+const SITE = (process.env.BASE_URL || 'https://freshaf.io').replace(/\/$/, '');
+// Only a hash is stored. Someone holding a copy of the database, or of a backup, cannot
+// turn an unused reset row into a way into the account.
+const hashToken = (t) => crypto.createHash('sha256').update(String(t)).digest('hex');
 
 function supplierProfile(userId) {
   return db.prepare('SELECT * FROM suppliers WHERE user_id = ?').get(userId) || null;
@@ -190,16 +214,71 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', (req, res) => {
-  const payload = readToken(req);
-  if (!payload) {
+  const s = readSession(req);
+  if (!s) {
     // A token that no longer matches an account is cleared rather than left to be sent
     // on every request for the rest of its thirty days.
     if (req.cookies?.freshaf_token) clearAuthCookie(res);
     return res.json({ user: null });
   }
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(s.user.id);
   if (!user) return res.json({ user: null });
-  res.json({ user: mePayload(user) });
+  const fresh = renewIfStale(req, res, s); // the app's token, renewed on launch
+  res.json({ user: mePayload(user), ...(fresh ? { token: fresh } : {}) });
+});
+
+// Step one: send a reset link. The answer is identical whether or not the address has an
+// account, so this cannot be used to find out who our customers and pros are.
+router.post('/forgot', forgotByIp, forgotByEmail, (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return res.status(400).json({ error: 'Enter the email address you signed up with' });
+  }
+  const answer = { ok: true, message: `If there is a FreshAF account for ${email}, a reset link is on its way. `
+    + `It works once and expires in ${RESET_TTL_MIN} minutes. Check your spam folder if it has not arrived in a few minutes.` };
+
+  const user = db.prepare('SELECT id, name, email, role FROM users WHERE email = ?').get(email);
+  // The admin password is set from the server environment on every boot, so an emailed
+  // reset could not stick anyway. Refusing it keeps a compromised mailbox from being a
+  // way into the admin account.
+  if (!user || user.role === 'admin' || user.email.endsWith('@freshaf.invalid')) return res.json(answer);
+
+  const token = crypto.randomBytes(32).toString('base64url');
+  // Only the newest link works; asking twice does not leave two keys lying around.
+  db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE user_id = ? AND used_at IS NULL").run(user.id);
+  db.prepare(`INSERT INTO password_resets (user_id, token_hash, expires_at)
+    VALUES (?, ?, datetime('now', '+${RESET_TTL_MIN} minutes'))`).run(user.id, hashToken(token));
+  const pro = user.role === 'supplier' ? '&pro=1' : '';
+  mailer.passwordReset({ to: user.email, name: user.name, minutes: RESET_TTL_MIN,
+    url: `${SITE}/reset-password?token=${token}${pro}` }).catch(() => {});
+  res.json(answer);
+});
+
+// Step two: the link from the email. Sets the password, signs this device in, and signs
+// every other device out, in case the reason for the reset is that someone else got in.
+router.post('/reset', resetLimit, (req, res) => {
+  const { token, password } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'This reset link is incomplete. Ask for a new one.' });
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  const expired = 'This reset link has expired or has already been used. Ask for a new one.';
+  const row = db.prepare(`SELECT * FROM password_resets
+    WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')`).get(hashToken(token));
+  if (!row) return res.status(400).json({ error: expired });
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
+  if (!user || user.role === 'admin' || user.email.endsWith('@freshaf.invalid')) {
+    return res.status(400).json({ error: expired });
+  }
+
+  db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE id = ?").run(row.id);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), user.id);
+  rotateSession(user.id);
+  mailer.passwordChanged({ to: user.email, name: user.name }).catch(() => {});
+
+  const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  setAuthCookie(res, fresh);
+  res.json({ user: mePayload(fresh), ...(wantsToken(req) ? { token: signUser(fresh) } : {}) });
 });
 
 // Update profile details (name, phone, preferred address).

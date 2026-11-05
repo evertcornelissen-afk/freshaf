@@ -112,4 +112,36 @@ function adminNewPro({ name, business, email, phone, services }) {
   });
 }
 
-module.exports = { configured, send, proApplicationReceived, proStatusChanged, adminNewPro };
+function passwordReset({ to, name, url, minutes }) {
+  return send({
+    to,
+    subject: 'Reset your FreshAF password',
+    heading: 'Choose a new password',
+    paragraphs: [
+      `Hi ${esc(String(name || '').split(' ')[0] || 'there')},`,
+      'Someone, hopefully you, asked to reset the password on your FreshAF account. Use the button below to choose a new one. You keep your account, your bookings and your reward points.',
+      `The link works once and expires in ${Number(minutes) || 30} minutes.`,
+      'If you did not ask for this, ignore this email. Your password has not changed and nobody can change it without this link.',
+    ],
+    cta: { label: 'Choose a new password', url },
+  });
+}
+
+// Sent after every successful reset, so a reset the owner did not make does not go unseen.
+function passwordChanged({ to, name }) {
+  return send({
+    to,
+    subject: 'Your FreshAF password was changed',
+    heading: 'Your password was changed',
+    paragraphs: [
+      `Hi ${esc(String(name || '').split(' ')[0] || 'there')},`,
+      'The password on your FreshAF account was just changed, and every other device signed in to your account has been signed out.',
+      'If this was you, there is nothing more to do.',
+      'If it was <strong>not</strong> you, reset your password straight away using the button below, and email <a href="mailto:admin@freshaf.io">admin@freshaf.io</a> so we can check your account.',
+    ],
+    cta: { label: 'Reset my password', url: `${BASE}/reset-password` },
+  });
+}
+
+module.exports = { configured, send, proApplicationReceived, proStatusChanged, adminNewPro,
+  passwordReset, passwordChanged };

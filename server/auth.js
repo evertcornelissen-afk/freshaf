@@ -110,14 +110,37 @@ function bearer(req) {
 // so this changes nothing on the web. In the app it means the identity the app chose is
 // the identity used: a cookie the web view picked up for some earlier account can never
 // quietly take over, and a rejected token is not rescued by falling back to that cookie.
-function readToken(req) {
-  const token = bearer(req) || req.cookies?.[COOKIE_NAME];
+function readSession(req) {
+  const fromHeader = bearer(req);
+  const token = fromHeader || req.cookies?.[COOKIE_NAME];
   if (!token) return null;
   try {
-    return currentUser(jwt.verify(token, JWT_SECRET));
+    const payload = jwt.verify(token, JWT_SECRET);
+    const user = currentUser(payload);
+    return user ? { user, iat: payload.iat || 0, via: fromHeader ? 'bearer' : 'cookie' } : null;
   } catch {
     return null;
   }
+}
+
+function readToken(req) {
+  const s = readSession(req);
+  return s ? s.user : null;
+}
+
+// Sessions slide. A token older than a week is quietly replaced on the next request, so
+// anyone who uses FreshAF at least once a month is never asked to sign in again. A fixed
+// thirty days signed every regular customer out once a month, and a customer who is asked
+// for a password they have long forgotten is a customer who opens a second account or
+// goes elsewhere.
+//
+// The website gets a new cookie. The app gets a new token in the body of /api/auth/me,
+// which it calls on every launch; common.js stores any token it is handed.
+const RENEW_AFTER_SEC = 7 * 24 * 3600;
+function renewIfStale(req, res, s) {
+  if (!s || Date.now() / 1000 - s.iat < RENEW_AFTER_SEC) return null;
+  if (s.via === 'cookie') { setAuthCookie(res, s.user); return null; }
+  return wantsToken(req) ? signUser(s.user) : null;
 }
 
 // A client that cannot use cookies asks for the token explicitly. It is returned ONLY on
@@ -129,12 +152,13 @@ function wantsToken(req) {
 
 function authRequired(...roles) {
   return (req, res, next) => {
-    const payload = readToken(req);
-    if (!payload) return res.status(401).json({ error: 'Not signed in' });
-    if (roles.length && !roles.includes(payload.role)) {
+    const s = readSession(req);
+    if (!s) return res.status(401).json({ error: 'Not signed in' });
+    if (roles.length && !roles.includes(s.user.role)) {
       return res.status(403).json({ error: 'Not allowed for your account type' });
     }
-    req.user = payload;
+    req.user = s.user;
+    renewIfStale(req, res, s);
     next();
   };
 }
@@ -158,5 +182,6 @@ function sseAuth() {
   };
 }
 
-module.exports = { setAuthCookie, clearAuthCookie, readToken, authRequired, signUser,
-  wantsToken, sseAuth, signSseTicket, rotateSession, SSE_SECRET: JWT_SECRET, COOKIE_NAME };
+module.exports = { setAuthCookie, clearAuthCookie, readToken, readSession, renewIfStale,
+  authRequired, signUser, wantsToken, sseAuth, signSseTicket, rotateSession,
+  SSE_SECRET: JWT_SECRET, COOKIE_NAME };

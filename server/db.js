@@ -367,6 +367,19 @@ checkpoint(); // fold in whatever the last run left behind
 addColumn('users', 'session_key TEXT');
 db.exec("UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session_key IS NULL");
 
+// Password reset links. Only a SHA-256 of the token is kept; see routes/auth.js.
+db.exec(`
+CREATE TABLE IF NOT EXISTS password_resets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+`);
+
 // Encrypt any ID or bank details written before a key existed. No-op once clean.
 try {
   require('./secrets').migrate(db);

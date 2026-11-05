@@ -57,8 +57,9 @@ remaining piece and needs card to be live. See **`GETTING-PAID.md`**.
    was: since 26 Oct card payments also require `PAYMENTS_LIVE=true`, which is not set, so stale
    keys can no longer switch card payments on by themselves. Still clear them.
    Claude cannot do it — Render keeps demanding a password.
-2. **Persistent disk.** Still not attached. Customers, suppliers and orders are wiped on every
-   restart or deploy. Nothing can truly launch until this is done.
+2. **Persistent disk — DONE (attached 4 Nov 2026).** Starter plan, 1 GB disk at
+   `/opt/render/project/src/data`. Verified 5 Nov from the boot log: "data/ has survived 18
+   restart(s) since 2026-11-04". Deploys no longer wipe customers, pros or orders.
 3. **Three FICA documents** still missing: proof of business address (<3 months), both directors'
    IDs (both sides), Beneficial Ownership at CIPC (was due ~9 Sept).
 4. **Activate the FNB account** with any deposit — the letter says it never has been.
@@ -83,10 +84,12 @@ remaining piece and needs card to be live. See **`GETTING-PAID.md`**.
 | Code | https://github.com/evertcornelissen-afk/freshaf (public — was made public so Render could fetch it) |
 
 ## Infrastructure
-- **Render** web service `srv-d9eavarrjlhs73c2u3ag`, region Frankfurt. **FREE PLAN.**
-  - ⚠️ **No persistent disk — the database is wiped on every restart/redeploy.** This is the
-    single most important outstanding item. Fix: add a card at dashboard.render.com/billing,
-    then upgrade to Starter + attach a 1 GB disk at `/opt/render/project/src/data`.
+- **Render** web service `srv-d9eavarrjlhs73c2u3ag`, region Frankfurt. **Starter plan.**
+  - **Persistent disk attached 4 Nov 2026** (1 GB at `/opt/render/project/src/data`). The
+    attach started empty, which reset user ids and let pre-4-Nov sign-in cookies open the
+    wrong account; fixed 5 Nov by binding every token to a per-account session key.
+  - A service with a disk cannot do zero-downtime deploys: each deploy is ~1 minute offline.
+    Deploy outside booking hours.
   - **`JWT_SECRET` is now set as a Render environment variable (19 Aug).** Before that, the
     signing secret lived in `data/jwt.secret` on the ephemeral disk, regenerated on every
     deploy, and silently invalidated every login cookie. Env vars survive restarts, so that

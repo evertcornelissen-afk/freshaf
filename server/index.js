@@ -224,6 +224,7 @@ app.get('/payment-complete', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'i
 // public web page, in addition to the in-app one. The URL is submitted in Play Console
 // under Data safety, so it must stay at exactly this path once declared.
 app.get('/delete-account', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'delete-account.html')));
+app.get('/reset-password', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'reset-password.html')));
 app.get('/terms', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'terms.html')));
 app.get('/contact', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'contact.html')));
 app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));

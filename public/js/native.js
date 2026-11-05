@@ -52,7 +52,7 @@
   // maps to .html files. Inside the app there is no Express: the pages are plain files
   // in the bundle, and /terms resolves to nothing. Every one of those links would be a
   // dead tap, which is exactly the sort of thing an App Store reviewer opens first.
-  var CLEAN_URLS = ['supplier', 'terms', 'privacy', 'contact', 'delete-account'];
+  var CLEAN_URLS = ['supplier', 'terms', 'privacy', 'contact', 'delete-account', 'reset-password'];
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest && e.target.closest('a[href]');
     if (!a) return;
