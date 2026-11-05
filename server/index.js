@@ -3,7 +3,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
-const { authRequired } = require('./auth');
+const { authRequired, sseAuth } = require('./auth');
 const realtime = require('./realtime');
 const dispatch = require('./dispatch');
 const push = require('./push');
@@ -15,6 +15,35 @@ if (process.env.NODE_ENV === 'production') {
 }
 app.disable('x-powered-by');
 app.use(require('./security').securityHeaders(path.join(__dirname, '..', 'public')));
+
+// CORS, for the native iOS and Android builds only.
+//
+// Those builds serve the same pages from inside the app binary, so their origin is
+// capacitor://localhost (iOS) or https://localhost (Android) and every API call is
+// cross-origin. An explicit allow-list rather than '*': a wildcard would let any website
+// on the internet call this API from a visitor's browser.
+//
+// No Access-Control-Allow-Credentials, on purpose. The app authenticates with a Bearer
+// token precisely so the cookie never has to travel cross-origin (see server/auth.js),
+// and allowing credentials here would undo that decision by the back door.
+const APP_ORIGINS = new Set([
+  'capacitor://localhost', // iOS
+  'ionic://localhost',     // iOS, older Capacitor
+  'https://localhost',     // Android, androidScheme https
+  'http://localhost',      // Android, androidScheme http
+]);
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+  if (origin && APP_ORIGINS.has(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Vary', 'Origin');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-FreshAF-Client');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    res.set('Access-Control-Max-Age', '86400');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
 // Stitch signs the RAW body, so this one path must not be JSON-parsed. express.json()
 // skips a request whose body a previous parser already set.
 app.use('/api/payments/stitch/webhook', express.raw({ type: '*/*', limit: '1mb' }));
@@ -26,7 +55,7 @@ app.use('/api', require('./routes/orders'));
 app.use('/api/supplier', require('./routes/supplier'));
 app.use('/api/admin', require('./routes/admin'));
 
-app.get('/api/events', authRequired(), realtime.sseHandler);
+app.get('/api/events', sseAuth(), realtime.sseHandler);
 
 // Address autocomplete. Google Places when a key is configured, because OpenStreetMap
 // rarely knows South African house numbers; Photon (OpenStreetMap) otherwise, so the
@@ -181,6 +210,10 @@ app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.h
 // matched byte-for-byte, so this path must exist exactly as registered — no trailing
 // slash, no redirect. It carries ?reference= and ?payment_id=, which the app reads.
 app.get('/payment-complete', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+// Google Play requires an account-deletion route reachable from OUTSIDE the app, as a
+// public web page, in addition to the in-app one. The URL is submitted in Play Console
+// under Data safety, so it must stay at exactly this path once declared.
+app.get('/delete-account', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'delete-account.html')));
 app.get('/terms', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'terms.html')));
 app.get('/contact', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'contact.html')));
 app.get('/privacy', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'privacy.html')));

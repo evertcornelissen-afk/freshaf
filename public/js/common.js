@@ -1,10 +1,43 @@
 // Shared helpers for all FreshAF frontends.
+
+// Where the API lives. On the website this is '' — same origin, as before.
+//
+// Inside the native app it is not. The store builds ship these same HTML, CSS and JS
+// files INSIDE the binary (which is what makes them real apps rather than the website
+// in a frame, and what Apple's guideline 4.2 is looking for), so the page origin is
+// capacitor://localhost, not freshaf.io, and a relative /api/... would resolve to the
+// bundle instead of the server. The native shell sets window.FRESHAF_API_BASE before
+// any of this runs; see mobile/README.md.
+//
+// credentials follows from the same fact: 'same-origin' on the web keeps the session
+// cookie exactly as strict as it is today, and 'include' is required in the app because
+// the request genuinely is cross-origin there.
+const API_BASE = (typeof window !== 'undefined' && window.FRESHAF_API_BASE) || '';
+const API_CREDENTIALS = API_BASE ? 'include' : 'same-origin';
+
+function apiUrl(path) {
+  // Absolute URLs (the payment hand-off) are passed through untouched.
+  if (!API_BASE || /^https?:\/\//i.test(path)) return path;
+  return API_BASE.replace(/\/$/, '') + path;
+}
+
+// In the native app the session is a Bearer token, not a cookie, because the page origin
+// is capacitor://localhost and the cookie is SameSite=lax. X-FreshAF-Client is what makes
+// the server return a token on sign-in at all — it is never handed to a browser.
+function authHeaders() {
+  if (!window.FRESHAF_NATIVE) return {};
+  const h = { 'X-FreshAF-Client': 'native' };
+  const t = window.FreshAFNative && window.FreshAFNative.getToken();
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
+}
+
 async function api(path, opts = {}) {
   let res;
   try {
-    res = await fetch(path, {
-      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
-      credentials: 'same-origin',
+    res = await fetch(apiUrl(path), {
+      headers: { ...(opts.body ? { 'Content-Type': 'application/json' } : {}), ...authHeaders() },
+      credentials: API_CREDENTIALS,
       signal: AbortSignal.timeout(75000),
       ...opts,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -15,6 +48,14 @@ async function api(path, opts = {}) {
   }
   let data = {};
   try { data = await res.json(); } catch { /* empty body */ }
+
+  // Session handling for the app, done once here rather than at every sign-in call site:
+  // a missed one would leave the user signed out again on the next cold start, which is
+  // the kind of bug that only shows up on a real device a day later.
+  if (window.FRESHAF_NATIVE && window.FreshAFNative) {
+    if (data && data.token) window.FreshAFNative.setToken(data.token);
+    else if (/\/api\/auth\/(logout|delete-account)$/.test(path)) window.FreshAFNative.setToken(null);
+  }
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
@@ -415,15 +456,37 @@ function statusPillClass(s) {
 }
 
 // SSE with auto-reconnect.
+//
+// On the web this is a plain same-origin EventSource and the cookie does the work. In the
+// app it cannot be: EventSource takes no headers, so there is nowhere to put the Bearer
+// token. A sixty-second ticket is fetched instead — short enough that a URL appearing in
+// a proxy log is worthless by the time anyone reads it. The ticket is re-fetched on every
+// reconnect, since by then the previous one has certainly expired.
 function connectEvents(handlers) {
   let es;
-  function open() {
-    es = new EventSource('/api/events');
+  let closed = false;
+
+  function attach(url) {
+    es = new EventSource(url);
     for (const [event, fn] of Object.entries(handlers)) es.addEventListener(event, (e) => fn(JSON.parse(e.data || '{}')));
-    es.onerror = () => { es.close(); setTimeout(open, 3000); };
+    es.onerror = () => { es.close(); if (!closed) setTimeout(open, 3000); };
   }
+
+  async function open() {
+    if (closed) return;
+    if (!window.FRESHAF_NATIVE) return attach(apiUrl('/api/events'));
+    try {
+      const { ticket } = await api('/api/auth/sse-ticket');
+      attach(`${apiUrl('/api/events')}?ticket=${encodeURIComponent(ticket)}`);
+    } catch {
+      // Signed out, or offline. Retrying is right: the stream is how the app learns a
+      // Pro accepted the job, so giving up leaves the screen silently stale.
+      if (!closed) setTimeout(open, 5000);
+    }
+  }
+
   open();
-  return () => es && es.close();
+  return () => { closed = true; if (es) es.close(); };
 }
 
 // Light / dark theme slider (theme is applied pre-paint by the inline head script).

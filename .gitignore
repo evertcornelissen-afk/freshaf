@@ -6,3 +6,16 @@ data/
 # Local Netlify folder
 .netlify
 backups/
+
+# Capacitor copies public/ into the native projects on `cap sync`. The native project
+# scaffolding IS committed (the iOS one has to be opened on a Mac, so it must travel),
+# but these copies are build output and would duplicate the whole site on every sync.
+android/app/src/main/assets/public/
+ios/App/App/public/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+ios/App/Pods/
+ios/App/Podfile.lock
+ios/App/App.xcworkspace/

@@ -88,6 +88,63 @@ const BASE = `http://127.0.0.1:${PORT}`;
     });
     check('register uses its own budget, not login\'s', reg.status !== 429, true);
 
+    // ---- native app auth (iOS / Android) ----------------------------------
+    // The app cannot use the session cookie, so it carries a Bearer token. Two things
+    // must stay true forever: a BROWSER must never be handed that token in a JSON body
+    // (that is what httpOnly protects against), and the app must be able to open the
+    // live-updates stream without putting a 30-day token in a URL.
+    const email = `native-${Date.now()}@example.test`;
+    const password = 'TestPass!2026';
+    const created = await fetch(`${BASE}/api/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'customer', name: 'Native Test', email, password,
+        phone: '0780000000', accept_terms: true, home_address: '1 Test Road, Durbanville',
+        home_lat: -33.83, home_lng: 18.65 }),
+    });
+    check('test account created', created.status, 200);
+
+    const signIn = (headers) => fetch(`${BASE}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ email, password }),
+    }).then((r) => r.json());
+
+    const web = await signIn({});
+    check('web sign-in succeeds', web.user?.name, 'Native Test');
+    check('web sign-in does NOT leak a token into JSON', 'token' in web, false);
+
+    const nat = await signIn({ 'X-FreshAF-Client': 'native' });
+    check('native sign-in returns a token', typeof nat.token === 'string' && nat.token.length > 50, true);
+
+    const me = await fetch(`${BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${nat.token}` },
+    }).then((r) => r.json());
+    check('Bearer token authenticates', me.user?.name, 'Native Test');
+
+    const bad = await fetch(`${BASE}/api/auth/me`, { headers: { Authorization: 'Bearer nonsense' } })
+      .then((r) => r.json());
+    check('a forged Bearer token authenticates nobody', bad.user, null);
+
+    const ticketRes = await fetch(`${BASE}/api/auth/sse-ticket`, {
+      headers: { Authorization: `Bearer ${nat.token}` },
+    });
+    const { ticket } = await ticketRes.json();
+    check('stream ticket issued to a signed-in app', typeof ticket === 'string' && ticket.length > 50, true);
+    check('stream ticket refused when signed out', (await fetch(`${BASE}/api/auth/sse-ticket`)).status, 401);
+
+    const streamBad = await fetch(`${BASE}/api/events?ticket=garbage`);
+    check('stream refuses a forged ticket', streamBad.status, 401);
+    streamBad.body?.cancel?.();
+
+    // ---- CORS -------------------------------------------------------------
+    const corsApp = await fetch(`${BASE}/api/pricing`, { headers: { Origin: 'capacitor://localhost' } });
+    check('the app origin is allowed', corsApp.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+    // The reason the allow-list is not '*': any website could otherwise call this API
+    // from a visitor's browser.
+    const corsEvil = await fetch(`${BASE}/api/pricing`, { headers: { Origin: 'https://evil.example' } });
+    check('an unknown origin is NOT allowed', corsEvil.headers.get('access-control-allow-origin'), null);
+    check('credentials are never allowed cross-origin',
+      corsApp.headers.get('access-control-allow-credentials'), null);
+
     const passed = checks.filter(Boolean).length;
     console.log(`\n${passed}/${checks.length} ${passed === checks.length ? 'PASS' : 'FAIL'}`);
     if (passed !== checks.length) {

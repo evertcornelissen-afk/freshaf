@@ -1,10 +1,12 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { db } = require('../db');
-const { setAuthCookie, clearAuthCookie, readToken, authRequired } = require('../auth');
+const { setAuthCookie, clearAuthCookie, readToken, authRequired, signUser, wantsToken } = require('../auth');
 const mailer = require('../mailer');
 const secrets = require('../secrets');
 const { rateLimit, forgive } = require('../ratelimit');
+const jwt = require('jsonwebtoken');
+const { SSE_SECRET } = require('../auth');
 
 const router = express.Router();
 
@@ -152,7 +154,8 @@ router.post('/register', registerLimit, (req, res) => {
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   setAuthCookie(res, user);
-  res.json({ user: mePayload(user) });
+  // The app gets a Bearer token because it cannot receive the cookie; see server/auth.js.
+  res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signUser(user) } : {}) });
 });
 
 router.post('/login', loginByIp, loginByEmail, (req, res) => {
@@ -165,7 +168,20 @@ router.post('/login', loginByIp, loginByEmail, (req, res) => {
   // address is not locked out by whoever fumbled their password first this morning.
   forgive('login-ip', req);
   setAuthCookie(res, user);
-  res.json({ user: mePayload(user) });
+  // The app gets a Bearer token because it cannot receive the cookie; see server/auth.js.
+  res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signUser(user) } : {}) });
+});
+
+// EventSource cannot send an Authorization header, so the native app cannot open the
+// live-updates stream the way it makes every other call. The usual workaround is to put
+// the session token in the query string, but URLs end up in access logs and proxy logs,
+// and that token is good for thirty days.
+//
+// This hands out a separate ticket that is valid for sixty seconds and only for the
+// stream. If it leaks into a log it is already expired by the time anyone reads it.
+router.get('/sse-ticket', authRequired('customer', 'supplier'), (req, res) => {
+  res.json({ ticket: jwt.sign({ id: req.user.id, role: req.user.role, sse: true },
+    SSE_SECRET, { expiresIn: '60s' }) });
 });
 
 router.post('/logout', (req, res) => {
