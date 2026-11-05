@@ -376,6 +376,14 @@ addColumn('users', 'is_demo INTEGER NOT NULL DEFAULT 0');
 // Last order status the customer was emailed about, so a confirmation or receipt can never
 // be sent twice however many times the status is re-announced.
 addColumn('orders', 'emailed_status TEXT');
+// Cancellations and refunds. payment_status keeps its original CHECK list (changing a CHECK
+// means rebuilding the live table), so money owed back is recorded here instead: a card
+// order that was paid and then cancelled carries refund_due_cents until it is refunded.
+addColumn('orders', 'cancelled_by TEXT');
+addColumn('orders', 'cancel_reason TEXT');
+addColumn('orders', 'cancelled_at TEXT');
+addColumn('orders', 'refund_due_cents INTEGER NOT NULL DEFAULT 0');
+addColumn('orders', 'refunded_at TEXT');
 db.exec(`
 DROP VIEW IF EXISTS real_orders;
 CREATE VIEW real_orders AS

@@ -226,6 +226,34 @@ async function refreshSuppliers() {
     </tr>`).join('') + '</tbody></table>';
 }
 
+window.adminCancel = async (id) => {
+  try {
+    const reason = await modal({
+      title: `Cancel order #${id}?`,
+      body: 'The customer is emailed with your reason and the pro is told not to go. If it was paid by card, the refund is recorded as owed and you are emailed.',
+      input: 'Reason (the customer sees this)', confirmText: 'Cancel order', danger: true,
+    });
+    if (reason === null) return;
+    const r = await api(`/api/admin/orders/${id}/cancel`, { method: 'POST', body: { reason } });
+    toast(r.refund_due_cents > 0 ? `Cancelled. Refund owed: ${rand(r.refund_due_cents)}` : 'Order cancelled', 'ok');
+    await Promise.all([refreshOrders(), refreshStats()]);
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.markRefunded = async (id, cents) => {
+  try {
+    const ok = await modal({
+      title: `Mark ${rand(cents)} as refunded?`,
+      body: 'Only after you have actually refunded it in the Stitch dashboard. The customer is emailed that the refund is on its way.',
+      confirmText: 'Mark refunded',
+    });
+    if (!ok) return;
+    await api(`/api/admin/orders/${id}/refunded`, { method: 'POST' });
+    toast('Refund recorded and customer emailed', 'ok');
+    await Promise.all([refreshOrders(), refreshStats()]);
+  } catch (e) { toast(e.message, 'error'); }
+};
+
 window.setDemo = async (id, makeDemo) => {
   try {
     const ok = await modal({
@@ -323,7 +351,7 @@ async function refreshOrders() {
   const { orders } = await api('/api/admin/orders');
   if (!orders.length) { el('orders-box').innerHTML = '<p class="empty">No orders yet.</p>'; return; }
   el('orders-box').innerHTML = `<table><thead><tr>
-      <th>Order</th><th>Service</th><th>Customer</th><th>Supplier</th><th>Package</th><th>Total</th><th>Fee</th><th>Payment</th><th>Status</th>
+      <th>Order</th><th>Service</th><th>Customer</th><th>Supplier</th><th>Package</th><th>Total</th><th>Fee</th><th>Payment</th><th>Status</th><th></th>
     </tr></thead><tbody>` + orders.map((o) => `<tr>
       <td>#${o.id}</td>
       <td><span class="pill ${o.service === 'laundry' ? 'ok' : 'warn'}">${serviceName(o.service)}</span></td>
@@ -331,7 +359,13 @@ async function refreshOrders() {
       <td>${o.package.replace(/_/g, ' ')} / ${o.vehicle}</td>
       <td>${rand(o.price_cents)}</td><td>${o.commission_cents ? rand(o.commission_cents) : '—'}</td>
       <td class="muted small-text">${o.payment_method} · ${o.payment_status.replace(/_/g, ' ')}</td>
-      <td><span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status, o.service)}</span></td>
+      <td><span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status, o.service)}</span>
+        ${o.refund_due_cents > 0 ? `<br><span class="pill bad" style="margin-top:5px">refund due ${rand(o.refund_due_cents)}</span>` : ''}
+        ${o.status === 'cancelled' && o.cancelled_by ? `<div class="muted small-text">by ${escapeHtml(o.cancelled_by)}${o.cancel_reason ? `: ${escapeHtml(o.cancel_reason)}` : ''}</div>` : ''}</td>
+      <td><div class="row" style="flex-wrap:nowrap">
+        ${!['completed', 'cancelled'].includes(o.status) ? `<button class="danger small" onclick="adminCancel(${o.id})">Cancel</button>` : ''}
+        ${o.refund_due_cents > 0 ? `<button class="small" onclick="markRefunded(${o.id}, ${o.refund_due_cents})">Mark refunded</button>` : ''}
+      </div></td>
     </tr>`).join('') + '</tbody></table>';
 }
 

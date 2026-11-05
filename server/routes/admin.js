@@ -174,6 +174,30 @@ router.post('/suppliers/:id/approve', (req, res) => setSupplierStatus(req, res, 
 router.post('/suppliers/:id/reject', (req, res) => setSupplierStatus(req, res, 'rejected'));
 router.post('/suppliers/:id/suspend', (req, res) => setSupplierStatus(req, res, 'suspended'));
 
+// Cancel any order that is not finished, with a reason the customer will see. Refunds owed
+// on card orders are recorded and flagged; see dispatch.cancelOrder.
+router.post('/orders/:id/cancel', (req, res) => {
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) return res.status(400).json({ error: 'Give a reason. The customer will see it.' });
+  const done = require('../dispatch').cancelOrder(Number(req.params.id), { by: 'admin', reason: reason.slice(0, 300) });
+  if (!done) return res.status(409).json({ error: 'That order is already finished or cancelled' });
+  res.json({ ok: true, refund_due_cents: done.refund_due_cents });
+});
+
+// Record that a refund owed has been paid back (in the Stitch dashboard). The customer
+// is told it is on its way.
+router.post('/orders/:id/refunded', (req, res) => {
+  const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  if (!o) return res.status(404).json({ error: 'Order not found' });
+  if (!(o.refund_due_cents > 0)) return res.status(409).json({ error: 'No refund is owed on this order' });
+  db.prepare(`UPDATE orders SET payment_status = 'refunded', refunded_at = datetime('now'),
+    refund_due_cents = 0 WHERE id = ?`).run(o.id);
+  const c = db.prepare('SELECT name, email FROM users WHERE id = ?').get(o.customer_id);
+  if (c?.email) mailer.refundSent({ to: c.email, name: c.name, orderId: o.id, refundCents: o.refund_due_cents }).catch(() => {});
+  console.log(`[FreshAF] Refund of R${(o.refund_due_cents / 100).toFixed(2)} recorded for order ${o.id}`);
+  res.json({ ok: true });
+});
+
 router.get('/orders', (req, res) => {
   const rows = db.prepare(`
     SELECT o.*, cu.name AS customer_name, su.name AS supplier_name
@@ -356,6 +380,8 @@ router.get('/stats', (req, res) => {
     orders_carwash: db.prepare("SELECT COUNT(*) c FROM real_orders WHERE service = 'carwash'").get().c,
     orders_laundry: db.prepare("SELECT COUNT(*) c FROM real_orders WHERE service = 'laundry'").get().c,
     revenue_cents: db.prepare("SELECT COALESCE(SUM(commission_cents),0) c FROM real_orders WHERE status = 'completed'").get().c,
+    refunds_due: db.prepare('SELECT COUNT(*) c FROM real_orders WHERE refund_due_cents > 0').get().c,
+    refunds_due_cents: db.prepare('SELECT COALESCE(SUM(refund_due_cents),0) c FROM real_orders').get().c,
   };
   res.json(stats);
 });

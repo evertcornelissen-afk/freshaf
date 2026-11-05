@@ -51,7 +51,7 @@ function notifyCustomer(order) {
 // Booking confirmed when a pro takes the job, receipt when it is done. Everything else
 // (on the way, started) is shown live in the app, where the customer is looking anyway.
 function emailCustomer(order) {
-  if (!['accepted', 'completed'].includes(order.status)) return;
+  if (!['accepted', 'completed', 'no_providers'].includes(order.status)) return;
   try {
     const claimed = db.prepare(`UPDATE orders SET emailed_status = ?
       WHERE id = ? AND COALESCE(emailed_status, '') != ?`).run(order.status, order.id, order.status).changes;
@@ -78,7 +78,8 @@ function emailCustomer(order) {
       completedAt: fresh.completed_at,
     };
     const mailer = require('./mailer');
-    const send = fresh.status === 'accepted' ? mailer.bookingConfirmed : mailer.receipt;
+    const send = fresh.status === 'accepted' ? mailer.bookingConfirmed
+      : fresh.status === 'completed' ? mailer.receipt : mailer.noProAvailable;
     send({ to: customer.email, name: customer.name, ...details }).catch(() => {});
   } catch (e) {
     console.warn(`[FreshAF] Could not email order ${order.id}: ${e.message}`);
@@ -191,6 +192,75 @@ function withdrawPendingOffers(orderId, exceptOfferId = null) {
   }
 }
 
+// The one way an order is cancelled, whoever does it: the customer, an admin, or the
+// clock (a card checkout never finished). Every path gets the same treatment: offers
+// withdrawn, rewards points given back, the pro told, and any card money owed back
+// recorded and flagged to the admin by email. Returns the cancelled order, or null if
+// it was already finished or cancelled.
+function cancelOrder(orderId, { by = 'customer', reason = null } = {}) {
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  if (!order || ['completed', 'cancelled'].includes(order.status)) return null;
+  withdrawPendingOffers(order.id);
+  const refundDue = order.payment_method === 'card' && order.payment_status === 'paid'
+    ? order.price_cents - (order.points_used_cents || 0) : 0;
+  db.prepare(`UPDATE orders SET status = 'cancelled', cancelled_by = ?, cancel_reason = ?,
+    cancelled_at = datetime('now'), refund_due_cents = ? WHERE id = ?`)
+    .run(by, reason, refundDue, order.id);
+  if (order.points_used_cents > 0) {
+    db.prepare('UPDATE users SET points_cents = points_cents + ? WHERE id = ?')
+      .run(order.points_used_cents, order.customer_id);
+  }
+  if (order.supplier_id) {
+    realtime.send(order.supplier_id, 'job_cancelled', { order_id: order.id });
+    push.sendToUser(order.supplier_id, {
+      title: 'Job cancelled', body: `Order #${order.id} at ${order.address} was cancelled. You do not need to go.`,
+      url: '/supplier', tag: `job-${order.id}`,
+    }).catch(() => {});
+  }
+  const fresh = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  notifyCustomer(fresh); // live update in the app; cancellations are emailed below
+
+  try {
+    const mailer = require('./mailer');
+    const customer = db.prepare('SELECT name, email FROM users WHERE id = ?').get(order.customer_id);
+    // A customer who cancels does not need telling, unless money is coming back to them.
+    if (customer?.email && !customer.email.endsWith('@freshaf.invalid') && (by !== 'customer' || refundDue > 0)) {
+      mailer.orderCancelled({ to: customer.email, name: customer.name, orderId: order.id,
+        by, reason, refundCents: refundDue }).catch(() => {});
+    }
+    if (refundDue > 0) {
+      mailer.adminAlert({
+        subject: `Refund due: order #${order.id}`,
+        lines: [
+          `Order #${order.id} was paid by card and then cancelled (by ${by}${reason ? `: ${reason}` : ''}).`,
+          `Refund owed: R${(refundDue / 100).toFixed(2)}. Stitch payment reference: ${order.payment_ref || 'see Stitch'}.`,
+          'Refund it in the Stitch dashboard, then press "Mark refunded" on the order in the admin app.',
+        ],
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.warn(`[FreshAF] Cancellation emails for order ${order.id} failed: ${e.message}`);
+  }
+  console.log(`[FreshAF] Order ${order.id} cancelled by ${by}${refundDue ? `; refund due R${(refundDue / 100).toFixed(2)}` : ''}`);
+  return fresh;
+}
+
+// A card checkout left unfinished holds the order "awaiting payment" forever, and the
+// customer cannot book that service again until it is gone. The Stitch payment link
+// itself expires after 60 minutes, so at 65 nobody can still be paying: cancel it.
+const PAYMENT_WINDOW_MIN = 65;
+function expireUnpaidOrders() {
+  try {
+    const rows = db.prepare(`SELECT id FROM orders WHERE status = 'pending_payment'
+      AND created_at < datetime('now', ?)`).all(`-${PAYMENT_WINDOW_MIN} minutes`);
+    for (const r of rows) cancelOrder(r.id, { by: 'expired', reason: 'Payment was not completed' });
+  } catch (e) {
+    console.warn(`[FreshAF] Expiring unpaid orders failed: ${e.message}`);
+  }
+}
+setTimeout(expireUnpaidOrders, 15_000).unref();
+setInterval(expireUnpaidOrders, 60_000).unref();
+
 // Re-dispatch orders left searching after a restart (offers in flight died with the process).
 function resumeSearchingOrders() {
   const rows = db.prepare("SELECT id FROM orders WHERE status = 'searching'").all();
@@ -204,4 +274,5 @@ function resumeSearchingOrders() {
 module.exports = {
   startDispatch, offerToNext, clearOfferTimer, withdrawPendingOffers,
   resumeSearchingOrders, notifyCustomer, orderPublic, haversineKm,
+  cancelOrder, expireUnpaidOrders,
 };

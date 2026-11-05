@@ -487,6 +487,28 @@ router.post('/payments/stitch/webhook', async (req, res) => {
 
   // Svix retries until it gets a 2xx, so this has to be safe to run twice.
   if (order.payment_status === 'paid') return res.send('ok');
+
+  // Money for an order that is already cancelled: the customer finished paying after the
+  // checkout expired or after cancelling. It must go back, and someone must be told.
+  if (order.status === 'cancelled') {
+    const amount = event.amountCents ?? expected;
+    db.prepare("UPDATE orders SET payment_status = 'paid', refund_due_cents = ? WHERE id = ?").run(amount, order.id);
+    const mailer = require('../mailer');
+    mailer.adminAlert({
+      subject: `Refund due: payment arrived for cancelled order #${order.id}`,
+      lines: [
+        `Stitch confirmed R${(amount / 100).toFixed(2)} for order #${order.id}, which was already cancelled (${order.cancelled_by || 'unknown'}).`,
+        `Stitch payment: ${event.paymentId}. Refund it in the Stitch dashboard, then press "Mark refunded" in the admin app.`,
+      ],
+    }).catch(() => {});
+    const customer = db.prepare('SELECT name, email FROM users WHERE id = ?').get(order.customer_id);
+    if (customer?.email) {
+      mailer.orderCancelled({ to: customer.email, name: customer.name, orderId: order.id,
+        by: 'late_payment', reason: null, refundCents: amount }).catch(() => {});
+    }
+    console.warn(`[FreshAF] Payment arrived for cancelled order ${order.id}; refund due.`);
+    return res.send('ok');
+  }
   db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(order.id);
   if (order.status === 'pending_payment') afterPayment(order.id);
   console.log(`[FreshAF] Stitch confirmed payment for order ${order.id}.`);
@@ -510,14 +532,8 @@ router.post('/orders/:id/cancel', authRequired('customer'), (req, res) => {
   if (!['pending_payment', 'searching', 'no_providers', 'accepted'].includes(order.status)) {
     return res.status(400).json({ error: 'This order can no longer be cancelled' });
   }
-  dispatch.withdrawPendingOffers(order.id);
-  db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(order.id);
-  if (order.points_used_cents > 0) {
-    db.prepare('UPDATE users SET points_cents = points_cents + ? WHERE id = ?')
-      .run(order.points_used_cents, order.customer_id);
-  }
-  if (order.supplier_id) realtime.send(order.supplier_id, 'job_cancelled', { order_id: order.id });
-  res.json({ ok: true });
+  const done = dispatch.cancelOrder(order.id, { by: 'customer' });
+  res.json({ ok: true, refund_due_cents: done?.refund_due_cents || 0 });
 });
 
 // Retry dispatch after no providers were found.

@@ -213,6 +213,58 @@ function receipt(o) {
   });
 }
 
+function orderCancelled({ to, name, orderId, by, reason, refundCents }) {
+  const why = {
+    expired: 'The card payment for it was not completed within the hour, so we released the booking.',
+    admin: `FreshAF cancelled it${reason ? `: ${esc(reason)}` : '.'}`,
+    customer: 'You cancelled it.',
+    late_payment: 'Your card payment came through after the booking had already been released.',
+  }[by] || 'It has been cancelled.';
+  const paras = [`Hi ${firstName(name)},`, `Your FreshAF booking #${orderId} is cancelled. ${why}`];
+  if (refundCents > 0) {
+    paras.push(`<strong>${rand(refundCents)} is being refunded to your card.</strong> We will email you as soon as it is sent. Banks usually show it within 5 to 10 working days after that.`);
+  } else if (by === 'expired') {
+    paras.push('No money was taken. You can book again at any time.');
+  }
+  paras.push('Questions? Reply to this email.');
+  return send({
+    to, subject: `Cancelled: booking #${orderId}`, heading: 'Your booking is cancelled', paragraphs: paras,
+    cta: { label: 'Book again', url: `${BASE}/` },
+  });
+}
+
+function noProAvailable({ to, name, orderId, service }) {
+  return send({
+    to,
+    subject: `No pro available yet: ${service} #${orderId}`,
+    heading: 'Your pro could not take this one',
+    paragraphs: [
+      `Hi ${firstName(name)},`,
+      `The pro you chose for booking #${orderId} could not take it right now. Nothing has been charged for the job itself.`,
+      'Open your booking to try again, or pick another pro near you.',
+    ],
+    cta: { label: 'Open my booking', url: `${BASE}/?track=${orderId}` },
+  });
+}
+
+function refundSent({ to, name, orderId, refundCents }) {
+  return send({
+    to,
+    subject: `Refund sent: booking #${orderId}`,
+    heading: 'Your refund is on its way',
+    paragraphs: [
+      `Hi ${firstName(name)},`,
+      `We have refunded <strong>${rand(refundCents)}</strong> for booking #${orderId} to the card you paid with. Banks usually show it within 5 to 10 working days.`,
+      'Questions? Reply to this email.',
+    ],
+  });
+}
+
+// Operational alerts to the FreshAF inbox: refunds owed, payments that need a person.
+function adminAlert({ subject, lines }) {
+  return send({ to: ADMIN_TO, subject: `[FreshAF] ${subject}`, heading: subject, paragraphs: lines.map(esc) });
+}
+
 function passwordReset({ to, name, url, minutes }) {
   return send({
     to,
@@ -246,4 +298,4 @@ function passwordChanged({ to, name }) {
 
 // layout is exported so an email can be rendered and looked at before it is sent.
 module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
-  passwordReset, passwordChanged, bookingConfirmed, receipt };
+  passwordReset, passwordChanged, bookingConfirmed, receipt, orderCancelled, noProAvailable, refundSent, adminAlert };
