@@ -19,3 +19,7 @@ android/local.properties
 ios/App/Pods/
 ios/App/Podfile.lock
 ios/App/App.xcworkspace/
+
+forms/
+# Documents we send to pros are built into the Desktop FreshAF folder (see marketing/outdir.py),
+# so there is exactly one copy of each on disk and it is the one that gets emailed.

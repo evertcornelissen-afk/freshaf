@@ -4,19 +4,37 @@
 
 ## Where the documents live
 
-`python marketing/make-questionnaire.py` builds both versions into **`freshaf/forms/`**, which is
-the only place they live — there is deliberately no Desktop copy, so an out-of-date form cannot be
-attached to an email by accident after the terms change.
+Everything we send a pro is built into **`C:\Users\Evert\Desktop\FreshAF`** — the working
+business folder, not this repo. The scripts that build them live here, so the wording stays
+under version control, but only one copy of each document exists on disk and it is the copy
+that gets emailed. That is deliberate: a second copy somewhere else is a copy that still says
+10% after the terms change.
+
+Change the destination in `marketing/outdir.py`.
 
 | File | Use |
 |---|---|
-| `FreshAF Pro Vetting Questionnaire (fillable).pdf` | **Send this one.** 48 typed fields and 82 tick boxes; the Pro completes it on a phone or laptop and emails it back without printing anything. The six "For FreshAF use only" fields are locked. |
-| `FreshAF Pro Vetting Questionnaire.pdf` | The flat version, for printing and completing by hand. |
-| `FreshAF Pro Brochure - Car Wash.pdf` / `- Laundry.pdf` | Sent first, before the questionnaire. Built by `marketing/make-brochures.py`. |
+| `FreshAF Pro Vetting Questionnaire.xlsx` | **Send this one.** Dropdowns for every fixed choice, yellow cells for everything else, an example column, and a **Load** sheet that turns a completed form into the exact row the `suppliers` table takes. |
+| `FreshAF Pro Vetting Questionnaire (fillable).pdf` | For a pro who would rather not open Excel. 48 typed fields, 82 tick boxes, the six "For FreshAF use only" fields locked. |
+| `FreshAF Pro Vetting Questionnaire.pdf` | Flat version, for printing and completing by hand. |
+| `FreshAF Pro Brochure - Car Wash.pdf` / `- Laundry.pdf` | Sent first, before the questionnaire. |
 
-Field names in the fillable PDF are taken from the printed labels (`p1_Full_name_as_on_ID`,
-`p1_Mobile_number`, …), so a returned form can be read straight into the bulk loader rather than
-retyped.
+Rebuild:
+
+```
+python marketing/make-questionnaire.py        # flat PDF + fillable PDF
+python marketing/make-questionnaire-xlsx.py   # the Excel form
+python marketing/make-brochures.py            # both brochures
+```
+
+**Bank account numbers are not asked for on any of these forms.** A pro enters banking details
+in the app, where they are encrypted at rest. The forms ask only for the bank and the account
+holder's name, which is what we need in order to check it matches the ID. A spreadsheet that
+travels by email is not a safe place for an account number.
+
+**Answer cells in the workbook are formatted as Text on purpose.** A 13-digit SA ID number typed
+into a General cell becomes `8.80513E+12` and the real number is gone; a phone number loses its
+leading zero.
 
 ## The steps
 

@@ -5,8 +5,10 @@ import base64, os, subprocess, tempfile
 ROOT = r"C:\Users\Evert\Desktop\local Session\freshaf"
 DESK = r"C:\Users\Evert\Desktop"
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-FORMS = os.path.join(ROOT, "forms")
-os.makedirs(FORMS, exist_ok=True)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from outdir import outdir
+FORMS = outdir()
 # The repo is the only home for the form, so there is never a second copy lying
 # around that can be mailed out after the terms change.
 PDF = os.path.join(FORMS, "FreshAF Pro Vetting Questionnaire.pdf")

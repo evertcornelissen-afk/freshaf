@@ -16,7 +16,10 @@ import os, re, sys
 import pymupdf
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FORMS = os.path.join(ROOT, "forms")
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from outdir import outdir
+FORMS = outdir()
 SRC = os.path.join(FORMS, "FreshAF Pro Vetting Questionnaire.pdf")
 OUT = os.path.join(FORMS, "FreshAF Pro Vetting Questionnaire (fillable).pdf")
 

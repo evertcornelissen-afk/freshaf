@@ -3,8 +3,10 @@ import base64, os, subprocess, sys
 ROOT = r"C:\Users\Evert\Desktop\local Session\freshaf"
 OUT = r"C:\Users\Evert\AppData\Local\Temp\brochure"
 DESK = r"C:\Users\Evert\Desktop"
-FORMS = os.path.join(ROOT, "forms")
-os.makedirs(FORMS, exist_ok=True)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from outdir import outdir
+FORMS = outdir()
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 def b64(rel, mime):
