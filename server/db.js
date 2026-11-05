@@ -367,6 +367,21 @@ checkpoint(); // fold in whatever the last run left behind
 addColumn('users', 'session_key TEXT');
 db.exec("UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session_key IS NULL");
 
+// Demo accounts, for App Store / Play reviewers and for testing on the live site. A demo
+// customer is only ever matched with demo pros and the other way round, so a reviewer's
+// test booking can never send a real pro out to a real address, and a real customer can
+// never be sent a pretend pro. Demo card payments use the test page and never charge a
+// card. Demo accounts are left out of every business figure (see the real_* views).
+addColumn('users', 'is_demo INTEGER NOT NULL DEFAULT 0');
+db.exec(`
+DROP VIEW IF EXISTS real_orders;
+CREATE VIEW real_orders AS
+  SELECT * FROM orders WHERE customer_id NOT IN (SELECT id FROM users WHERE is_demo = 1);
+DROP VIEW IF EXISTS real_suppliers;
+CREATE VIEW real_suppliers AS
+  SELECT * FROM suppliers WHERE user_id NOT IN (SELECT id FROM users WHERE is_demo = 1);
+`);
+
 // Native app push tokens (APNs / FCM); see server/native-push.js.
 db.exec(`
 CREATE TABLE IF NOT EXISTS device_tokens (

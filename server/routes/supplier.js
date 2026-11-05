@@ -242,7 +242,8 @@ router.get('/quote-requests', requireApproved, (req, res) => {
     FROM quote_requests r
     LEFT JOIN quotes q ON q.request_id = r.id AND q.supplier_id = ?
     WHERE r.status = 'open' AND datetime('now') <= r.expires_at
-    ORDER BY r.id DESC LIMIT 40`).all(req.user.id);
+      AND (SELECT is_demo FROM users WHERE id = r.customer_id) = (SELECT is_demo FROM users WHERE id = ?)
+    ORDER BY r.id DESC LIMIT 40`).all(req.user.id, req.user.id);
 
   const requests = rows.filter((r) => mine.includes(r.service)).map((r) => {
     const distance = dispatch.haversineKm(r.lat, r.lng, me.lat, me.lng);
@@ -281,7 +282,10 @@ router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
   if (!me || !me.online || me.lat == null) return res.status(400).json({ error: 'Go online before quoting' });
   if (balance.isBlocked(req.user.id)) return res.status(402).json({ error: balance.blockedMessage(req.user.id) });
 
-  const request = db.prepare("SELECT * FROM quote_requests WHERE id = ? AND status = 'open'").get(req.params.id);
+  // Same demo rule as the list: a request id typed by hand does not cross the line.
+  const request = db.prepare(`SELECT * FROM quote_requests r WHERE r.id = ? AND r.status = 'open'
+    AND (SELECT is_demo FROM users WHERE id = r.customer_id) = (SELECT is_demo FROM users WHERE id = ?)`)
+    .get(req.params.id, req.user.id);
   if (!request) return res.status(409).json({ error: 'That request is no longer open' });
   const expired = db.prepare("SELECT datetime('now') > ? AS x").get(request.expires_at).x;
   if (expired) return res.status(409).json({ error: 'That request has expired' });

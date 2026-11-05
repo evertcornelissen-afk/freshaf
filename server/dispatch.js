@@ -59,10 +59,11 @@ function offerToNext(orderId) {
     SELECT s.user_id, s.lat, s.lng FROM suppliers s
     WHERE s.user_id = ? AND s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
       AND s.user_id NOT IN (SELECT supplier_id FROM offers WHERE order_id = ?)
+      AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)
       AND s.user_id NOT IN (
         SELECT supplier_id FROM orders
         WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
-  `).all(order.requested_supplier_id, orderId)
+  `).all(order.requested_supplier_id, orderId, order.customer_id)
     .map((s) => ({ ...s, distance: haversineKm(order.lat, order.lng, s.lat, s.lng) }))
     .filter((s) => s.distance <= radiusKm)
     .sort((a, b) => a.distance - b.distance);

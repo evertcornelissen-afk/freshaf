@@ -27,10 +27,11 @@ router.get('/pricing', (req, res) => {
 // right. Straight-line distance picks the candidate (free); the road distance only
 // prices the one pro who would actually drive. Falls back to straight-line if the
 // lookup fails — a slightly wrong fee beats refusing to quote.
-async function computeCallout(lat, lng, service) {
+async function computeCallout(lat, lng, service, customerId) {
   const sups = db.prepare(
-    `SELECT lat, lng FROM suppliers WHERE status = 'approved' AND online = 1 AND lat IS NOT NULL
-     AND instr(',' || services || ',', ',' || ? || ',') > 0`).all(service);
+    `SELECT s.lat, s.lng FROM suppliers s WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
+     AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+     AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)`).all(service, customerId);
   if (!sups.length) return { available: false, fee_cents: 0, distance_km: null };
   let dist = Infinity;
   let nearest = null;
@@ -75,10 +76,11 @@ router.get('/quote/providers', authRequired('customer'), (req, res) => {
     JOIN supplier_prices sp ON sp.user_id = s.user_id AND sp.service = ? AND sp.package = ?
     WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
       AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+      AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)
       AND s.user_id NOT IN (
         SELECT supplier_id FROM orders
         WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
-  `).all(service, pkg, service);
+  `).all(service, pkg, service, req.user.id);
 
   const providers = rows.map((r) => {
     const distance = dispatch.haversineKm(lat, lng, r.lat, r.lng);
@@ -192,7 +194,7 @@ router.get('/quote/callout', authRequired('customer'), async (req, res) => {
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   const service = SERVICE_KEYS.includes(req.query.service) ? req.query.service : 'carwash';
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'lat and lng required' });
-  res.json(await computeCallout(lat, lng, service));
+  res.json(await computeCallout(lat, lng, service, req.user.id));
 });
 
 // Accept one quote: it becomes the order, at exactly the price that pro quoted.
@@ -295,13 +297,14 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
     JOIN supplier_prices sp ON sp.user_id = s.user_id AND sp.service = ? AND sp.package = ?
     WHERE s.user_id = ? AND s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
       AND instr(',' || s.services || ',', ',' || ? || ',') > 0
-  `).get(service, pkg, supplier_id, service);
+      AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)
+  `).get(service, pkg, supplier_id, service, req.user.id);
   if (!chosen) return res.status(409).json({ error: 'That pro is no longer available. Please choose another.' });
 
   const supplierPrice = priceFor(service, pkg, vehicle, chosen.price_cents);
   if (supplierPrice == null) return res.status(400).json({ error: 'Invalid package or size selection' });
 
-  const callout = await computeCallout(lat, lng, service);
+  const callout = await computeCallout(lat, lng, service, req.user.id);
   const feePct = Number(getSetting('platform_fee_pct', '20'));
   const fee = platformFee(supplierPrice + callout.fee_cents, feePct);
   // Customer pays the pro's price + callout + our fee on top. The pro keeps their price + callout.
@@ -352,7 +355,9 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
 // sitting in pending_payment.
 async function startPayment(order, customer, res) {
   try {
-    const pay = await payments.createPayment(order, customer);
+    const pay = customer.is_demo
+      ? { url: `/pay/${order.id}`, mode: 'sandbox' } // a reviewer's card is never charged
+      : await payments.createPayment(order, customer);
     if (pay.reference) db.prepare('UPDATE orders SET payment_ref = ? WHERE id = ?').run(pay.reference, order.id);
     return pay;
   } catch (e) {
@@ -388,7 +393,8 @@ function afterPayment(orderId) {
 }
 
 router.post('/orders/:id/pay-sandbox', authRequired('customer'), (req, res) => {
-  if (payments.LIVE) return res.status(400).json({ error: 'Live payments enabled — sandbox disabled' });
+  const demo = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(req.user.id)?.is_demo;
+  if (payments.LIVE && !demo) return res.status(400).json({ error: 'Live payments enabled — sandbox disabled' });
   const order = db.prepare('SELECT * FROM orders WHERE id = ? AND customer_id = ?').get(req.params.id, req.user.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'Order is not awaiting payment' });

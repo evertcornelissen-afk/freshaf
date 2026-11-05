@@ -94,7 +94,7 @@ router.post('/suppliers/import', (req, res) => {
 router.get('/suppliers', (req, res) => {
   const status = req.query.status;
   const base = `
-    SELECT s.*, u.name, u.email, u.phone, u.created_at AS user_created_at
+    SELECT s.*, u.name, u.email, u.phone, u.is_demo, u.created_at AS user_created_at
     FROM suppliers s JOIN users u ON u.id = s.user_id`;
   const rows = status
     ? db.prepare(`${base} WHERE s.status = ? ORDER BY s.created_at DESC`).all(status)
@@ -113,7 +113,7 @@ router.get('/suppliers', (req, res) => {
       bank_name: r.bank_name, bank_account: secrets.maskTail(r.bank_account),
       bank_branch: secrets.maskTail(r.bank_branch),
       documents: db.prepare('SELECT id, kind, original_name FROM supplier_docs WHERE user_id = ?').all(r.user_id),
-      status: r.status, status_reason: r.status_reason, online: !!r.online,
+      status: r.status, status_reason: r.status_reason, online: !!r.online, is_demo: !!r.is_demo,
       ...balance.status(r.user_id),
       rating: r.rating_count ? +(r.rating_sum / r.rating_count).toFixed(1) : null,
       rating_count: r.rating_count, created_at: r.created_at,
@@ -156,6 +156,20 @@ router.post('/suppliers/:id/settle-cash', (req, res) => {
   res.json({ ok: true, cleared_cents: cleared, ...balance.status(s.user_id) });
 });
 
+// Mark an account as a demo account (or back). See the note in server/db.js. Refused while
+// the account has an order in progress, so nothing in flight changes sides.
+router.post('/users/:id/demo', (req, res) => {
+  const u = db.prepare("SELECT id, role FROM users WHERE id = ? AND role IN ('customer','supplier')").get(req.params.id);
+  if (!u) return res.status(404).json({ error: 'Account not found' });
+  const busy = db.prepare(`SELECT id FROM orders WHERE (customer_id = ? OR supplier_id = ?)
+    AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(u.id, u.id);
+  if (busy) return res.status(409).json({ error: 'This account has an order in progress. Finish or cancel it first.' });
+  const flag = req.body?.is_demo ? 1 : 0;
+  db.prepare('UPDATE users SET is_demo = ? WHERE id = ?').run(flag, u.id);
+  console.log(`[FreshAF] Account ${u.id} (${u.role}) marked ${flag ? 'DEMO' : 'real'}`);
+  res.json({ ok: true, is_demo: !!flag });
+});
+
 router.post('/suppliers/:id/approve', (req, res) => setSupplierStatus(req, res, 'approved'));
 router.post('/suppliers/:id/reject', (req, res) => setSupplierStatus(req, res, 'rejected'));
 router.post('/suppliers/:id/suspend', (req, res) => setSupplierStatus(req, res, 'suspended'));
@@ -173,7 +187,7 @@ router.get('/orders', (req, res) => {
 // Everyone who has signed up for the service, newest first — the sign-up book.
 router.get('/customers', (req, res) => {
   const rows = db.prepare(`
-    SELECT u.id, u.name, u.email, u.phone, u.home_address, u.created_at, u.terms_accepted_at,
+    SELECT u.id, u.name, u.email, u.phone, u.home_address, u.created_at, u.terms_accepted_at, u.is_demo,
            u.points_cents,
            (SELECT COUNT(*) FROM orders o WHERE o.customer_id = u.id) AS orders,
            (SELECT COUNT(*) FROM orders o WHERE o.customer_id = u.id AND o.status = 'completed') AS orders_completed,
@@ -277,7 +291,7 @@ router.get('/readiness', (req, res) => {
   const { persistence } = require('../db');
   const survivedARestart = Number(persistence?.boots || 0) > 1;
 
-  const approvedPros = db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved'").get().c;
+  const approvedPros = db.prepare("SELECT COUNT(*) c FROM real_suppliers WHERE status = 'approved'").get().c;
   res.json({
     checks: [
       { key: 'persistent_disk', label: 'Customer accounts survive a restart', ok: survivedARestart,
@@ -322,26 +336,26 @@ router.get('/readiness', (req, res) => {
             : 'Set from the environment, and applied on every boot.' },
     ],
     approved_pros: approvedPros,
-    online_pros: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved' AND online = 1").get().c,
+    online_pros: db.prepare("SELECT COUNT(*) c FROM real_suppliers WHERE status = 'approved' AND online = 1").get().c,
     uploads_present: onDisk(require('path').join(DATA_DIR, 'uploads')),
   });
 });
 
 router.get('/stats', (req, res) => {
   const stats = {
-    customers: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer'").get().c,
+    customers: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND is_demo = 0").get().c,
     // Growth, not just a total — a flat number tells an investor nothing.
-    signups_7d: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND created_at > datetime('now','-7 days')").get().c,
-    signups_30d: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND created_at > datetime('now','-30 days')").get().c,
-    suppliers_pending: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'pending'").get().c,
-    suppliers_approved: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved'").get().c,
-    suppliers_online: db.prepare("SELECT COUNT(*) c FROM suppliers WHERE status = 'approved' AND online = 1").get().c,
-    orders_total: db.prepare('SELECT COUNT(*) c FROM orders').get().c,
-    orders_active: db.prepare("SELECT COUNT(*) c FROM orders WHERE status IN ('searching','accepted','en_route','in_progress')").get().c,
-    orders_completed: db.prepare("SELECT COUNT(*) c FROM orders WHERE status = 'completed'").get().c,
-    orders_carwash: db.prepare("SELECT COUNT(*) c FROM orders WHERE service = 'carwash'").get().c,
-    orders_laundry: db.prepare("SELECT COUNT(*) c FROM orders WHERE service = 'laundry'").get().c,
-    revenue_cents: db.prepare("SELECT COALESCE(SUM(commission_cents),0) c FROM orders WHERE status = 'completed'").get().c,
+    signups_7d: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND is_demo = 0 AND created_at > datetime('now','-7 days')").get().c,
+    signups_30d: db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'customer' AND is_demo = 0 AND created_at > datetime('now','-30 days')").get().c,
+    suppliers_pending: db.prepare("SELECT COUNT(*) c FROM real_suppliers WHERE status = 'pending'").get().c,
+    suppliers_approved: db.prepare("SELECT COUNT(*) c FROM real_suppliers WHERE status = 'approved'").get().c,
+    suppliers_online: db.prepare("SELECT COUNT(*) c FROM real_suppliers WHERE status = 'approved' AND online = 1").get().c,
+    orders_total: db.prepare('SELECT COUNT(*) c FROM real_orders').get().c,
+    orders_active: db.prepare("SELECT COUNT(*) c FROM real_orders WHERE status IN ('searching','accepted','en_route','in_progress')").get().c,
+    orders_completed: db.prepare("SELECT COUNT(*) c FROM real_orders WHERE status = 'completed'").get().c,
+    orders_carwash: db.prepare("SELECT COUNT(*) c FROM real_orders WHERE service = 'carwash'").get().c,
+    orders_laundry: db.prepare("SELECT COUNT(*) c FROM real_orders WHERE service = 'laundry'").get().c,
+    revenue_cents: db.prepare("SELECT COALESCE(SUM(commission_cents),0) c FROM real_orders WHERE status = 'completed'").get().c,
   };
   res.json(stats);
 });

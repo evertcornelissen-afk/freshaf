@@ -75,7 +75,9 @@ in our build. Three ways round it:
 | **Native push notifications** | ✅ **Built 5 Nov** (`server/native-push.js`, app side in `public/js/native.js`, AppDelegate token hand-off, `App.entitlements`). Tested against stand-in Apple and Google servers. **Switches on when the APNs key is set on Render** (step B4); until then the app does not ask for permission |
 | iOS build without a Mac | ✅ `codemagic.yaml` ready: builds, signs and uploads to TestFlight (step B2) |
 | Map tiles | ⚠️ OpenStreetMap's free tile servers forbid heavy use by distributed apps and can block them. Move to a paid tile provider before launch |
-| Reviewer demo account + Pros online | ❌ See the warning under Guideline 4.2 |
+| Reviewer demo accounts | ✅ Built 5 Nov: **demo accounts** (admin → Make demo) only ever meet each other, never charge a card, and stay out of the figures. Setup steps in `APP-STORE-LISTING.md` |
+| Listing text, keywords, review notes | ✅ `APP-STORE-LISTING.md`, checked against Apple's limits by `node scripts/check-listing.js` |
+| Real Pros online | ❌ See the warning under Guideline 4.2. The demo pro covers the reviewer; it does not replace real supply |
 
 ---
 

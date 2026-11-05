@@ -46,8 +46,9 @@ function eligiblePros(request) {
     FROM suppliers s
     JOIN users u ON u.id = s.user_id
     WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
-      AND instr(',' || s.services || ',', ',' || ? || ',') > 0${busyClause}
-  `).all(request.service, request.package, request.service);
+      AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+      AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)${busyClause}
+  `).all(request.service, request.package, request.service, request.customer_id);
 
   // A pro sitting on too much of our cash stops being offered work until they settle.
   const blocked = balance.blockedSupplierIds();

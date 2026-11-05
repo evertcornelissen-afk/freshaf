@@ -194,7 +194,7 @@ async function refreshSuppliers() {
   el('suppliers-box').innerHTML = `<table><thead><tr>
       <th>Business</th><th>Contact</th><th>Details</th><th>Status</th><th>Actions</th>
     </tr></thead><tbody>` + suppliers.map((s) => `<tr>
-      <td><strong>${s.business_name}</strong><br>
+      <td><strong>${s.business_name}</strong>${s.is_demo ? ' <span class="pill warn">DEMO</span>' : ''}<br>
         <span class="muted small-text">${s.service_area || ''}</span><br>
         ${(s.services || []).map((x) => `<span class="pill ${x === 'laundry' ? 'ok' : 'warn'}" style="margin-top:4px">${serviceName(x)}</span>`).join(' ')}</td>
       <td>${s.name}<br><span class="muted small-text">${s.email}<br>${s.phone || ''}</span></td>
@@ -220,10 +220,28 @@ async function refreshSuppliers() {
         ${s.status === 'pending' ? `<button class="danger small" onclick="setStatus(${s.user_id},'reject')">Reject</button>` : ''}
         ${s.status === 'approved' ? `<button class="danger small" onclick="setStatus(${s.user_id},'suspend')">Suspend</button>` : ''}
         ${s.cash_owed_cents > 0 ? `<button class="small" onclick="settleCash(${s.user_id}, ${s.cash_owed_cents})">Settle cash</button>` : ''}
+        <button class="secondary small" onclick="setDemo(${s.user_id}, ${!s.is_demo})">${s.is_demo ? 'Make real' : 'Make demo'}</button>
         </div>
       </td>
     </tr>`).join('') + '</tbody></table>';
 }
+
+window.setDemo = async (id, makeDemo) => {
+  try {
+    const ok = await modal({
+      title: makeDemo ? 'Make this a demo account?' : 'Make this a real account again?',
+      body: makeDemo
+        ? 'Demo accounts only ever see other demo accounts: a demo customer is matched only with demo pros, card payments use the test page, and they are left out of all figures. Use this for the App Store reviewer and for your own testing.'
+        : 'It will be matched with real customers and pros again, card payments will be real, and it counts in the figures.',
+      confirmText: makeDemo ? 'Make demo' : 'Make real',
+      danger: !makeDemo,
+    });
+    if (!ok) return;
+    await api(`/api/admin/users/${id}/demo`, { method: 'POST', body: { is_demo: makeDemo } });
+    toast(makeDemo ? 'Marked as a demo account' : 'Marked as a real account', 'ok');
+    await Promise.all([refreshSuppliers(), refreshCustomers(), refreshStats(), refreshReadiness()]);
+  } catch (e) { showError('sup-error', e.message); }
+};
 
 window.settleCash = async (id, owed) => {
   try {
@@ -280,16 +298,17 @@ function renderCustomers() {
     return;
   }
   el('customers-box').innerHTML = `<table><thead><tr>
-      <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Signed up</th><th>Orders</th><th>Rewards</th>
+      <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Signed up</th><th>Orders</th><th>Rewards</th><th></th>
     </tr></thead><tbody>` + rows.map((c) => `<tr>
       <td>${c.id}</td>
-      <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.name)}${c.is_demo ? ' <span class="pill warn">DEMO</span>' : ''}</td>
       <td><a href="mailto:${encodeURIComponent(c.email)}">${escapeHtml(c.email)}</a></td>
       <td>${c.phone ? `<a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a>` : '—'}</td>
       <td class="muted small-text">${escapeHtml(c.home_address || '—')}</td>
       <td class="muted small-text">${(c.created_at || '').replace('T', ' ').slice(0, 16)}</td>
       <td>${c.orders}${c.orders_completed ? ` <span class="muted small-text">(${c.orders_completed} done)</span>` : ''}</td>
       <td>${c.points_cents ? rand(c.points_cents) : '—'}</td>
+      <td><button class="secondary small" onclick="setDemo(${c.id}, ${!c.is_demo})">${c.is_demo ? 'Make real' : 'Make demo'}</button></td>
     </tr>`).join('') + '</tbody></table>';
 }
 
