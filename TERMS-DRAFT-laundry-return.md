@@ -1,7 +1,8 @@
 # DRAFT — Terms for laundry returned to a different address
 
-**Status: NOT PUBLISHED. Awaiting Evert's approval** (and ideally the lawyer's read, with the
-rest of the terms). Nothing here is on freshaf.io/terms. When approved, it goes into
+**Status: NOT PUBLISHED. Awaiting Evert's approval of the full wording** (and ideally the
+lawyer's read, with the rest of the terms). Option (a) for "no one can receive it" was chosen
+by Evert on 6 Nov 2026 at 00:26. Nothing here is on freshaf.io/terms. When approved, it goes into
 `public/terms.html` and the "Last updated" date changes in the same commit.
 
 Written 6 November 2026 against the feature shipped in `5d23262`.
@@ -27,11 +28,11 @@ Written 6 November 2026 against the feature shipped in `5d23262`.
   laundry is your responsibility, and the 48-hour period for reporting damage or loss (above)
   starts then.
 
-- **If no one can receive it.** *[DECISION NEEDED — Evert]* If nobody is available to receive
-  the laundry at the return address during the window, the Pro will contact you. Choose one:
-  (a) a second delivery attempt is charged at the return-trip rate; (b) the laundry goes back
-  to the collection address at no charge; (c) you collect it from the Pro. The app does not yet
-  handle this case: today the Pro would phone you and agree it.
+- **If no one can receive it.** If nobody is available to receive the laundry at the return
+  address during the window you chose, the Pro will try to contact you and will keep your
+  laundry safe. We will arrange a second delivery attempt with you, and that second attempt is
+  charged at the return-trip rate shown in the app. Until it is handed over, your laundry
+  remains our responsibility.
 
 ## Section 11 (Terms for Pros) — add this point
 
@@ -47,3 +48,10 @@ and can show the person receiving the laundry. Add: *"Handover photos: when a Pr
 laundry they photograph the handover as proof of delivery. The photo is visible to you, the
 Pro and FreshAF only, and is kept with the order record."* (While editing, the privacy policy
 still names PayFast as the card processor; it is Stitch.)
+
+## Not in the app yet (internal note, not terms wording)
+
+Option (a) needs a "Nobody there — arrange a second attempt" action for the Pro, which records
+the failed attempt and charges the return-trip rate for the second one. Today the Pro would
+phone the customer and FreshAF would adjust the order by hand. Build before publishing these
+terms, or publish knowing the second-attempt charge is applied manually.
