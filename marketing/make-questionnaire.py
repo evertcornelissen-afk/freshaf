@@ -1,11 +1,16 @@
-"""Builds the FreshAF Pro vetting questionnaire PDF (A4) on the Desktop.
+"""Builds the FreshAF Pro vetting questionnaire PDF (A4) into freshaf/forms/.
 Run: python marketing/make-questionnaire.py   (needs Chrome; renders via --print-to-pdf)."""
 import base64, os, subprocess, tempfile
 
 ROOT = r"C:\Users\Evert\Desktop\local Session\freshaf"
 DESK = r"C:\Users\Evert\Desktop"
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-PDF = os.path.join(DESK, "FreshAF Pro Vetting Questionnaire.pdf")
+FORMS = os.path.join(ROOT, "forms")
+os.makedirs(FORMS, exist_ok=True)
+# Canonical copy lives in the repo so the form that goes out is the form under version
+# control. The Desktop copy is a convenience for attaching to mail.
+PDF = os.path.join(FORMS, "FreshAF Pro Vetting Questionnaire.pdf")
+DESK_PDF = os.path.join(DESK, "FreshAF Pro Vetting Questionnaire.pdf")
 
 with open(os.path.join(ROOT, "public/img/logo.svg"), "rb") as f:
     LOGO = "data:image/svg+xml;base64," + base64.b64encode(f.read()).decode()
@@ -64,7 +69,7 @@ SECTIONS = [
    box("Public liability insurance?", ["Yes", "No", "Busy getting it"]),
    line("Insurer and cover amount"),
    line("If you damage a customer's car or clothing, how do you handle it?", True),
-   box("Can you accept card payments yourself?", ["Yes (Yoco, SnapScan, etc.)", "Cash and EFT only"]),
+   box("Do you have your own card machine or payment app? (FreshAF collects all payment from the customer; this is for our records only.)", ["Yes (Yoco, SnapScan, etc.)", "No, cash and EFT only"]),
  ]),
  ("6", "Background and trust", [
    yn("Have you, or anyone who will do jobs with you, ever been convicted of a criminal offence?"),
@@ -79,8 +84,10 @@ SECTIONS = [
    line("Reference 2: name, phone, relationship", True),
  ]),
  ("8", "How FreshAF works: please confirm", [
-   box("You set your own prices. FreshAF adds a 10% fee on top, paid by the customer. You keep 100% of your price.", ["Understood"]),
-   box("On cash jobs you collect the full amount, and the 10% fee is owed back to FreshAF.", ["Understood"]),
+   box("FreshAF buys each job from you at YOUR price. You set it, and FreshAF pays it in full. No commission or platform fee is deducted from you.", ["Understood"]),
+   box("FreshAF then sells the job to the customer at its own price, which includes FreshAF's margin. The customer sees one price only. What the customer pays does not change what you are paid.", ["Understood"]),
+   box("You are paid weekly, by the Wednesday following the week in which you completed the job, against your invoice or a self-billed statement.", ["Understood"]),
+   box("On cash jobs you collect the full amount as FreshAF's collection agent. You keep your own price; the balance belongs to FreshAF and is payable on demand. Your cash balance shows in the app, and at R300 owed you cannot take new jobs until you settle it.", ["Understood"]),
    box("You work as an independent contractor, not as a FreshAF employee.", ["Understood"]),
    box("Job offers arrive on your phone. You must accept them within the time limit or they go to someone else.", ["Understood"]),
    box("Customers rate every job. Low ratings or no-shows can lead to suspension.", ["Understood"]),
@@ -155,4 +162,7 @@ if os.path.exists(PDF):
 subprocess.run([CHROME, "--headless", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
                 f"--print-to-pdf={PDF}", "--virtual-time-budget=8000", tmp],
                check=False, capture_output=True, timeout=180)
+if os.path.exists(PDF):
+    import shutil
+    shutil.copyfile(PDF, DESK_PDF)
 print(("OK   " if os.path.exists(PDF) else "FAIL ") + PDF)

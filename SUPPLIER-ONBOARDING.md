@@ -1,7 +1,9 @@
 # Onboarding a FreshAF Pro, start to finish
 
-*Written 14 October 2026. The vetting questionnaire is built by `marketing/make-questionnaire.py`,
-which writes `FreshAF Pro Vetting Questionnaire.pdf` to the Desktop.*
+*Written 14 October 2026. Section 8 rewritten 5 November 2026 for merchant-of-record pricing.
+The vetting questionnaire is built by `marketing/make-questionnaire.py`, which writes
+`forms/FreshAF Pro Vetting Questionnaire.pdf` in this repo (and a copy on the Desktop for mailing).
+**Send the copy in `forms/` — it is the one under version control.**
 
 ## The steps
 
