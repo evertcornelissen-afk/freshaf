@@ -1,9 +1,22 @@
 # Onboarding a FreshAF Pro, start to finish
 
-*Written 14 October 2026. Section 8 rewritten 5 November 2026 for merchant-of-record pricing.
-The vetting questionnaire is built by `marketing/make-questionnaire.py`, which writes
-`forms/FreshAF Pro Vetting Questionnaire.pdf` in this repo (and a copy on the Desktop for mailing).
-**Send the copy in `forms/` — it is the one under version control.**
+*Written 14 October 2026. Section 8 rewritten 5 November 2026 for merchant-of-record pricing.*
+
+## Where the documents live
+
+`python marketing/make-questionnaire.py` builds both versions into **`freshaf/forms/`**, which is
+the only place they live — there is deliberately no Desktop copy, so an out-of-date form cannot be
+attached to an email by accident after the terms change.
+
+| File | Use |
+|---|---|
+| `FreshAF Pro Vetting Questionnaire (fillable).pdf` | **Send this one.** 48 typed fields and 82 tick boxes; the Pro completes it on a phone or laptop and emails it back without printing anything. The six "For FreshAF use only" fields are locked. |
+| `FreshAF Pro Vetting Questionnaire.pdf` | The flat version, for printing and completing by hand. |
+| `FreshAF Pro Brochure - Car Wash.pdf` / `- Laundry.pdf` | Sent first, before the questionnaire. Built by `marketing/make-brochures.py`. |
+
+Field names in the fillable PDF are taken from the printed labels (`p1_Full_name_as_on_ID`,
+`p1_Mobile_number`, …), so a returned form can be read straight into the bulk loader rather than
+retyped.
 
 ## The steps
 

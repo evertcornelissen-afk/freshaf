@@ -7,10 +7,9 @@ DESK = r"C:\Users\Evert\Desktop"
 CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 FORMS = os.path.join(ROOT, "forms")
 os.makedirs(FORMS, exist_ok=True)
-# Canonical copy lives in the repo so the form that goes out is the form under version
-# control. The Desktop copy is a convenience for attaching to mail.
+# The repo is the only home for the form, so there is never a second copy lying
+# around that can be mailed out after the terms change.
 PDF = os.path.join(FORMS, "FreshAF Pro Vetting Questionnaire.pdf")
-DESK_PDF = os.path.join(DESK, "FreshAF Pro Vetting Questionnaire.pdf")
 
 with open(os.path.join(ROOT, "public/img/logo.svg"), "rb") as f:
     LOGO = "data:image/svg+xml;base64," + base64.b64encode(f.read()).decode()
@@ -162,7 +161,11 @@ if os.path.exists(PDF):
 subprocess.run([CHROME, "--headless", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
                 f"--print-to-pdf={PDF}", "--virtual-time-budget=8000", tmp],
                check=False, capture_output=True, timeout=180)
-if os.path.exists(PDF):
-    import shutil
-    shutil.copyfile(PDF, DESK_PDF)
 print(("OK   " if os.path.exists(PDF) else "FAIL ") + PDF)
+
+# The flat form is for printing; the fillable one is what actually gets emailed to a pro.
+# Building both from one command is the only way they stay in step.
+if os.path.exists(PDF):
+    import runpy
+    runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "make-fillable.py"),
+                   run_name="__main__")
