@@ -440,11 +440,7 @@ function updateTotal() {
 function initMap() {
   if (map) return;
   const startLat = me?.home_lat ?? -33.8903, startLng = me?.home_lng ?? 18.6292;
-  map = L.map('map').setView([startLat, startLng], 12);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-  }).addTo(map);
-  map.on('click', (e) => setPin(e.latlng.lat, e.latlng.lng));
+  map = FreshMap.create('map', [startLat, startLng], me?.home_lat != null ? 15 : 12, setPin);
   if (me?.home_lat != null) setPin(me.home_lat, me.home_lng);
 }
 
@@ -456,7 +452,7 @@ function refreshCallout() {
 
 function setPin(lat, lng) {
   sel.lat = lat; sel.lng = lng;
-  if (pin) pin.setLatLng([lat, lng]); else pin = L.marker([lat, lng]).addTo(map);
+  map.pin(lat, lng);
   el('pin-status').innerHTML = `${icon('pin')} Pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   refreshCallout();
   invalidateQuotes();
@@ -464,15 +460,21 @@ function setPin(lat, lng) {
 
 el('btn-geolocate').onclick = () => {
   navigator.geolocation.getCurrentPosition(
-    (pos) => { setPin(pos.coords.latitude, pos.coords.longitude); map.setView([pos.coords.latitude, pos.coords.longitude], 14); },
+    (pos) => {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      map.showMe(lat, lng, accuracy);
+      setPin(lat, lng);
+      map.flyTo(lat, lng, 17);
+    },
     () => showError('order-error', 'Could not get your location — tap the map instead.'),
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
   );
 };
 
 el('btn-saved-address').onclick = () => {
   if (me?.home_lat == null) return;
   setPin(me.home_lat, me.home_lng);
-  map.setView([me.home_lat, me.home_lng], 14);
+  map.flyTo(me.home_lat, me.home_lng, 16);
   if (me.home_address) el('order-address').value = me.home_address;
 };
 
@@ -480,7 +482,7 @@ el('btn-saved-address').onclick = () => {
 attachAutocomplete(el('order-address'), (r) => {
   if (!map) return;
   setPin(r.lat, r.lng);
-  map.setView([r.lat, r.lng], 15);
+  map.flyTo(r.lat, r.lng, 16);
 });
 
 /* ---------- auth actions ---------- */

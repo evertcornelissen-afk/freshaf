@@ -67,8 +67,9 @@
     var(--bg);
 }
 [data-theme="dark"] .topbar { background: rgba(12, 21, 27, .85); }
-[data-theme="dark"] .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.5); }
-[data-theme="dark"] .leaflet-control-attribution { background: rgba(12, 21, 27, .75); color: var(--faint); }
+/* The map stays light in dark mode, as Google's does. An inverted street map is hard to
+   read at a glance, and this is the screen where a customer checks the pin is on their
+   driveway. */
 [data-theme="dark"] .seg input:checked + span { box-shadow: inset 0 0 0 1px var(--coral); }
 
 /* themed logo variants (importants outrank .brand .logo-img layout rules) */
@@ -374,6 +375,41 @@ button.small { padding: 8px 14px; font-size: .8rem; border-radius: 9px; }
   z-index: 1; overflow: hidden;
 }
 .leaflet-control-attribution { font-size: .62rem; }
+
+/* Light and calm, closer to Google's default palette than OpenStreetMap's busy one. */
+.map, #map, #sup-map { background: #f2efe9; }
+.fm-tiles { filter: saturate(.72) brightness(1.04) contrast(.94); }
+
+/* Google-style controls: white, rounded, soft shadow. */
+.leaflet-bar { border: none !important; border-radius: 8px !important; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3) !important; }
+.leaflet-bar a { background: #fff !important; color: #666 !important; border-bottom-color: #e6e6e6 !important;
+  width: 36px !important; height: 36px !important; line-height: 36px !important; font-size: 20px !important;
+  transition: background .15s, color .15s; }
+.leaflet-bar a:hover { background: #f4f4f4 !important; color: #222 !important; }
+
+/* The pin drops in from above and settles with a small bounce. */
+.fm-pin-wrap { background: none; border: none; }
+.fm-pin { position: relative; z-index: 2; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .25)); }
+.fm-pin-shadow { position: absolute; left: 7px; top: 36px; width: 14px; height: 6px; border-radius: 50%;
+  background: rgba(0, 0, 0, .28); filter: blur(1.5px); z-index: 1; }
+.fm-drop { animation: fm-drop .55s cubic-bezier(.3, 1.55, .55, 1) both; }
+.fm-drop-shadow { animation: fm-shadow .55s ease-out both; }
+@keyframes fm-drop { 0% { transform: translateY(-46px); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0); } }
+@keyframes fm-shadow { 0% { transform: scale(.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* "You are here": the blue dot with a white rim and a slow pulse. */
+.fm-me-wrap { background: none; border: none; }
+.fm-me { position: relative; width: 22px; height: 22px; }
+.fm-me-dot { position: absolute; inset: 3px; border-radius: 50%; background: #4285F4;
+  border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+.fm-me-pulse { position: absolute; inset: 0; border-radius: 50%; background: rgba(66, 133, 244, .35);
+  animation: fm-pulse 2s ease-out infinite; }
+@keyframes fm-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-drop, .fm-drop-shadow, .fm-me-pulse { animation: none; }
+}
 
 /* ---------- tables ---------- */
 table { width: 100%; border-collapse: collapse; font-size: .87rem; }

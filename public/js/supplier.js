@@ -351,22 +351,26 @@ function ping() {
 
 function initMap() {
   if (map) return;
-  map = L.map('sup-map').setView([loc.lat ?? -33.8903, loc.lng ?? 18.6292], 12);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
-  map.on('click', (e) => setPin(e.latlng.lat, e.latlng.lng));
+  map = FreshMap.create('sup-map', [loc.lat ?? -33.8903, loc.lng ?? 18.6292], loc.lat != null ? 15 : 12, setPin);
   if (loc.lat != null) setPin(loc.lat, loc.lng);
 }
 
 function setPin(lat, lng) {
   loc = { lat, lng };
-  if (pin) pin.setLatLng([lat, lng]); else pin = L.marker([lat, lng]).addTo(map);
+  map.pin(lat, lng);
   el('sup-pin-status').innerHTML = `${icon('pin')} Location — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
 el('btn-sup-geolocate').onclick = () => {
   navigator.geolocation.getCurrentPosition(
-    (pos) => { setPin(pos.coords.latitude, pos.coords.longitude); map.setView([pos.coords.latitude, pos.coords.longitude], 14); },
+    (pos) => {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      map.showMe(lat, lng, accuracy);
+      setPin(lat, lng);
+      map.flyTo(lat, lng, 16);
+    },
     () => showError('dash-error', 'Could not get your location — tap the map instead.'),
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
   );
 };
 

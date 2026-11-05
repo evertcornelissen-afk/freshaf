@@ -297,8 +297,10 @@ router.get('/readiness', (req, res) => {
         detail: payments.statusDetail() },
       { key: 'whatsapp', label: 'WhatsApp job alerts live', ok: whatsapp.configured(),
         detail: whatsapp.configured() ? 'Alerts are being sent.' : 'Dry run — see WHATSAPP-SETUP.md.' },
-      { key: 'email', label: 'Account emails live', ok: require('../mailer').configured(),
-        detail: require('../mailer').configured() ? 'Sending from admin@freshaf.io.' : 'Dry run — set SMTP_PASS (the admin@freshaf.io mailbox password) on Render.' },
+      // Proven by an actual sign-in to the mail server at boot, not by the password
+      // merely being set; see server/mailer.js.
+      { key: 'email', label: 'Account emails live', ok: require('../mailer').status().ok,
+        detail: require('../mailer').status().detail },
       { key: 'suppliers', label: 'Approved pros on the platform', ok: approvedPros > 0,
         detail: `${approvedPros} approved. Nothing else matters without supply.` },
       // Checked against the real default, not merely "is the variable set". Someone

@@ -19,6 +19,35 @@ const transport = configured()
   ? nodemailer.createTransport({ host: HOST, port: PORT, secure: PORT === 465, auth: { user: USER, pass: PASS } })
   : null;
 
+// Whether mail actually works, proven at boot by signing in to the mail server. "The
+// password is set" and "email is being delivered" are different statements: a mistyped
+// password looks identical to a correct one until a customer's reset email never arrives.
+// The result goes in the log, where it can be checked without anyone needing an account,
+// and on the admin readiness screen.
+let health = transport
+  ? { ok: false, detail: 'Checking the mail server sign-in...' }
+  : { ok: false, detail: 'Dry run. Set SMTP_PASS (the admin@freshaf.io mailbox password) on Render.' };
+
+if (transport) {
+  transport.verify()
+    .then(() => {
+      health = { ok: true, detail: `Signed in to ${HOST} as ${USER}. Account emails are being sent.` };
+      console.log(`[FreshAF][mail] LIVE: signed in to ${HOST}:${PORT} as ${USER}`);
+    })
+    .catch((e) => {
+      health = { ok: false, detail: `Mail server sign-in FAILED (${e.code || 'error'}): ${e.message}` };
+      console.error(`[FreshAF][mail] NOT WORKING: could not sign in to ${HOST}:${PORT} as ${USER}: ${e.message}`);
+    });
+} else {
+  console.warn('[FreshAF][mail] DRY RUN: SMTP_PASS is not set, no email will be sent');
+}
+
+function status() { return health; }
+
+// a***@gmail.com: enough to match a support query to a log line, without the log
+// becoming a list of customer email addresses.
+const mask = (addr) => String(addr).replace(/^(.)[^@]*(@.*)$/, '$1***$2');
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // One branded shell for every message. Logo is the hosted PNG so it renders in every client
@@ -48,9 +77,10 @@ async function send({ to, subject, heading, paragraphs, cta }) {
   }
   try {
     await transport.sendMail({ from: FROM, to, subject, html, text });
+    console.log(`[FreshAF][mail] sent: ${subject} -> ${mask(to)}`);
     return { ok: true, status: 'sent' };
   } catch (e) {
-    console.warn(`[FreshAF][mail] ${subject} -> ${to} failed: ${e.message}`);
+    console.warn(`[FreshAF][mail] FAILED: ${subject} -> ${mask(to)}: ${e.message}`);
     return { ok: false, status: 'failed' };
   }
 }
@@ -143,5 +173,5 @@ function passwordChanged({ to, name }) {
   });
 }
 
-module.exports = { configured, send, proApplicationReceived, proStatusChanged, adminNewPro,
+module.exports = { configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
   passwordReset, passwordChanged };
