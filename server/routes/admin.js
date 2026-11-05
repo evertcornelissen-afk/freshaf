@@ -40,8 +40,13 @@ router.use((req, res, next) => {
 router.use(authRequired('admin'));
 
 // Bulk-import pre-approved suppliers. Each row: { name, email, phone, business_name,
-// id_number, service_area, services: ['carwash','laundry'] }. Returns a generated
-// temporary password per created supplier so the admin can hand out credentials.
+// id_number, service_area, radius_km, vehicle_reg, equipment_notes,
+// services: ['carwash','laundry'] }. Returns a generated temporary password per created
+// supplier so the admin can hand out credentials.
+//
+// The fields line up with the Load sheet of the Pro vetting questionnaire, so a completed
+// form goes in without being retyped. Banking details are deliberately not importable:
+// the pro enters those in the app, where they are encrypted at rest.
 router.post('/suppliers/import', (req, res) => {
   const rows = req.body?.suppliers;
   if (!Array.isArray(rows) || !rows.length) return res.status(400).json({ error: 'Provide a suppliers array' });
@@ -55,20 +60,33 @@ router.post('/suppliers/import', (req, res) => {
       results.push({ email: email || '(missing)', status: 'invalid', reason: 'name, email, business_name, id_number and services are required' });
       continue;
     }
+    // A pasted row with its columns one out puts a person's name here, and without this
+    // the import creates a supplier account that can never be logged in to or emailed.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      results.push({ email, status: 'invalid', reason: 'that is not an email address - check the columns line up' });
+      continue;
+    }
     if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
       results.push({ email, status: 'skipped', reason: 'email already registered' });
       continue;
     }
+    // "Furthest you will travel" off the questionnaire. Dropping it put every imported pro
+    // on the global dispatch radius instead of the distance they actually agreed to cover,
+    // which quietly offers them jobs they will decline.
+    const km = Number(String(r.radius_km ?? '').replace(/[^\d.]/g, ''));
+    const radius = Number.isFinite(km) && km > 0 ? Math.min(200, Math.max(1, km)) : null;
+
     const tempPassword = crypto.randomBytes(6).toString('base64url'); // 8 chars, urlsafe
     const info = db.prepare(`INSERT INTO users (role, name, email, phone, password_hash, terms_accepted_at)
       VALUES ('supplier', ?, ?, ?, ?, NULL)`)
       .run(r.name.trim(), email, r.phone?.trim() || null, bcrypt.hashSync(tempPassword, 10));
     const userId = Number(info.lastInsertRowid);
-    db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')`)
+    db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services, radius_km, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved')`)
       .run(userId, r.business_name.trim(), secrets.encryptField(r.id_number.trim()), r.vehicle_reg?.trim() || null,
-        r.service_area?.trim() || null, r.equipment_notes?.trim() || null, services.join(','));
-    results.push({ email, status: 'created', temp_password: tempPassword, user_id: userId });
+        r.service_area?.trim() || null, r.equipment_notes?.trim() || null, services.join(','), radius);
+    results.push({ email, status: 'created', temp_password: tempPassword, user_id: userId,
+      services: services.join(','), radius_km: radius });
   }
   res.json({ results, created: results.filter((x) => x.status === 'created').length });
 });

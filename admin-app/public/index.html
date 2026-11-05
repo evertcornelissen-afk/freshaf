@@ -99,11 +99,18 @@
 
     <div class="card">
       <h2 id="h-import">Bulk import suppliers</h2>
-      <p class="muted small-text">One supplier per line, comma-separated:<br>
-      <code style="font-size:.78rem">name, email, phone, business name, ID number, area, services</code><br>
-      Services: <code>carwash</code>, <code>laundry</code> or <code>both</code>. Imported suppliers are pre-approved; a temporary password is generated for each.</p>
+      <p class="muted small-text"><strong>From a returned questionnaire:</strong> open the workbook, go to the
+      <strong>Load</strong> sheet, select <code>A3:J4</code> (the headings and the row under them), copy, and paste below.
+      Several pros at once: paste the heading row once, then each pro's row under it.<br>
+      The headings tell the import which column is which, so the order does not matter. Values containing
+      commas are fine &mdash; Excel separates cells with tabs.<br>
+      <span class="muted">Typing by hand instead? One per line, comma-separated:
+      <code style="font-size:.78rem">name, email, phone, business name, ID number, area, services</code>
+      where services is <code>carwash</code>, <code>laundry</code> or <code>both</code>.</span><br>
+      Imported pros are pre-approved, and a temporary password is generated for each. Banking details are not
+      imported &mdash; the pro enters those in the app, where they are encrypted.</p>
       <div class="msg error" id="import-error"></div>
-      <textarea id="import-text" rows="6" style="margin-top:10px;font-family:monospace;font-size:.82rem" placeholder="Sipho Dlamini, sipho@gmail.com, 0821234567, Sipho Shine, 9001015800087, Bellville, carwash&#10;Palesa Mokoena, palesa@gmail.com, 0739876543, Palesa Laundry, 9202025800083, Durbanville, laundry"></textarea>
+      <textarea id="import-text" rows="6" style="margin-top:10px;font-family:monospace;font-size:.82rem" placeholder="name&#9;email&#9;phone&#9;business_name&#9;id_number&#9;services&#9;service_area&#9;radius_km&#9;vehicle_reg&#9;equipment_notes&#10;Sipho Dlamini&#9;sipho@gmail.com&#9;082 123 4567&#9;Sipho Shine&#9;9001015800087&#9;carwash,laundry&#9;Bellville, Durbanville&#9;20&#9;Toyota Hilux, CA 123 456&#9;Own bakkie, 2 x 25L drums"></textarea>
       <div class="row mt">
         <button class="small" id="btn-import">Import suppliers</button>
         <button class="secondary small hidden" id="btn-copy-creds">Copy credentials</button>

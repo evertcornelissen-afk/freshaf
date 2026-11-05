@@ -36,29 +36,67 @@ function decorate() {
   initScrollChrome();
 }
 
-/* ---------- bulk supplier import ---------- */
+/* ---------- bulk supplier import ----------
+   Reads a row copied straight out of the Load sheet of the Pro vetting questionnaire, so a
+   completed form is pasted rather than retyped.
+
+   Excel puts TABS between cells on the clipboard, and that matters here: two of the Load
+   columns contain commas of their own - services is "carwash,laundry" and the service area
+   is a list of suburbs - so splitting on commas tears those apart and shifts every column
+   after them. Tabs are looked for first, and a header row is honoured when there is one,
+   so the column order cannot silently corrupt an import. */
 let lastCreds = [];
+
+const IMPORT_FIELDS = ['name', 'email', 'phone', 'business_name', 'id_number', 'services',
+  'service_area', 'radius_km', 'vehicle_reg', 'equipment_notes'];
+// What the old comma format meant, kept so a list already written that way still imports.
+const IMPORT_LEGACY = ['name', 'email', 'phone', 'business_name', 'id_number', 'service_area', 'services'];
+
+function parseSupplierPaste(text) {
+  const lines = String(text || '').split(/\r?\n/).filter((l) => l.trim());
+  if (!lines.length) throw new Error('Paste at least one supplier line first');
+
+  const tabbed = lines.some((l) => l.includes('\t'));
+  const cut = (l) => (tabbed ? l.split('\t') : l.split(','))
+    .map((x) => (x || '').trim().replace(/^"([\s\S]*)"$/, '$1').trim());
+
+  let order = tabbed ? IMPORT_FIELDS : IMPORT_LEGACY;
+  let body = lines;
+  const head = cut(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z_]/g, '_'));
+  if (head.includes('email') && head.includes('name')) { order = head; body = lines.slice(1); }
+  if (!body.length) throw new Error('That is a header row with no suppliers under it');
+
+  return body.map((line, i) => {
+    const cells = cut(line);
+    const row = {};
+    order.forEach((key, c) => { if (IMPORT_FIELDS.includes(key) && cells[c]) row[key] = cells[c]; });
+    // Not cosmetic: a shifted column puts a person's NAME in the email field, and the
+    // import happily creates an account nobody can ever log in to.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row.email || '')) {
+      throw new Error(`Line ${i + 1}: "${row.email || ''}" is not an email address - check the columns line up`);
+    }
+
+    const svc = String(row.services || 'carwash').toLowerCase();
+    row.services = svc === 'both'
+      ? ['carwash', 'laundry']
+      : svc.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+    return row;
+  });
+}
 
 el('btn-import').onclick = async () => {
   try {
-    const lines = el('import-text').value.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (!lines.length) throw new Error('Paste at least one supplier line first');
-    const suppliers = lines.map((line) => {
-      const [name, email, phone, business_name, id_number, service_area, svc] = line.split(',').map((x) => (x || '').trim());
-      const s = (svc || 'carwash').toLowerCase();
-      return {
-        name, email, phone, business_name, id_number, service_area,
-        services: s === 'both' ? ['carwash', 'laundry'] : [s],
-      };
-    });
+    const suppliers = parseSupplierPaste(el('import-text').value);
     const { results, created } = await api('/api/admin/suppliers/import', { method: 'POST', body: { suppliers } });
     lastCreds = results.filter((r) => r.status === 'created');
-    el('import-results').innerHTML = '<table><thead><tr><th>Email</th><th>Status</th><th>Temp password</th></tr></thead><tbody>' +
+    el('import-results').innerHTML = '<table><thead><tr><th>Email</th><th>Status</th><th>Services</th><th>Radius</th><th>Temp password</th></tr></thead><tbody>' +
       results.map((r) => `<tr>
-        <td>${r.email}</td>
+        <td>${escapeHtml(r.email)}</td>
         <td><span class="pill ${r.status === 'created' ? 'ok' : r.status === 'skipped' ? 'warn' : 'bad'}">${r.status}</span>
-          ${r.reason ? `<div class="muted small-text">${r.reason}</div>` : ''}</td>
-        <td><code>${r.temp_password || '—'}</code></td>
+          ${r.reason ? `<div class="muted small-text">${escapeHtml(r.reason)}</div>` : ''}</td>
+        <td class="small-text">${escapeHtml(r.services || '—')}</td>
+        <td class="small-text">${r.radius_km ? `${r.radius_km} km` : '—'}</td>
+        <td><code>${escapeHtml(r.temp_password || '—')}</code></td>
       </tr>`).join('') + '</tbody></table>';
     el('btn-copy-creds').classList.toggle('hidden', !lastCreds.length);
     toast(`${created} supplier${created === 1 ? '' : 's'} imported and pre-approved`, 'ok');
