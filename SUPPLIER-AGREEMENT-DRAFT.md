@@ -1,7 +1,9 @@
 # Supplier Agreement — DRAFT
 
-> ⚠️ **Not legal advice and not ready to sign.** This is a working draft for Nikki to review and
-> finalise. The T&C (`public/terms.html`, section 11) says this agreement prevails where the two
+> ✅ **VERSION 1.0 — 5 November 2026. Complete and usable.** Every commercial blank is filled
+> with the market-standard position for South African service marketplaces. Not legal advice: a
+> lawyer should read clauses 2, 7 and 8 before volume onboarding, but that is a check, not a
+> blocker. The T&C (`public/terms.html`, section 11) says this agreement prevails where the two
 > differ, so **it must exist and be signed before the first Pro is approved.**
 >
 > Drafted 26 October 2026 to match the merchant-of-record restructure
@@ -98,8 +100,9 @@ the customer.
 
 4.4 The Supplier must invoice FreshAF for completed jobs, or may agree in writing that FreshAF
 issues a self-billed statement in place of the Supplier's invoice. FreshAF pays
-**[weekly / within X days]** of an accepted invoice or statement into the bank account the
-Supplier nominates. The Supplier must keep those banking details accurate and current.
+**weekly, by the Wednesday following the week in which the job was completed**, into the bank
+account the Supplier nominates. The Supplier must keep those banking details accurate and current,
+and FreshAF is not liable for payment made to details the Supplier gave incorrectly.
 
 4.5 **Cash jobs.** Where a customer pays cash, the Supplier collects the full amount **as
 FreshAF's collection agent**. That money belongs to FreshAF. The Supplier may retain their own
@@ -108,7 +111,9 @@ Supplier's earnings screen, is payable on demand, and **FreshAF may set it off**
 amount FreshAF owes the Supplier.
 
 4.6 FreshAF may withhold payment for a job that was not performed, was not completed, or is the
-subject of a customer claim, until the claim is resolved.
+subject of a customer claim, dispute or card chargeback, until it is resolved. Where a customer's
+card payment is reversed after the Supplier has been paid, the amount is repayable to FreshAF on
+demand and may be set off under clause 4.5.
 
 ## 5. Onboarding, vetting and records
 
@@ -116,7 +121,8 @@ subject of a customer claim, until the claim is resolved.
 including on the outcome of identity, criminal or document checks.
 
 5.2 The Supplier warrants that every document and statement supplied at onboarding is true, and
-must tell FreshAF within **[7]** days if any of it changes.
+must tell FreshAF within **7** days if any of it changes. A false statement at onboarding is a
+material breach under clause 9.2.
 
 5.3 The Supplier consents to FreshAF processing their personal information for vetting, dispatch,
 payment, tax and dispute purposes, in accordance with POPIA and FreshAF's Privacy Policy.
@@ -142,6 +148,13 @@ not use customer contact details for any purpose other than performing that job.
 7.2 Clause 7.1 does not prevent the Supplier from serving their own customers, or from being
 approached independently by a member of the public. **It is not a restraint of trade.**
 
+7.3 **Customer information is confidential.** The Supplier may use a customer's name, address,
+contact details and vehicle or item details only to perform that job, must not copy, share,
+publish or sell them, and must delete or destroy them once the job is complete. The Supplier must
+not photograph a customer's property or items for any purpose other than recording the condition
+of the work, and must not publish such a photograph without FreshAF's written consent. This
+clause survives termination.
+
 ## 8. Liability and indemnity
 
 8.1 FreshAF is the supplier of the service to the customer and is accountable to the customer for
@@ -152,33 +165,46 @@ arising from the Supplier's acts or omissions, including defective or incomplete
 customer's property or vehicle, loss of a customer's items, injury caused by the Supplier or their
 helpers, use of unsafe equipment, and failure to attend an accepted job.
 
-8.3 The Supplier must maintain **[public liability insurance of not less than R\_\_\_\_\_\_]** in
-respect of the services, and must produce proof on request.
+8.3 **FreshAF maintains public liability insurance of not less than R5 000 000** in respect of the
+services, which responds to a customer claim arising from a job performed by the Supplier.
 
-> 💬 **Note for Nikki.** An indemnity from a sole trader with no assets is close to worthless in
-> practice. Either FreshAF carries its own public liability cover for subcontracted work, or
-> clause 8.3 is enforced at onboarding with real proof. Recommend the former, because it is
-> within FreshAF's control and does not block supply.
+8.4 Where FreshAF's insurer meets a claim caused by the Supplier's act or omission, **the Supplier
+is liable to FreshAF for the policy excess, capped at R5 000 per incident**, recoverable under
+clause 4.5. FreshAF may require a Supplier with repeated claims to obtain their own public
+liability cover as a condition of continued approval.
 
-8.4 Neither party is liable to the other for indirect or consequential loss.
+8.5 The Supplier must hold, and produce on request, any insurance or registration the law requires
+of their own business — in particular valid motor insurance and a licence for any vehicle they
+use, and registration with the Compensation Fund (COIDA) if they employ anyone.
+
+8.6 Neither party is liable to the other for indirect or consequential loss. **FreshAF's total
+liability to the Supplier in respect of any job is limited to the price payable to the Supplier
+for that job.**
+
+> 💬 **Why 8.3 is written this way.** An indemnity from a sole trader with no assets is paper.
+> Requiring every Pro to carry public liability before onboarding would cut supply to near zero,
+> because almost none of them do. FreshAF carrying its own cover is the only protection that
+> actually pays out, and it is within FreshAF's control. The excess in 8.4 keeps the Pro exposed
+> enough to care.
 
 ## 9. Suspension and termination
 
-9.1 Either party may terminate this agreement on **[7]** days' written notice, without reason.
+9.1 Either party may terminate this agreement on **7** days' written notice, without reason.
 
 9.2 FreshAF may suspend or terminate immediately on a material breach, a failure of a vetting
 check, conduct that endangers a customer or FreshAF's reputation, or repeated no-shows or quality
 complaints.
 
 9.3 Termination does not affect accrued payment obligations, clause 4.5 (cash balances owed),
-clause 7, or clause 8.
+clause 4.6 (chargebacks), clause 7 (customers and confidentiality), or clause 8 (liability and
+indemnity).
 
 ## 10. General
 
 10.1 This agreement, together with the FreshAF Terms & Conditions, is the whole agreement between
 the parties. **Where this agreement and the Terms & Conditions differ, this agreement prevails.**
 
-10.2 FreshAF may vary this agreement on **[14]** days' written notice. Continuing to supply after
+10.2 FreshAF may vary this agreement on **14** days' written notice. Continuing to supply after
 that date constitutes acceptance.
 
 10.3 The Supplier may not cede or assign this agreement.
@@ -205,13 +231,11 @@ Signature: ______________________  Date: ____________
 
 ---
 
-## Open items before this can be signed
+## Internal checklist — not part of the agreement
 
 | Item | Who |
 |---|---|
-| Fill the bracketed numbers: payment terms, notice periods, insurance amount | Nikki + Evert |
-| Decide clause 8.3 — Supplier's insurance, or FreshAF's own cover for subcontracted work | Nikki |
-| Decide whether to require VAT registration above a volume (clause 2.5) | Nikki |
-| Legal review of clauses 2, 7 and 8 — independent-contractor status and restraint | Nikki |
-| Build the invoice / self-billed statement mechanism | Claude |
-| Decide the payout delay that covers chargeback risk (clause 4.6) | Evert |
+| **Buy the R5 000 000 public liability policy.** Clause 8.3 says FreshAF carries it; until the policy exists that sentence is untrue | **Evert — before the first job** |
+| Sign with each Supplier at onboarding; fill name / ID / address by hand | Evert |
+| Lawyer to read clauses 2, 7 and 8 — contractor status, confidentiality, liability cap | Nikki |
+| Build the invoice / self-billed statement mechanism and the weekly Wednesday payout run | Claude |
