@@ -67,8 +67,14 @@ in our build. Three ways round it:
 | Apple Developer Program | ❌ **$99/year** |
 | D-U-N-S number to enrol as a company | ❌ Free, takes 5–14 days |
 | App privacy "nutrition labels" | ❌ Answers pre-written below |
-| Export compliance declaration | ❌ One question; answer is "uses HTTPS only" |
+| Export compliance declaration | ✅ `ITSAppUsesNonExemptEncryption = false` in Info.plist (5 Nov), so uploads skip the question |
 | Age rating | ❌ 4+ |
+| **Permission wording** (location, camera, photo library) | ✅ Added 5 Nov. Before this, iOS would have closed the app the first time anyone tapped "Use my location" |
+| **Privacy manifest** (`PrivacyInfo.xcprivacy`, required since 1 May 2024) | ✅ Added 5 Nov and registered in the Xcode project. Must match section D |
+| Required device capability | ✅ `arm64` (was a stale `armv7`, which App Store Connect rejects on upload) |
+| **Native push notifications** | ❌ **Not built.** The plugin is installed but unused; the server only sends web push, which does not work inside an iOS app. Pros on iPhone get no job alerts except WhatsApp. Needs an APNs key from the Apple Developer account |
+| Map tiles | ⚠️ OpenStreetMap's free tile servers forbid heavy use by distributed apps and can block them. Move to a paid tile provider before launch |
+| Reviewer demo account + Pros online | ❌ See the warning under Guideline 4.2 |
 
 ---
 
@@ -83,10 +89,13 @@ What we built instead, and what to say in the review notes:
 - **The app ships its own interface.** The HTML, CSS and JavaScript are inside the binary.
   Nothing is downloaded from freshaf.io to draw a screen — only data. The app is a client of
   an API, which is exactly how most native apps work.
-- **Real native capabilities**, wired in `public/js/native.js`:
-  native push notifications, device geolocation for the pickup pin, the camera for job photos,
-  haptic feedback on primary actions, a native splash screen and status bar, and Android
-  hardware-back handling.
+- **Real native capabilities**, wired in `public/js/native.js`: the session token kept in
+  native storage, haptic feedback on primary actions, a native splash screen and status bar,
+  Android hardware-back handling, and device location for the pickup pin.
+  **Only claim what is wired.** Corrected 5 Nov 2026: this list used to name native push and
+  the camera plugin, neither of which was in use. Telling a reviewer about a feature they then
+  cannot find is worse than not mentioning it. Native push is the next thing to build, and it
+  is also the strongest genuine answer to 4.2: Pros receiving job alerts on a locked phone.
 - **It is not a browser.** There is no address bar, no tabs, no way to navigate off FreshAF.
 
 ⚠️ **Do not submit until there are Pros on the platform.** A reviewer will create an order and

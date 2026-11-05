@@ -29,6 +29,9 @@ const KEEP = keepIdx >= 0 ? Number(args[keepIdx + 1]) || 30 : 30;
 const BASE_URL = (process.env.BACKUP_URL || process.env.BASE_URL || 'https://freshaf.io').replace(/\/$/, '');
 const EMAIL = process.env.BACKUP_EMAIL || process.env.ADMIN_EMAIL || '';
 const PASSWORD = process.env.BACKUP_PASSWORD || process.env.ADMIN_PASSWORD || '';
+// The live admin API also demands the admin key (server/routes/admin.js). Without it every
+// admin call is answered 404, so a scheduled backup failed every single night.
+const ADMIN_KEY = process.env.ADMIN_API_KEY || '';
 
 const tick = (s) => console.log(`  \x1b[32mOK\x1b[0m   ${s}`);
 const cross = (s) => console.log(`  \x1b[31mFAIL\x1b[0m ${s}`);
@@ -98,11 +101,13 @@ async function remote(dest) {
   if (!cookie) throw new Error('the server did not return a session cookie');
 
   const r = await fetch(`${BASE_URL}/api/admin/backup`, {
-    headers: { Cookie: cookie },
+    headers: { Cookie: cookie, ...(ADMIN_KEY ? { 'x-admin-key': ADMIN_KEY } : {}) },
     signal: AbortSignal.timeout(180000),
   });
   if (!r.ok) {
-    throw new Error(`backup download failed (${r.status}) — is that account an admin?`);
+    throw new Error(r.status === 404
+      ? 'backup download refused (404) — ADMIN_API_KEY in .env does not match the one on Render'
+      : `backup download failed (${r.status}) — is that account an admin?`);
   }
   fs.writeFileSync(dest, Buffer.from(await r.arrayBuffer()));
 }

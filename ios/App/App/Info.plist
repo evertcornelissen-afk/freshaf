@@ -43,13 +43,24 @@
       </array>
     </dict>
 	</dict>
+	<!-- Why FreshAF asks. iOS closes the app outright if it touches location or the camera
+	     without these, and Apple rejects vague wording, so each says exactly what for. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FreshAF uses your location to drop the pin where your car is parked or your laundry is collected, so your Pro finds you and the call-out fee is quoted correctly. Pros share it to receive nearby jobs.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>FreshAF Pros use the camera to photograph their ID and proof of address for vetting.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FreshAF Pros choose a photo of their ID and proof of address from their library for vetting.</string>
+	<!-- Only standard HTTPS. Answers the export-compliance question on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
