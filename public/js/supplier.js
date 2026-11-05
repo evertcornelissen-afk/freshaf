@@ -369,7 +369,7 @@ function ping() {
 
 function initMap() {
   if (map) return;
-  map = FreshMap.create('sup-map', [loc.lat ?? -33.8903, loc.lng ?? 18.6292], loc.lat != null ? 15 : 12, setPin);
+  map = FreshMap.create('sup-map', [loc.lat ?? -29.0, loc.lng ?? 24.5], loc.lat != null ? 15 : 5, setPin); // SA until set
   if (loc.lat != null) setPin(loc.lat, loc.lng);
 }
 

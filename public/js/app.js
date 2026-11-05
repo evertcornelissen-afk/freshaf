@@ -224,9 +224,11 @@ el('btn-change-service').onclick = () => { renderCategoryCards(); show('view-ser
 // The two categories, each with its own look and copy.
 function renderCategoryCards() {
   if (!pricing) return;
+  // Payment is stated as it is today: card only once it is live on the gateway.
+  const pay = pricing.payments_live ? 'Card or cash' : 'Pay cash on completion';
   const bullets = {
-    carwash: ['Washed where it stands', 'Vetted, rated washers', 'Card or cash'],
-    laundry: ['Collected and delivered back', 'Wash, iron, duvets & bedding', 'Card or cash'],
+    carwash: ['Washed where it stands', 'Vetted, rated washers', pay],
+    laundry: ['Collected and delivered back', 'Wash, iron, duvets & bedding', pay],
   };
   // The same two cards appear on the logged-out home and on the in-app chooser.
   const fill = (icoId, listId, key, ico) => {
@@ -439,8 +441,10 @@ function updateTotal() {
 /* ---------- map ---------- */
 function initMap() {
   if (map) return;
-  const startLat = me?.home_lat ?? -33.8903, startLng = me?.home_lng ?? 18.6292;
-  map = FreshMap.create('map', [startLat, startLng], me?.home_lat != null ? 15 : 12, setPin);
+  // With no saved address, open on the whole of South Africa; the address search, "Use my
+  // location" or a tap then brings it down to the street.
+  const startLat = me?.home_lat ?? -29.0, startLng = me?.home_lng ?? 24.5;
+  map = FreshMap.create('map', [startLat, startLng], me?.home_lat != null ? 15 : 5, setPin);
   if (me?.home_lat != null) setPin(me.home_lat, me.home_lng);
 }
 

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mobile Car Wash &amp; Laundry — Northern Suburbs, Cape Town | FreshAF</title>
-<meta name="description" content="FreshAF sends vetted pros to wash your car and collect your laundry across Bellville, Durbanville, Brackenfell, Parow and the rest of Cape Town's Northern Suburbs. Book in under a minute, pay by card or cash.">
+<title>Mobile Car Wash &amp; Laundry at Your Door, South Africa | FreshAF</title>
+<meta name="description" content="FreshAF sends vetted pros to wash your car where it is parked and to collect your laundry from your door, across South Africa. See the pros near you and book in under a minute.">
 <link rel="canonical" href="https://freshaf.io/">
 <meta name="theme-color" content="#1799c2">
 
@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="FreshAF">
 <meta property="og:url" content="https://freshaf.io/">
 <meta property="og:title" content="Mobile car wash &amp; laundry, at your door">
-<meta property="og:description" content="Vetted pros wash your car where it stands and collect your laundry from your door. Across Cape Town's Northern Suburbs.">
+<meta property="og:description" content="Vetted pros wash your car where it stands and collect your laundry from your door, across South Africa.">
 <meta property="og:image" content="https://freshaf.io/img/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_ZA">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Mobile car wash &amp; laundry, at your door">
-<meta name="twitter:description" content="Vetted pros across Cape Town's Northern Suburbs. Book in under a minute.">
+<meta name="twitter:description" content="Vetted pros across South Africa. Book in under a minute.">
 <meta name="twitter:image" content="https://freshaf.io/img/og-card.png">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/img/logo-mark.svg" type="image/svg+xml">
@@ -35,8 +35,10 @@
 <script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'dark';</script>
 <link rel="stylesheet" href="/css/style.css">
 <!-- Structured data. Deliberately no street address: the registered address is a
-     director's home, and search results are not the place to publish it. areaServed
-     is what a local search actually needs. -->
+     director's home, and search results are not the place to publish it. The address is
+     the company's home region only; areaServed is the whole country, because FreshAF
+     serves wherever there are pros. paymentAccepted says Cash until card is live on
+     Stitch; change it to "Card, Cash" in the same commit as the live keys. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -51,19 +53,9 @@
   "description": "On-demand mobile car wash and laundry. Vetted professionals come to you.",
   "priceRange": "RR",
   "currenciesAccepted": "ZAR",
-  "paymentAccepted": "Card, Cash",
+  "paymentAccepted": "Cash",
   "address": { "@type": "PostalAddress", "addressLocality": "Cape Town", "addressRegion": "Western Cape", "addressCountry": "ZA" },
-  "areaServed": [
-    { "@type": "City", "name": "Cape Town" },
-    { "@type": "Place", "name": "Bellville" }, { "@type": "Place", "name": "Durbanville" },
-    { "@type": "Place", "name": "Brackenfell" }, { "@type": "Place", "name": "Kraaifontein" },
-    { "@type": "Place", "name": "Kuils River" }, { "@type": "Place", "name": "Parow" },
-    { "@type": "Place", "name": "Goodwood" }, { "@type": "Place", "name": "Tygervalley" },
-    { "@type": "Place", "name": "Plattekloof" }, { "@type": "Place", "name": "Welgemoed" },
-    { "@type": "Place", "name": "Edgemead" }, { "@type": "Place", "name": "Bothasig" },
-    { "@type": "Place", "name": "Monte Vista" }, { "@type": "Place", "name": "Vredekloof" },
-    { "@type": "Place", "name": "Stikland" }
-  ],
+  "areaServed": { "@type": "Country", "name": "South Africa" },
   "hasOfferCatalog": {
     "@type": "OfferCatalog",
     "name": "FreshAF services",
@@ -103,7 +95,7 @@
       <div class="glow"></div>
       <span class="eyebrow">On-demand car wash &amp; laundry</span>
       <h1>Consider it <em>done.</em></h1>
-      <p>Vetted professionals come to you across Cape Town's Northern Suburbs — your car washed at your parking spot, your laundry collected, cleaned and delivered back. Choose what you need.</p>
+      <p>Vetted professionals come to you across South Africa — your car washed at your parking spot, your laundry collected, cleaned and delivered back. Choose what you need, and see which pros are available near you.</p>
     </div>
 
     <!-- The front door: pick a service first, account second. -->
@@ -155,7 +147,7 @@
       <label for="reg-name">Full name</label><input id="reg-name" name="name" autocomplete="name">
       <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocomplete="username email">
       <label for="reg-phone">Mobile number</label><input id="reg-phone" name="phone" placeholder="e.g. 082 555 1234" autocomplete="tel">
-      <label for="reg-address">Preferred address (home or work)</label><input id="reg-address" name="address" placeholder="e.g. 12 Durban Rd, Bellville" autocomplete="street-address">
+      <label for="reg-address">Preferred address (home or work)</label><input id="reg-address" name="address" placeholder="e.g. 12 Main Road, Suburb, City" autocomplete="street-address">
       <label for="reg-password">Password (min 8 characters)</label><input id="reg-password" name="password" type="password" autocomplete="new-password">
       <label class="row" style="margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--muted)">
         <input type="checkbox" id="reg-terms" style="width:auto">
@@ -218,7 +210,7 @@
         <span id="pin-status" class="muted small-text">No pin set</span>
       </div>
       <label>Address / access instructions</label>
-      <input id="order-address" placeholder="e.g. 12 Durban Rd, Bellville — complex gate code 1234">
+      <input id="order-address" placeholder="e.g. 12 Main Road, Suburb, City — complex gate code 1234">
       <label id="notes-label">Notes for the pro (optional)</label>
       <input id="order-notes" placeholder="e.g. White Hilux, keys with security">
       <h3><span class="step-num">4</span>When do you want it?</h3>
@@ -291,17 +283,17 @@
 
   <footer class="site-footer">
     <!-- The app is a single page behind a splash, so this is the one block of text that
-         is in the HTML on every view. It is also the only place the service area is
-         stated, which is what a "mobile car wash near me" search needs to match. -->
+         is in the HTML on every view. It is also where the service area is stated. FreshAF
+         is national, but a pro has to be near the address for a booking to happen, so this
+         says so instead of promising cover everywhere. -->
     <p class="footer-blurb">
-      <strong>FreshAF</strong> is an on-demand mobile car wash and laundry service in Cape Town.
+      <strong>FreshAF</strong> is an on-demand mobile car wash and laundry service in South Africa.
       A vetted pro comes to your car wherever it is parked, or collects your laundry from your
       door and delivers it back clean.
     </p>
     <p class="footer-areas">
-      <strong>Areas we serve:</strong> Bellville, Durbanville, Brackenfell, Kraaifontein,
-      Kuils River, Parow, Goodwood, Tygervalley, Plattekloof, Welgemoed, Edgemead, Bothasig,
-      Monte Vista, Vredekloof and Stikland.
+      <strong>Where we work:</strong> across South Africa. We are recruiting pros nationwide,
+      so availability depends on the pros near you: enter your address to see who can come.
     </p>
     <div class="footer-tag">FreshAF &middot; Fresh and Fast</div>
     <a href="/terms">Terms &amp; Conditions</a>
