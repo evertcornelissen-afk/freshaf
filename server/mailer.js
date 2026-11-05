@@ -183,8 +183,10 @@ function bookingConfirmed(o) {
   });
 }
 
-// A receipt, not a tax invoice. If FreshAF is or becomes VAT-registered, SARS requires a
-// tax invoice instead: the words "tax invoice", the VAT number and the VAT shown separately.
+// A receipt, never a tax invoice, and no VAT line. FreshAF is not VAT-registered (confirmed
+// by Evert, 5 Nov 2026), and a business that is not a VAT vendor may not issue a tax invoice
+// or show VAT. If FreshAF registers, this and terms section 3 change together: the words
+// "tax invoice", the VAT number, and the VAT amount shown separately.
 function receipt(o) {
   const paid = o.totalCents - o.pointsUsedCents;
   const lines = [
@@ -260,6 +262,12 @@ function refundSent({ to, name, orderId, refundCents }) {
   });
 }
 
+// The morning summary to the FreshAF inbox; see server/daily-summary.js. The lines are
+// built there from figures and fixed wording, so they are passed through as HTML.
+function adminDigest({ subject, paragraphs }) {
+  return send({ to: ADMIN_TO, subject: `[FreshAF] ${subject}`, heading: 'Daily summary', paragraphs });
+}
+
 // Operational alerts to the FreshAF inbox: refunds owed, payments that need a person.
 function adminAlert({ subject, lines }) {
   return send({ to: ADMIN_TO, subject: `[FreshAF] ${subject}`, heading: subject, paragraphs: lines.map(esc) });
@@ -298,4 +306,4 @@ function passwordChanged({ to, name }) {
 
 // layout is exported so an email can be rendered and looked at before it is sent.
 module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
-  passwordReset, passwordChanged, bookingConfirmed, receipt, orderCancelled, noProAvailable, refundSent, adminAlert };
+  passwordReset, passwordChanged, bookingConfirmed, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };

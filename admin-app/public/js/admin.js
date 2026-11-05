@@ -147,6 +147,14 @@ async function refreshReadiness() {
 }
 
 el('btn-restore').onclick = () => el('restore-file').click();
+
+const btnSummary = el('btn-daily-summary');
+if (btnSummary) btnSummary.onclick = async () => {
+  try {
+    const r = await api('/api/admin/daily-summary', { method: 'POST' });
+    toast(r.mail === 'sent' ? `Sent to admin@freshaf.io: ${r.subject}` : `Not sent (${r.mail}): ${r.subject}`, r.mail === 'sent' ? 'ok' : 'error');
+  } catch (e) { toast(e.message, 'error'); }
+};
 el('restore-file').onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;

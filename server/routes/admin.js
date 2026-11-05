@@ -174,6 +174,22 @@ router.post('/suppliers/:id/approve', (req, res) => setSupplierStatus(req, res, 
 router.post('/suppliers/:id/reject', (req, res) => setSupplierStatus(req, res, 'rejected'));
 router.post('/suppliers/:id/suspend', (req, res) => setSupplierStatus(req, res, 'suspended'));
 
+// The daily summary on demand: GET shows it, POST emails it now. ?day=YYYY-MM-DD for a
+// particular day; defaults to yesterday, South African time.
+function summaryDay(req) {
+  const d = String(req.query.day || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  return new Date(Date.now() + 2 * 3600_000 - 24 * 3600_000).toISOString().slice(0, 10);
+}
+router.get('/daily-summary', (req, res) => {
+  const s = require('../daily-summary').build(summaryDay(req));
+  res.json({ subject: s.subject, todo: s.todo });
+});
+router.post('/daily-summary', async (req, res) => {
+  const s = await require('../daily-summary').send(summaryDay(req));
+  res.json({ subject: s.subject, todo: s.todo, mail: s.mail?.status });
+});
+
 // Cancel any order that is not finished, with a reason the customer will see. Refunds owed
 // on card orders are recorded and flagged; see dispatch.cancelOrder.
 router.post('/orders/:id/cancel', (req, res) => {
