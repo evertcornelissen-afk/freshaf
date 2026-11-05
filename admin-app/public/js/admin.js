@@ -337,7 +337,7 @@ async function refreshOrders() {
 
 async function loadSettings() {
   const s = await api('/api/admin/settings');
-  el('set-commission').value = s.commission_pct;
+  el('set-commission').value = s.platform_fee_pct;
   el('set-radius').value = s.dispatch_radius_km;
   el('set-timeout').value = s.offer_timeout_sec;
   el('set-points').value = s.points_earn_pct;
@@ -351,7 +351,7 @@ el('btn-save-settings').onclick = async () => {
     await api('/api/admin/settings', {
       method: 'POST',
       body: {
-        commission_pct: el('set-commission').value,
+        platform_fee_pct: el('set-commission').value,
         dispatch_radius_km: el('set-radius').value,
         offer_timeout_sec: el('set-timeout').value,
         points_earn_pct: el('set-points').value,

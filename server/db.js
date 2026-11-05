@@ -373,6 +373,9 @@ db.exec("UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session
 // never be sent a pretend pro. Demo card payments use the test page and never charge a
 // card. Demo accounts are left out of every business figure (see the real_* views).
 addColumn('users', 'is_demo INTEGER NOT NULL DEFAULT 0');
+// Last order status the customer was emailed about, so a confirmation or receipt can never
+// be sent twice however many times the status is re-announced.
+addColumn('orders', 'emailed_status TEXT');
 db.exec(`
 DROP VIEW IF EXISTS real_orders;
 CREATE VIEW real_orders AS

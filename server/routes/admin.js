@@ -362,7 +362,9 @@ router.get('/stats', (req, res) => {
 
 router.get('/settings', (req, res) => {
   res.json({
-    commission_pct: Number(getSetting('commission_pct', '15')),
+    // FreshAF's margin on top of the pro's price (merchant of record). This replaced a
+    // "commission_pct" control that the pricing code never read: changing it did nothing.
+    platform_fee_pct: Number(getSetting('platform_fee_pct', '20')),
     dispatch_radius_km: Number(getSetting('dispatch_radius_km', '25')),
     offer_timeout_sec: Number(getSetting('offer_timeout_sec', '60')),
     points_earn_pct: Number(getSetting('points_earn_pct', '5')),
@@ -373,10 +375,10 @@ router.get('/settings', (req, res) => {
 });
 
 router.post('/settings', (req, res) => {
-  const { commission_pct, dispatch_radius_km, offer_timeout_sec,
+  const { platform_fee_pct, dispatch_radius_km, offer_timeout_sec,
     points_earn_pct, callout_free_km, callout_per_km_cents, callout_cap_cents } = req.body || {};
   const checks = [
-    ['commission_pct', commission_pct, 0, 50],
+    ['platform_fee_pct', platform_fee_pct, 0, 50],
     ['dispatch_radius_km', dispatch_radius_km, 1, 200],
     ['offer_timeout_sec', offer_timeout_sec, 10, 600],
     ['points_earn_pct', points_earn_pct, 0, 50],

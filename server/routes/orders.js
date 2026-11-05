@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.get('/pricing', (req, res) => {
   res.json({
-    services: catalog(), payments_live: payments.LIVE,
+    services: catalog(), payments_live: payments.cardAvailableFor(viewer(req)),
     points_earn_pct: Number(getSetting('points_earn_pct', '5')),
     callout: {
       free_km: Number(getSetting('callout_free_km', '5')),
@@ -27,6 +27,13 @@ router.get('/pricing', (req, res) => {
 // right. Straight-line distance picks the candidate (free); the road distance only
 // prices the one pro who would actually drive. Falls back to straight-line if the
 // lookup fails — a slightly wrong fee beats refusing to quote.
+// The signed-in visitor, if any, for decisions that depend on who is asking (card is open
+// to demo accounts before it is open to everyone). Never required.
+function viewer(req) {
+  const u = require('../auth').readToken(req);
+  return u ? db.prepare('SELECT id, is_demo FROM users WHERE id = ?').get(u.id) : null;
+}
+
 async function computeCallout(lat, lng, service, customerId) {
   const sups = db.prepare(
     `SELECT s.lat, s.lng FROM suppliers s WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
@@ -223,6 +230,9 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
   }
 
   const customer = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (payment_method === 'card' && !payments.cardAvailableFor(customer)) {
+    return res.status(400).json({ error: 'Card payments are not available yet. Please choose cash.' });
+  }
   const pointsUsed = use_points ? Math.min(customer.points_cents || 0, q.total_cents) : 0;
   if (pointsUsed > 0) {
     db.prepare('UPDATE users SET points_cents = points_cents - ? WHERE id = ?').run(pointsUsed, req.user.id);
@@ -312,6 +322,9 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
 
   // Rewards redemption — platform-funded, deducted from what the customer pays.
   const customer = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (payment_method === 'card' && !payments.cardAvailableFor(customer)) {
+    return res.status(400).json({ error: 'Card payments are not available yet. Please choose cash.' });
+  }
   const pointsUsed = use_points ? Math.min(customer.points_cents || 0, price) : 0;
   if (pointsUsed > 0) {
     db.prepare('UPDATE users SET points_cents = points_cents - ? WHERE id = ?').run(pointsUsed, req.user.id);
@@ -355,9 +368,7 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
 // sitting in pending_payment.
 async function startPayment(order, customer, res) {
   try {
-    const pay = customer.is_demo
-      ? { url: `/pay/${order.id}`, mode: 'sandbox' } // a reviewer's card is never charged
-      : await payments.createPayment(order, customer);
+    const pay = await payments.createPayment(order, customer); // demo handling lives there
     if (pay.reference) db.prepare('UPDATE orders SET payment_ref = ? WHERE id = ?').run(pay.reference, order.id);
     return pay;
   } catch (e) {
@@ -393,8 +404,10 @@ function afterPayment(orderId) {
 }
 
 router.post('/orders/:id/pay-sandbox', authRequired('customer'), (req, res) => {
+  // Marks an order paid without any money moving, so it is for demo accounts only. Before
+  // this, any customer could open /pay/<id> while card was not live and "pay" for free.
   const demo = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(req.user.id)?.is_demo;
-  if (payments.LIVE && !demo) return res.status(400).json({ error: 'Live payments enabled — sandbox disabled' });
+  if (!demo) return res.status(403).json({ error: 'Test payments are only available on demo accounts' });
   const order = db.prepare('SELECT * FROM orders WHERE id = ? AND customer_id = ?').get(req.params.id, req.user.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   if (order.status !== 'pending_payment') return res.status(400).json({ error: 'Order is not awaiting payment' });

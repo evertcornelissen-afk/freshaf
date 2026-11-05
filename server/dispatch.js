@@ -45,6 +45,44 @@ function orderPublic(order) {
 
 function notifyCustomer(order) {
   realtime.send(order.customer_id, 'order_update', orderPublic(order));
+  emailCustomer(order);
+}
+
+// Booking confirmed when a pro takes the job, receipt when it is done. Everything else
+// (on the way, started) is shown live in the app, where the customer is looking anyway.
+function emailCustomer(order) {
+  if (!['accepted', 'completed'].includes(order.status)) return;
+  try {
+    const claimed = db.prepare(`UPDATE orders SET emailed_status = ?
+      WHERE id = ? AND COALESCE(emailed_status, '') != ?`).run(order.status, order.id, order.status).changes;
+    if (!claimed) return;
+    const fresh = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    const customer = db.prepare('SELECT name, email FROM users WHERE id = ?').get(fresh.customer_id);
+    if (!customer?.email || customer.email.endsWith('@freshaf.invalid')) return;
+    const pro = fresh.supplier_id ? db.prepare(`SELECT u.name, s.business_name FROM users u
+      JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(fresh.supplier_id) : null;
+    const { SERVICES } = require('./pricing');
+    const svc = SERVICES[fresh.service];
+    const details = {
+      orderId: fresh.id,
+      service: svc?.name || fresh.service,
+      pkg: svc?.packages?.[fresh.package]?.name || fresh.package,
+      unit: svc?.units?.[fresh.vehicle]?.name || fresh.vehicle,
+      address: fresh.address,
+      scheduledFor: fresh.scheduled_for,
+      proName: pro ? `${pro.business_name}${pro.name ? ` (${pro.name})` : ''}` : null,
+      totalCents: fresh.price_cents,
+      pointsUsedCents: fresh.points_used_cents || 0,
+      pointsEarnedCents: fresh.points_earned_cents || 0,
+      paymentMethod: fresh.payment_method,
+      completedAt: fresh.completed_at,
+    };
+    const mailer = require('./mailer');
+    const send = fresh.status === 'accepted' ? mailer.bookingConfirmed : mailer.receipt;
+    send({ to: customer.email, name: customer.name, ...details }).catch(() => {});
+  } catch (e) {
+    console.warn(`[FreshAF] Could not email order ${order.id}: ${e.message}`);
+  }
 }
 
 // Offer the job to the nearest online, approved supplier not yet tried for this order.

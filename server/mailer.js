@@ -72,6 +72,17 @@ async function send({ to, subject, heading, paragraphs, cta }) {
   const html = layout(heading, paragraphs, cta);
   const text = [heading, '', ...paragraphs.map((p) => p.replace(/<[^>]+>/g, '')), cta ? `${cta.label}: ${cta.url}` : ''].join('\n');
   if (!transport) {
+    // Local development: MAIL_PREVIEW_DIR=some/folder saves each email as an .html file
+    // to open in a browser, so a template can be looked at without sending anything.
+    if (process.env.MAIL_PREVIEW_DIR) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        fs.mkdirSync(process.env.MAIL_PREVIEW_DIR, { recursive: true });
+        const name = `${Date.now()}-${subject.replace(/[^a-z0-9]+/gi, '-').slice(0, 60)}.html`;
+        fs.writeFileSync(path.join(process.env.MAIL_PREVIEW_DIR, name), html);
+      } catch { /* preview only */ }
+    }
     console.log(`[FreshAF][mail:dry-run] ${subject} -> ${to}`);
     return { ok: true, status: 'dry_run' };
   }
@@ -142,6 +153,66 @@ function adminNewPro({ name, business, email, phone, services }) {
   });
 }
 
+const rand = (cents) => `R${(Math.round(Number(cents) || 0) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`;
+const firstName = (name) => esc(String(name || '').split(' ')[0] || 'there');
+const row = (k, v) => `<tr><td style="padding:4px 14px 4px 0;color:#5b7480;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:4px 0">${v}</td></tr>`;
+
+function bookingConfirmed(o) {
+  const when = o.scheduledFor ? esc(o.scheduledFor) : 'As soon as possible';
+  const pay = o.paymentMethod === 'cash'
+    ? `${rand(o.totalCents - o.pointsUsedCents)}, paid in cash to your pro when the job is done`
+    : `${rand(o.totalCents - o.pointsUsedCents)}, paid by card`;
+  return send({
+    to: o.to,
+    subject: `Booked: ${o.service} #${o.orderId}`,
+    heading: 'Your booking is confirmed',
+    paragraphs: [
+      `Hi ${firstName(o.name)},`,
+      `Your pro has accepted the job. You can follow them live in the app, from on the way to done.`,
+      `<table cellpadding="0" cellspacing="0" style="font-size:14px">${[
+        row('Order', `#${o.orderId}`),
+        row('Service', esc(`${o.service}: ${o.pkg}, ${o.unit}`)),
+        row('Pro', esc(o.proName || 'Your FreshAF pro')),
+        row('Where', esc(o.address)),
+        row('When', when),
+        row('Price', pay),
+      ].join('')}</table>`,
+      'Need to change something? Reply to this email or cancel in the app before your pro is on the way.',
+    ],
+    cta: { label: 'Track my order', url: `${BASE}/?track=${o.orderId}` },
+  });
+}
+
+// A receipt, not a tax invoice. If FreshAF is or becomes VAT-registered, SARS requires a
+// tax invoice instead: the words "tax invoice", the VAT number and the VAT shown separately.
+function receipt(o) {
+  const paid = o.totalCents - o.pointsUsedCents;
+  const lines = [
+    row('Receipt for order', `#${o.orderId}`),
+    row('Date', esc(String(o.completedAt || '').slice(0, 16) || new Date().toISOString().slice(0, 16).replace('T', ' '))),
+    row('Service', esc(`${o.service}: ${o.pkg}, ${o.unit}`)),
+    row('Done by', esc(o.proName || 'Your FreshAF pro')),
+    row('Where', esc(o.address)),
+    row('Price', rand(o.totalCents)),
+  ];
+  if (o.pointsUsedCents > 0) lines.push(row('Rewards used', `-${rand(o.pointsUsedCents)}`));
+  lines.push(row('<strong>Paid</strong>', `<strong>${rand(paid)}</strong> ${o.paymentMethod === 'cash' ? '(cash, to your pro)' : '(card)'}`));
+  if (o.pointsEarnedCents > 0) lines.push(row('Rewards earned', `${rand(o.pointsEarnedCents)} to spend on your next order`));
+  return send({
+    to: o.to,
+    subject: `Receipt: ${o.service} #${o.orderId}`,
+    heading: 'All done. Here is your receipt',
+    paragraphs: [
+      `Hi ${firstName(o.name)},`,
+      'Thank you for using FreshAF. Your job is complete.',
+      `<table cellpadding="0" cellspacing="0" style="font-size:14px">${lines.join('')}</table>`,
+      'How did it go? Rate your pro in the app. It helps the best pros get more work.',
+      '<span style="font-size:12px;color:#5b7480">FreshAF (Pty) Ltd, registration 2026/683087/07. FreshAF sells this service to you and pays the pro who carried it out.</span>',
+    ],
+    cta: { label: 'Rate your pro', url: `${BASE}/?track=${o.orderId}` },
+  });
+}
+
 function passwordReset({ to, name, url, minutes }) {
   return send({
     to,
@@ -173,5 +244,6 @@ function passwordChanged({ to, name }) {
   });
 }
 
-module.exports = { configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
-  passwordReset, passwordChanged };
+// layout is exported so an email can be rendered and looked at before it is sent.
+module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
+  passwordReset, passwordChanged, bookingConfirmed, receipt };
