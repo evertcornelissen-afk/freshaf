@@ -166,12 +166,16 @@ customer's property or vehicle, loss of a customer's items, injury caused by the
 helpers, use of unsafe equipment, and failure to attend an accepted job.
 
 8.3 **FreshAF maintains public liability insurance of not less than R5 000 000** in respect of the
-services, which responds to a customer claim arising from a job performed by the Supplier.
+services. **That cover extends to the Supplier while they are performing a job accepted through
+FreshAF**, and responds to a customer claim arising from that job whether the claim is brought
+against FreshAF or against the Supplier. The Supplier is not required to carry their own public
+liability insurance in order to be approved.
 
 8.4 Where FreshAF's insurer meets a claim caused by the Supplier's act or omission, **the Supplier
 is liable to FreshAF for the policy excess, capped at R5 000 per incident**, recoverable under
-clause 4.5. FreshAF may require a Supplier with repeated claims to obtain their own public
-liability cover as a condition of continued approval.
+clause 4.5 **by set-off against no more than 25% of any weekly payment**, so that a single
+incident cannot take a whole week's earnings. FreshAF may require a Supplier with repeated
+claims to obtain their own public liability cover as a condition of continued approval.
 
 8.5 The Supplier must hold, and produce on request, any insurance or registration the law requires
 of their own business — in particular valid motor insurance and a licence for any vehicle they
@@ -185,7 +189,15 @@ for that job.**
 > Requiring every Pro to carry public liability before onboarding would cut supply to near zero,
 > because almost none of them do. FreshAF carrying its own cover is the only protection that
 > actually pays out, and it is within FreshAF's control. The excess in 8.4 keeps the Pro exposed
-> enough to care.
+> enough to care, but is capped and bled off at 25% of a weekly payment so it cannot wipe a
+> week's earnings.
+>
+> **It is also the best recruiting line FreshAF has.** A Pro working alone carries a scratched
+> Fortuner personally. Working through FreshAF, they do not. With zero Pros on the platform that
+> is worth more than the premium costs.
+>
+> ⚠️ **The policy must be bought to extend to subcontractors.** A standard public liability
+> policy covers the business's own staff only. Say this to the broker explicitly.
 
 ## 9. Suspension and termination
 
@@ -235,7 +247,7 @@ Signature: ______________________  Date: ____________
 
 | Item | Who |
 |---|---|
-| **Buy the R5 000 000 public liability policy.** Clause 8.3 says FreshAF carries it; until the policy exists that sentence is untrue | **Evert — before the first job** |
+| **Buy the R5 000 000 public liability policy, extending to subcontractors.** Clause 8.3 says FreshAF carries it and that it covers the Pro; until the policy exists that sentence is untrue | **Evert — before the first job** |
 | Sign with each Supplier at onboarding; fill name / ID / address by hand | Evert |
 | Lawyer to read clauses 2, 7 and 8 — contractor status, confidentiality, liability cap | Nikki |
 | Build the invoice / self-billed statement mechanism and the weekly Wednesday payout run | Claude |
