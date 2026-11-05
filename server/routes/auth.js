@@ -4,8 +4,36 @@ const { db } = require('../db');
 const { setAuthCookie, clearAuthCookie, readToken, authRequired } = require('../auth');
 const mailer = require('../mailer');
 const secrets = require('../secrets');
+const { rateLimit, forgive } = require('../ratelimit');
 
 const router = express.Router();
+
+// Nothing here was throttled at all until now, on a live site that stores ID numbers and
+// bank details: a script could try passwords as fast as the network allowed.
+//
+// Two limiters per sensitive route, deliberately. The per-address one stops one attacker
+// hammering many accounts; the per-email one stops a botnet spread across many addresses
+// hammering ONE account, which the address limiter alone cannot see. The email limiter is
+// the looser of the two so that a person genuinely mistyping their own password is not
+// the one who gets locked out.
+const loginByIp = rateLimit({
+  name: 'login-ip', windowMs: 15 * 60_000, max: 20,
+  message: 'Too many sign-in attempts from this connection. Wait a few minutes and try again.',
+});
+const loginByEmail = rateLimit({
+  name: 'login-email', windowMs: 15 * 60_000, max: 10,
+  keyBy: (req) => String(req.body?.email || '').trim().toLowerCase() || 'none',
+  message: 'Too many sign-in attempts for this account. Wait a few minutes and try again.',
+});
+const registerLimit = rateLimit({
+  name: 'register', windowMs: 60 * 60_000, max: 10,
+  message: 'Too many accounts created from this connection. Try again later.',
+});
+// Deleting an account asks for the password, so it is a password oracle like any other.
+const deleteLimit = rateLimit({
+  name: 'delete-account', windowMs: 15 * 60_000, max: 10,
+  message: 'Too many attempts. Wait a few minutes and try again.',
+});
 
 function supplierProfile(userId) {
   return db.prepare('SELECT * FROM suppliers WHERE user_id = ?').get(userId) || null;
@@ -34,7 +62,7 @@ function mePayload(user) {
 
 const VALID_SERVICES = ['carwash', 'laundry'];
 
-router.post('/register', (req, res) => {
+router.post('/register', registerLimit, (req, res) => {
   const { role, name, email, phone, password, home_address, home_lat, home_lng, accept_terms,
     business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
     bank_name, bank_account, bank_branch, vehicles, equipment } = req.body || {};
@@ -127,12 +155,15 @@ router.post('/register', (req, res) => {
   res.json({ user: mePayload(user) });
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', loginByIp, loginByEmail, (req, res) => {
   const { email, password } = req.body || {};
   const user = email && db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim());
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
+  // A correct password clears the address budget, so a household or office behind one
+  // address is not locked out by whoever fumbled their password first this morning.
+  forgive('login-ip', req);
   setAuthCookie(res, user);
   res.json({ user: mePayload(user) });
 });
@@ -167,7 +198,7 @@ router.post('/profile', authRequired('customer', 'supplier'), (req, res) => {
 
 // Permanent account deletion (required for app-store listing). Anonymises the user so
 // completed-order history and marketplace accounting stay intact.
-router.post('/delete-account', authRequired('customer', 'supplier'), (req, res) => {
+router.post('/delete-account', deleteLimit, authRequired('customer', 'supplier'), (req, res) => {
   const { password } = req.body || {};
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {

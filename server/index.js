@@ -14,12 +14,7 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1); // secure cookies behind the host's TLS proxy
 }
 app.disable('x-powered-by');
-app.use((req, res, next) => {
-  res.set('X-Content-Type-Options', 'nosniff');
-  res.set('X-Frame-Options', 'DENY');
-  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  next();
-});
+app.use(require('./security').securityHeaders(path.join(__dirname, '..', 'public')));
 // Stitch signs the RAW body, so this one path must not be JSON-parsed. express.json()
 // skips a request whose body a previous parser already set.
 app.use('/api/payments/stitch/webhook', express.raw({ type: '*/*', limit: '1mb' }));
@@ -195,8 +190,40 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong on our side' });
 });
 
+// Until now a single unhandled promise rejection killed the process. Node's default for
+// an unhandled rejection is to terminate, and this app awaits on Stitch, SMTP, Google
+// Places and Web Push — four things that fail for reasons outside our control. Render
+// restarts it, but a customer mid-checkout sees the failure and the dispatch loop has to
+// rebuild its state.
+//
+// These handlers log and keep serving. That is the right call for a rejection, which is
+// usually one request's problem. An uncaughtException is different: the process may be
+// in an unknown state, so it finishes in-flight requests and then exits for a clean
+// restart rather than serving from a corrupted one.
+process.on('unhandledRejection', (reason) => {
+  console.error('[FreshAF] Unhandled promise rejection (continuing):',
+    reason instanceof Error ? reason.stack : reason);
+});
+
+let server;
+function shutdown(code, label) {
+  console.error(`[FreshAF] ${label} — finishing in-flight requests, then exiting.`);
+  if (!server) process.exit(code);
+  // Do not wait forever for a hung socket to drain.
+  const force = setTimeout(() => process.exit(code), 5000);
+  force.unref();
+  server.close(() => process.exit(code));
+}
+process.on('uncaughtException', (err) => {
+  console.error('[FreshAF] Uncaught exception:', err?.stack || err);
+  shutdown(1, 'Uncaught exception');
+});
+// Render sends SIGTERM on deploy. Draining first means nobody's order is cut mid-write.
+process.on('SIGTERM', () => shutdown(0, 'SIGTERM received'));
+process.on('SIGINT', () => shutdown(0, 'SIGINT received'));
+
 const PORT = Number(process.env.PORT || 5757);
-app.listen(PORT, () => {
+server = app.listen(PORT, () => {
   console.log(`[FreshAF] Fresh and Fast — running at http://localhost:${PORT}`);
   console.log(`[FreshAF] Customer app:    http://localhost:${PORT}/`);
   console.log(`[FreshAF] Supplier portal: http://localhost:${PORT}/supplier`);
