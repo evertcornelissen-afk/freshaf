@@ -1,8 +1,8 @@
 # DRAFT — Terms for laundry returned to a different address
 
 **Status: NOT PUBLISHED. Awaiting Evert's approval of the full wording** (and ideally the
-lawyer's read, with the rest of the terms). Option (a) for "no one can receive it" was chosen
-by Evert on 6 Nov 2026 at 00:26. Nothing here is on freshaf.io/terms. When approved, it goes into
+lawyer's read, with the rest of the terms). The "no one can receive it" rule is Evert's of 6 Nov 2026,
+00:34: back to the Pro's premises, redelivery only on a new request, at a fee. Nothing here is on freshaf.io/terms. When approved, it goes into
 `public/terms.html` and the "Last updated" date changes in the same commit.
 
 Written 6 November 2026 against the feature shipped in `5d23262`.
@@ -29,17 +29,19 @@ Written 6 November 2026 against the feature shipped in `5d23262`.
   starts then.
 
 - **If no one can receive it.** If nobody is available to receive the laundry at the return
-  address during the window you chose, the Pro will try to contact you and will keep your
-  laundry safe. We will arrange a second delivery attempt with you, and that second attempt is
-  charged at the return-trip rate shown in the app. Until it is handed over, your laundry
-  remains our responsibility.
+  address during the window you chose, the Pro will try to contact you. If it still cannot be
+  handed over, the Pro takes your laundry back to their premises and keeps it there. It is not
+  brought back again automatically. To have it delivered, request a new delivery in the app;
+  a redelivery fee applies, and you are shown it before you confirm.
 
 ## Section 11 (Terms for Pros) — add this point
 
 - **Laundry handovers.** When you deliver laundry you must, in FreshAF Pro, photograph the
   items being handed over and record the name of the person who received them. Hand laundry
   only to the receiver the customer named, or to the customer. A laundry job is not complete
-  until the handover is recorded.
+  until the handover is recorded. If nobody is there to receive it, take the laundry back to
+  your premises, keep it safe, and deliver it only when the customer requests a new delivery
+  through FreshAF.
 
 ## Privacy policy — matching change also needed
 
@@ -51,7 +53,14 @@ still names PayFast as the card processor; it is Stitch.)
 
 ## Not in the app yet (internal note, not terms wording)
 
-Option (a) needs a "Nobody there — arrange a second attempt" action for the Pro, which records
-the failed attempt and charges the return-trip rate for the second one. Today the Pro would
-phone the customer and FreshAF would adjust the order by hand. Build before publishing these
-terms, or publish knowing the second-attempt charge is applied manually.
+The rule above needs app support that does not exist yet: a Pro action "Nobody there, back to
+my premises", a "Request redelivery" step for the customer with the fee shown, and a
+redelivery fee the owner has set. Listed in full in the chat of 6 Nov 2026; not built until
+Evert says so. **The redelivery fee amount is Evert's decision and is deliberately not set.**
+
+## Open points for Evert (not yet in the wording)
+
+- How long the Pro keeps uncollected laundry, and what happens after that.
+- Whether the customer may collect from the Pro instead of paying for redelivery.
+- Whether FreshAF stays responsible for the laundry while the Pro holds it (the wording above
+  is silent on this; the earlier draft said it did).
