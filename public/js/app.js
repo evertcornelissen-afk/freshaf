@@ -746,6 +746,7 @@ function renderTrack(order) {
   const steps = STEPS_BY_SERVICE[order.service] || STEPS;
   const idx = steps.indexOf(order.status);
   const labels = STEP_LABELS[order.service] || STEP_LABELS.carwash;
+  el('track-timeline').classList.toggle('six', steps.length > 5); // narrow screens: see style.css
   el('track-timeline').innerHTML = steps.map((s, i) => {
     const cls = idx < 0 ? '' : i < idx ? 'done' : i === idx ? 'current' : '';
     return `<div class="step ${cls}">${labels[s]}</div>`;

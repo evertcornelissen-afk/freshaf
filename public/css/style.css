@@ -317,6 +317,13 @@ button.small { padding: 8px 14px; font-size: .8rem; border-radius: 9px; }
 .toast.error .icon { color: var(--danger); }
 .toast.info .icon { color: var(--accent); }
 .toast.out { animation: toastOut .3s var(--ease) forwards; }
+/* Phones: compact, full-width, and never more than two at once (see toast() in common.js),
+   so a run of status updates does not cover the price and order details. Tap to dismiss. */
+@media (max-width: 520px) {
+  #toast-root { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); max-width: none; gap: 6px; }
+  .toast { padding: 9px 12px; font-size: .8rem; border-radius: 10px; gap: 8px; }
+}
+.toast { cursor: pointer; }
 @keyframes toastIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { to { opacity: 0; transform: translateX(24px); } }
 
@@ -455,6 +462,20 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
   animation: stepPulse 1.8s infinite;
 }
 .step.current::after { background: var(--accent); }
+/* Phones. A flex item will not shrink below its longest word, so on a ~340px card the six
+   laundry steps (Searching ... Out for delivery, Delivered) ran together and "Delivered" was
+   pushed past the card's right edge. Labels are smaller and may wrap ("Out for / delivery").
+   Six labels still touch at 390px, so up to 420px a six-step timeline shows only the current
+   step's label; the dots, the line and the status pill above still show where the order is.
+   The five-step car-wash timeline fits and keeps all its labels. */
+@media (max-width: 520px) {
+  .timeline { margin: 18px -4px; }
+  .step { min-width: 0; padding: 26px 1px 0; font-size: .6rem; line-height: 1.25; letter-spacing: -.01em; }
+}
+@media (max-width: 420px) {
+  .timeline.six .step:not(.current) { color: transparent; }
+  .timeline.six .step.current { font-size: .64rem; }
+}
 @keyframes stepPulse {
   0%, 100% { box-shadow: 0 0 0 4px rgba(33, 172, 207, .22); }
   50% { box-shadow: 0 0 0 8px rgba(33, 172, 207, .07); }

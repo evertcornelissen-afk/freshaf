@@ -416,15 +416,26 @@ function toast(message, type = 'info') {
     root.id = 'toast-root';
     document.body.appendChild(root);
   }
+  // At most two on screen: a third replaces the oldest, so stacked updates never pile up
+  // over the order details. Gone after 3 s (errors 4.5 s, they need reading), or on a tap.
+  const TOAST_MAX = 2;
+  const live = [...root.querySelectorAll('.toast:not(.out)')];
+  live.slice(0, Math.max(0, live.length - (TOAST_MAX - 1))).forEach((old) => old.remove());
   const t = document.createElement('div');
   t.className = `toast ${type}`;
+  t.setAttribute('role', type === 'error' ? 'alert' : 'status');
   const ic = type === 'ok' ? 'check' : type === 'error' ? 'alert' : 'signal';
   t.innerHTML = `${icon(ic)}<span>${message}</span>`;
   root.appendChild(t);
-  setTimeout(() => {
+  let gone = false;
+  const dismiss = () => {
+    if (gone) return;
+    gone = true;
     t.classList.add('out');
     setTimeout(() => t.remove(), 320);
-  }, 4200);
+  };
+  t.addEventListener('click', dismiss);
+  setTimeout(dismiss, type === 'error' ? 4500 : 3000);
 }
 
 /* ---------- modal (replaces confirm/prompt) ---------- */
