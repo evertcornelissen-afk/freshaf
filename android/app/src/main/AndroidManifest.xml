@@ -38,4 +38,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Job alerts. Android 13+ shows no notification at all without this. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "Use my location" for the pickup pin and a Pro's position. The web view asks at
+         runtime, but only for permissions declared here; without them the button silently fails. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Pros photographing their ID and proof of address for vetting. -->
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

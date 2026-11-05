@@ -295,6 +295,13 @@ router.get('/readiness', (req, res) => {
           : 'JWT_SECRET is not set, so every deploy signs everyone out.' },
       { key: 'card_payments', label: 'Card payments live', ok: payments.LIVE,
         detail: payments.statusDetail() },
+      { key: 'native_push', label: 'App push notifications live (iOS + Android)',
+        ok: require('../native-push').configured().ios && require('../native-push').configured().android,
+        detail: (() => {
+          const c = require('../native-push').configured();
+          return `iOS: ${c.ios ? 'live' : 'off. Set APNS_KEY, APNS_KEY_ID, APNS_TEAM_ID (Apple Developer > Keys)'}. `
+            + `Android: ${c.android ? 'live' : 'off. Set FCM_SERVICE_ACCOUNT (Firebase > Service accounts)'}.`;
+        })() },
       { key: 'whatsapp', label: 'WhatsApp job alerts live', ok: whatsapp.configured(),
         detail: whatsapp.configured() ? 'Alerts are being sent.' : 'Dry run — see WHATSAPP-SETUP.md.' },
       // Proven by an actual sign-in to the mail server at boot, not by the password

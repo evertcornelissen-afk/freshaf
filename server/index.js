@@ -160,6 +160,24 @@ app.get('/api/geocode/place', async (req, res) => {
   }
 });
 
+// Native app push (APNs / FCM). The app asks first which platforms the server can send to,
+// and only then asks the person for permission.
+const nativePush = require('./native-push');
+app.get('/api/push/native-config', (req, res) => res.json(nativePush.configured()));
+app.post('/api/push/device', authRequired('customer', 'supplier'), (req, res) => {
+  try {
+    nativePush.register(req.user.id, String(req.body?.platform || ''), String(req.body?.token || ''));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+// Called by the app just before signing out, so this phone stops receiving the account's
+// alerts the moment someone else might pick it up.
+app.post('/api/push/device/remove', authRequired(), (req, res) => {
+  res.json({ ok: true, removed: nativePush.unregister(req.user.id, req.body?.token) });
+});
+
 // Web Push (provider job alerts)
 app.get('/api/push/key', (req, res) => res.json({ key: push.publicKey() }));
 app.post('/api/push/subscribe', authRequired(), (req, res) => {

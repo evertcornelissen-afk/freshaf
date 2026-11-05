@@ -72,7 +72,8 @@ in our build. Three ways round it:
 | **Permission wording** (location, camera, photo library) | ✅ Added 5 Nov. Before this, iOS would have closed the app the first time anyone tapped "Use my location" |
 | **Privacy manifest** (`PrivacyInfo.xcprivacy`, required since 1 May 2024) | ✅ Added 5 Nov and registered in the Xcode project. Must match section D |
 | Required device capability | ✅ `arm64` (was a stale `armv7`, which App Store Connect rejects on upload) |
-| **Native push notifications** | ❌ **Not built.** The plugin is installed but unused; the server only sends web push, which does not work inside an iOS app. Pros on iPhone get no job alerts except WhatsApp. Needs an APNs key from the Apple Developer account |
+| **Native push notifications** | ✅ **Built 5 Nov** (`server/native-push.js`, app side in `public/js/native.js`, AppDelegate token hand-off, `App.entitlements`). Tested against stand-in Apple and Google servers. **Switches on when the APNs key is set on Render** (step B4); until then the app does not ask for permission |
+| iOS build without a Mac | ✅ `codemagic.yaml` ready: builds, signs and uploads to TestFlight (step B2) |
 | Map tiles | ⚠️ OpenStreetMap's free tile servers forbid heavy use by distributed apps and can block them. Move to a paid tile provider before launch |
 | Reviewer demo account + Pros online | ❌ See the warning under Guideline 4.2 |
 
@@ -174,7 +175,37 @@ review is typically a few days.
 2. Enrol as an **Organization**, which needs the same **D-U-N-S number** as Play. One D-U-N-S
    serves both, so get it once.
 
-### B2. Build
+### B2. Build in the cloud with Codemagic (no Mac needed)
+`codemagic.yaml` in the repo does the whole build. One-time setup, after B1:
+1. **App Store Connect → Users and Access → Integrations → App Store Connect API →
+   Generate API Key.** Name `Codemagic`, access **App Manager**. Download the `.p8` file
+   (Apple lets you download it **once**) and note the **Key ID** and **Issuer ID**.
+2. **codemagic.io** → sign up with GitHub → add the `freshaf` repository.
+3. **Codemagic → Team settings → Integrations → Developer Portal → Connect.** Name it exactly
+   `FreshAF App Store Connect`; paste the Issuer ID and Key ID; upload the `.p8`.
+4. **App Store Connect → Apps → + → New App**: iOS, name FreshAF, bundle ID `io.freshaf.app`,
+   SKU `freshaf-ios`. (If the bundle ID is not in the list, Codemagic registers it on the
+   first build; create the app record straight after.)
+5. **Codemagic → freshaf → Start new build → workflow "FreshAF iOS -> TestFlight".**
+   About 15 minutes later the build is in TestFlight. Install the TestFlight app on your
+   iPhone and test it there before anything goes to review.
+
+### B4. Switch on push notifications for iPhone
+1. **developer.apple.com → Certificates, IDs & Profiles → Keys → +.** Name `FreshAF APNs`,
+   tick **Apple Push Notifications service (APNs)**, Continue, Register, **Download** the
+   `.p8` (once only). Note the **Key ID**, and your **Team ID** (top right of the page).
+2. On Render → freshaf → Environment, add three variables:
+   `APNS_KEY_ID` (the Key ID), `APNS_TEAM_ID` (the Team ID), and `APNS_KEY` (open the `.p8`
+   in Notepad, copy everything including the BEGIN/END lines, paste).
+3. Save. After the redeploy the log shows `[FreshAF][push] native: iOS ON`, and the admin
+   readiness screen turns green for iOS.
+
+Android push is the same idea with Firebase: create a Firebase project, add an Android app
+`io.freshaf.app`, put its `google-services.json` in `android/app/`, and paste the
+service-account JSON (Firebase → Project settings → Service accounts → Generate new private
+key) into a Render variable named `FCM_SERVICE_ACCOUNT`.
+
+### B2-alt. Build on a Mac instead
 On the Mac, with the repo cloned and Xcode installed:
 
 ```bash

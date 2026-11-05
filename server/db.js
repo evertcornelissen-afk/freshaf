@@ -367,6 +367,20 @@ checkpoint(); // fold in whatever the last run left behind
 addColumn('users', 'session_key TEXT');
 db.exec("UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session_key IS NULL");
 
+// Native app push tokens (APNs / FCM); see server/native-push.js.
+db.exec(`
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  platform TEXT NOT NULL CHECK (platform IN ('ios','android')),
+  token TEXT NOT NULL UNIQUE,
+  apns_env TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+`);
+
 // Password reset links. Only a SHA-256 of the token is kept; see routes/auth.js.
 db.exec(`
 CREATE TABLE IF NOT EXISTS password_resets (

@@ -26,6 +26,10 @@ function subscribe(userId, subscription) {
 }
 
 async function sendToUser(userId, payload) {
+  // The apps first: a Pro with the app installed is the case that matters most, and a
+  // slow web-push endpoint must not hold up the alert to their phone.
+  require('./native-push').sendToUser(userId, payload)
+    .catch((e) => console.warn(`[FreshAF][push] native send failed: ${e.message}`));
   const rows = db.prepare('SELECT id, subscription FROM push_subscriptions WHERE user_id = ?').all(userId);
   const body = JSON.stringify(payload);
   for (const row of rows) {

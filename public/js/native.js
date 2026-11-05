@@ -66,6 +66,80 @@
   // ---- native chrome -------------------------------------------------------
   function plugin(name) { return (cap.Plugins && cap.Plugins[name]) || null; }
 
+  // ---- push notifications ---------------------------------------------------
+  // Permission is asked for only when the person taps "Enable job alerts", never at launch:
+  // Apple's guidance, and a prompt with no context is the one people refuse. Nothing is
+  // asked at all until the server confirms it can send to this platform.
+  var Push = plugin('PushNotifications');
+  var platform = cap.getPlatform ? cap.getPlatform() : '';
+  var pushToken = null;
+  var listening = false;
+
+  function openFromNotification(url) {
+    if (!url) return;
+    // '/supplier?job=12' -> 'supplier.html?job=12': the page names map as for links,
+    // and the query string survives so the notification opens the right job or order.
+    var m = /^\/?([^?#]*)(.*)$/.exec(String(url));
+    var name = m ? m[1] : '';
+    var rest = m ? m[2] : '';
+    window.location.href = (CLEAN_URLS.indexOf(name) !== -1 ? name + '.html' : 'index.html') + rest;
+  }
+
+  function listen() {
+    if (listening || !Push) return;
+    listening = true;
+    Push.addListener('registration', function (t) {
+      pushToken = t && t.value;
+      if (!pushToken || typeof api !== 'function') return;
+      api('/api/push/device', { method: 'POST', body: { platform: platform, token: pushToken } })
+        .catch(function () { /* retried on next launch */ });
+    });
+    Push.addListener('registrationError', function () { pushToken = null; });
+    Push.addListener('pushNotificationActionPerformed', function (a) {
+      var data = (a && a.notification && a.notification.data) || {};
+      openFromNotification(data.url);
+    });
+  }
+
+  window.FreshAFNative.push = {
+    available: !!Push && (platform === 'ios' || platform === 'android'),
+    // 'granted' | 'denied' | 'prompt' | 'unavailable'
+    status: function () {
+      if (!this.available) return Promise.resolve('unavailable');
+      return Push.checkPermissions().then(function (p) {
+        return p.receive === 'granted' ? 'granted' : p.receive === 'denied' ? 'denied' : 'prompt';
+      }).catch(function () { return 'unavailable'; });
+    },
+    // ask=false only refreshes an existing grant (on every launch, so the token stays current).
+    enable: function (ask) {
+      var self = this;
+      if (!self.available) return Promise.resolve('unavailable');
+      return fetch(window.FRESHAF_API_BASE + '/api/push/native-config')
+        .then(function (r) { return r.json(); })
+        .then(function (cfg) {
+          if (!cfg || !cfg[platform]) return 'unavailable';
+          return self.status().then(function (st) {
+            if (st === 'granted') return 'granted';
+            if (st === 'denied' || !ask) return st;
+            return Push.requestPermissions().then(function (p) { return p.receive === 'granted' ? 'granted' : 'denied'; });
+          }).then(function (st) {
+            if (st === 'granted') { listen(); Push.register(); }
+            return st;
+          });
+        })
+        .catch(function () { return 'unavailable'; });
+    },
+    // Unlink this phone from the account before signing out.
+    forget: function () {
+      if (!pushToken || typeof api !== 'function') return Promise.resolve();
+      var t = pushToken;
+      pushToken = null;
+      return api('/api/push/device/remove', { method: 'POST', body: { token: t } }).catch(function () {});
+    },
+  };
+  // Taps on a notification that launched the app arrive before anything asks for push.
+  listen();
+
   var StatusBar = plugin('StatusBar');
   if (StatusBar) {
     // The app is dark by default; a light status bar on a dark header is unreadable.

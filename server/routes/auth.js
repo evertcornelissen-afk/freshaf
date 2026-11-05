@@ -320,6 +320,9 @@ router.post('/delete-account', deleteLimit, authRequired('customer', 'supplier')
   // Without this the token stayed valid for up to thirty days on every other device, still
   // signed in to what is now the anonymised "Deleted user" row.
   rotateSession(user.id);
+  // And no more notifications to a deleted account's phones or browsers.
+  require('../native-push').forgetUser(user.id);
+  db.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').run(user.id);
   clearAuthCookie(res);
   res.json({ ok: true });
 });

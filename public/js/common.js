@@ -66,6 +66,9 @@ async function api(path, opts = {}) {
 // can clear, so if that call fails we say so instead of reloading into a page that still
 // looks signed in.
 async function signOut() {
+  // Unlink this phone's push token first, while the session that owns it is still valid,
+  // so the next person to use the phone does not receive this account's alerts.
+  if (window.FreshAFNative && window.FreshAFNative.push) await window.FreshAFNative.push.forget();
   if (window.FreshAFNative) await window.FreshAFNative.setToken(null);
   try {
     await api('/api/auth/logout', { method: 'POST' });

@@ -229,6 +229,15 @@ async function subscribePush() {
 }
 
 async function refreshAlertsButton() {
+  // Inside the iOS / Android app: native push, not web push.
+  const np = window.FreshAFNative && window.FreshAFNative.push;
+  if (np && np.available) {
+    const st = await np.enable(false); // refreshes the token if already allowed
+    const show = st === 'prompt' || st === 'denied';
+    el('btn-enable-alerts').classList.toggle('hidden', !show);
+    el('alerts-hint').classList.toggle('hidden', !show);
+    return;
+  }
   const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
   el('btn-enable-alerts').classList.toggle('hidden', !supported || Notification.permission === 'granted');
   el('alerts-hint').classList.toggle('hidden', !supported || Notification.permission === 'granted');
@@ -239,6 +248,15 @@ async function refreshAlertsButton() {
 
 el('btn-enable-alerts').onclick = async () => {
   try {
+    const np = window.FreshAFNative && window.FreshAFNative.push;
+    if (np && np.available) {
+      const st = await np.enable(true);
+      if (st === 'denied') throw new Error('Notifications are switched off for FreshAF. Turn them on in your phone Settings > FreshAF > Notifications.');
+      if (st !== 'granted') throw new Error('Job alerts are not available in the app yet. You will still get them on WhatsApp.');
+      toast('Job alerts enabled. You will be notified even when the app is closed.', 'ok');
+      refreshAlertsButton();
+      return;
+    }
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') throw new Error('Notifications were not allowed — enable them in your browser settings');
     await subscribePush();
