@@ -60,6 +60,24 @@ async function api(path, opts = {}) {
   return data;
 }
 
+// Sign out of this device. The app's stored token is dropped FIRST, before any network
+// call, so a dead connection can never leave the next person to pick up the phone signed
+// in as the last one. On the website the session is an httpOnly cookie only the server
+// can clear, so if that call fails we say so instead of reloading into a page that still
+// looks signed in.
+async function signOut() {
+  if (window.FreshAFNative) await window.FreshAFNative.setToken(null);
+  try {
+    await api('/api/auth/logout', { method: 'POST' });
+  } catch (e) {
+    if (!window.FRESHAF_NATIVE) {
+      toast('Could not sign out. Check your connection and try again.', 'error');
+      return;
+    }
+  }
+  window.location.reload();
+}
+
 // Disable a button and show progress text while an async action runs.
 async function withBusy(btn, busyLabel, fn) {
   const orig = btn.innerHTML;

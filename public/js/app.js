@@ -518,7 +518,7 @@ el('register-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('
   } catch (e) { showError('reg-error', e.message); }
 }); };
 
-el('btn-logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); window.location.reload(); };
+el('btn-logout').onclick = signOut;
 
 /* ---------- account dialog (profile, rewards, deletion) ---------- */
 el('btn-account').onclick = () => openAccount();

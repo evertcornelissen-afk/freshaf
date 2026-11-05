@@ -652,7 +652,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
   } catch (e) { showError('reg-error', e.message); }
 });
 
-el('btn-logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); window.location.reload(); };
+el('btn-logout').onclick = signOut;
 
 el('btn-delete-account').onclick = async () => {
   const pw = await modal({

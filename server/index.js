@@ -50,6 +50,16 @@ app.use('/api/payments/stitch/webhook', express.raw({ type: '*/*', limit: '1mb' 
 app.use(express.json());
 app.use(cookieParser());
 
+// Nothing under /api may be stored by a browser or by anything between it and us. These
+// responses are one person's account; a cached copy is served to whoever asks next.
+// Cloudflare sits in front of the site and does not cache them today, but that is its
+// default, not a promise, and one page rule would change it.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, private');
+  res.set('Vary', 'Cookie, Authorization');
+  next();
+});
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/orders'));
 app.use('/api/supplier', require('./routes/supplier'));

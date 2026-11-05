@@ -1,7 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { db } = require('../db');
-const { setAuthCookie, clearAuthCookie, readToken, authRequired, signUser, wantsToken } = require('../auth');
+const { setAuthCookie, clearAuthCookie, readToken, authRequired, signUser, wantsToken,
+  signSseTicket, rotateSession } = require('../auth');
 const mailer = require('../mailer');
 const secrets = require('../secrets');
 const { rateLimit, forgive } = require('../ratelimit');
@@ -180,8 +181,7 @@ router.post('/login', loginByIp, loginByEmail, (req, res) => {
 // This hands out a separate ticket that is valid for sixty seconds and only for the
 // stream. If it leaks into a log it is already expired by the time anyone reads it.
 router.get('/sse-ticket', authRequired('customer', 'supplier'), (req, res) => {
-  res.json({ ticket: jwt.sign({ id: req.user.id, role: req.user.role, sse: true },
-    SSE_SECRET, { expiresIn: '60s' }) });
+  res.json({ ticket: signSseTicket(req.user.id) });
 });
 
 router.post('/logout', (req, res) => {
@@ -191,7 +191,12 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', (req, res) => {
   const payload = readToken(req);
-  if (!payload) return res.json({ user: null });
+  if (!payload) {
+    // A token that no longer matches an account is cleared rather than left to be sent
+    // on every request for the rest of its thirty days.
+    if (req.cookies?.freshaf_token) clearAuthCookie(res);
+    return res.json({ user: null });
+  }
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
   if (!user) return res.json({ user: null });
   res.json({ user: mePayload(user) });
@@ -233,6 +238,9 @@ router.post('/delete-account', deleteLimit, authRequired('customer', 'supplier')
     home_address = NULL, home_lat = NULL, home_lng = NULL, points_cents = 0, password_hash = ?
     WHERE id = ?`)
     .run(`deleted-${user.id}-${Date.now()}@freshaf.invalid`, bcrypt.hashSync(require('crypto').randomBytes(24).toString('hex'), 10), user.id);
+  // Without this the token stayed valid for up to thirty days on every other device, still
+  // signed in to what is now the anonymised "Deleted user" row.
+  rotateSession(user.id);
   clearAuthCookie(res);
   res.json({ ok: true });
 });

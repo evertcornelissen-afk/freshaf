@@ -19,8 +19,57 @@ if (!JWT_SECRET) {
 
 const COOKIE_NAME = 'freshaf_token';
 
+// Every token carries the account's session key, and every request checks it against
+// the database.
+//
+// Before this, a token said only "user 3". The signing secret is pinned on Render so that
+// sessions survive deploys, but the database itself has been wiped on restart, and user
+// ids start again at 1 on an empty database. A thirty-day cookie that said "user 3" then
+// opened the account of whoever happened to sign up third AFTER the wipe: a stranger saw
+// another customer's name, phone and address, and every protected route would have let
+// them act as that person. Restoring a backup reuses ids in exactly the same way.
+//
+// The key is random per account and lives in the users row, so it disappears with the
+// row. A token minted against any other database, or for an account that has since been
+// deleted, no longer matches anything and simply reads as signed out.
+function db() {
+  return require('./db').db; // required lazily so load order between the two never matters
+}
+
+function sessionKeyFor(user) {
+  if (user.session_key) return user.session_key;
+  const key = crypto.randomBytes(16).toString('hex');
+  db().prepare('UPDATE users SET session_key = ? WHERE id = ? AND session_key IS NULL').run(key, user.id);
+  return db().prepare('SELECT session_key FROM users WHERE id = ?').get(user.id).session_key;
+}
+
+// Signs every token this account holds out, on every device. Used when the account is
+// deleted; anything else that should end all sessions (a password change) calls it too.
+function rotateSession(userId) {
+  db().prepare('UPDATE users SET session_key = ? WHERE id = ?')
+    .run(crypto.randomBytes(16).toString('hex'), userId);
+}
+
 function signUser(user) {
-  return jwt.sign({ id: user.id, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ id: user.id, role: user.role, name: user.name, sk: sessionKeyFor(user) },
+    JWT_SECRET, { expiresIn: '30d' });
+}
+
+// The live account behind a verified token, or null. Role and name come from the
+// database, not the token, so a role change takes effect on the next request.
+function currentUser(payload) {
+  if (!payload || !payload.id || !payload.sk) return null;
+  const u = db().prepare('SELECT id, role, name, session_key FROM users WHERE id = ?').get(payload.id);
+  if (!u || !u.session_key) return null;
+  const a = Buffer.from(String(payload.sk));
+  const b = Buffer.from(u.session_key);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  return { id: u.id, role: u.role, name: u.name };
+}
+
+function signSseTicket(userId) {
+  const u = db().prepare('SELECT id, role, session_key FROM users WHERE id = ?').get(userId);
+  return jwt.sign({ id: u.id, role: u.role, sse: true, sk: sessionKeyFor(u) }, JWT_SECRET, { expiresIn: '60s' });
 }
 
 function setAuthCookie(res, user) {
@@ -32,8 +81,14 @@ function setAuthCookie(res, user) {
   });
 }
 
+// Cleared with the same attributes it was set with. Browsers match a cookie on more than
+// its name, and a clear that does not match leaves the session sitting there.
 function clearAuthCookie(res) {
-  res.clearCookie(COOKIE_NAME);
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
 }
 
 // The native iOS and Android builds cannot use the cookie. Their pages are served from
@@ -50,12 +105,16 @@ function bearer(req) {
   return m ? m[1] : null;
 }
 
-// Cookie first, so a browser session is never overridden by a stale header.
+// An explicit Bearer token wins over the cookie, and if it is present it is the ONLY thing
+// looked at. The website never sends one (common.js adds it only inside the native app),
+// so this changes nothing on the web. In the app it means the identity the app chose is
+// the identity used: a cookie the web view picked up for some earlier account can never
+// quietly take over, and a rejected token is not rescued by falling back to that cookie.
 function readToken(req) {
-  const token = req.cookies?.[COOKIE_NAME] || bearer(req);
+  const token = bearer(req) || req.cookies?.[COOKIE_NAME];
   if (!token) return null;
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return currentUser(jwt.verify(token, JWT_SECRET));
   } catch {
     return null;
   }
@@ -91,7 +150,8 @@ function sseAuth() {
     if (ticket) {
       try {
         const t = jwt.verify(String(ticket), JWT_SECRET);
-        if (t.sse) { req.user = t; return next(); }
+        const u = t.sse && currentUser(t);
+        if (u) { req.user = u; return next(); }
       } catch { /* fall through to 401 */ }
     }
     return res.status(401).json({ error: 'Not signed in' });
@@ -99,4 +159,4 @@ function sseAuth() {
 }
 
 module.exports = { setAuthCookie, clearAuthCookie, readToken, authRequired, signUser,
-  wantsToken, sseAuth, SSE_SECRET: JWT_SECRET, COOKIE_NAME };
+  wantsToken, sseAuth, signSseTicket, rotateSession, SSE_SECRET: JWT_SECRET, COOKIE_NAME };

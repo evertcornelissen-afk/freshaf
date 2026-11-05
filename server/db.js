@@ -362,6 +362,11 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 process.on('exit', checkpoint);
 checkpoint(); // fold in whatever the last run left behind
 
+// Per-account session key; see server/auth.js. Accounts without one get it here, and new
+// accounts get it lazily the first time a token is signed for them.
+addColumn('users', 'session_key TEXT');
+db.exec("UPDATE users SET session_key = lower(hex(randomblob(16))) WHERE session_key IS NULL");
+
 // Encrypt any ID or bank details written before a key existed. No-op once clean.
 try {
   require('./secrets').migrate(db);
