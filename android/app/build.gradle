@@ -7,7 +7,8 @@ android {
         applicationId "io.freshaf.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // Every Play upload needs a higher versionCode. Codemagic's BUILD_NUMBER always rises.
+        versionCode((System.getenv('BUILD_NUMBER') ?: '1').toInteger())
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,8 +17,28 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Upload key for Google Play. The key itself never enters git: it is read from
+    // android/keystore.properties (gitignored) locally, or from environment variables on a
+    // build server (Codemagic sets CM_KEYSTORE_PATH etc.). Without either, the release bundle
+    // is built unsigned, which is fine for checking that it compiles.
+    def keystoreProps = new Properties()
+    def keystorePropsFile = rootProject.file('keystore.properties')
+    if (keystorePropsFile.exists()) { keystorePropsFile.withInputStream { keystoreProps.load(it) } }
+    def signingValue = { String prop, String env -> keystoreProps.getProperty(prop) ?: System.getenv(env) }
+    def storePath = signingValue('storeFile', 'CM_KEYSTORE_PATH')
+    signingConfigs {
+        if (storePath) {
+            release {
+                storeFile file(storePath)
+                storePassword signingValue('storePassword', 'CM_KEYSTORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'CM_KEY_ALIAS')
+                keyPassword signingValue('keyPassword', 'CM_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (storePath) { signingConfig signingConfigs.release }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

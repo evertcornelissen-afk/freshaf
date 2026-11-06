@@ -1,6 +1,6 @@
-# FreshAF iOS build: a cloud Mac builds the app and uploads it to TestFlight.
-# Apple only lets iOS apps be built on a Mac; this is the Mac. Setup, once, is in
-# APP-STORE-SUBMISSION.md section B2.
+# FreshAF app builds in the cloud. iOS: a cloud Mac builds the app and uploads it to
+# TestFlight (Apple only lets iOS apps be built on a Mac). Android: a Linux machine builds the
+# signed App Bundle for Google Play. Setup, once, is in APP-STORE-SUBMISSION.md B2 and A2b.
 #
 # Runs only when started by hand from the Codemagic dashboard (Start new build), so a
 # push to master never ships an app build by accident.
@@ -48,3 +48,46 @@ workflows:
         # Lands in TestFlight for testing on real phones. Sending it to App Review is a
         # separate, deliberate click in App Store Connect.
         submit_to_testflight: true
+
+  # Android: builds a signed App Bundle (.aab) and puts it on Google Play's INTERNAL
+  # testing track (up to 100 testers, no Google review). Promoting it to Production is a
+  # separate, deliberate click in Play Console. Setup, once, is in APP-STORE-SUBMISSION.md A2b.
+  android-play-internal:
+    name: FreshAF Android -> Play internal testing
+    max_build_duration: 45
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        # The upload key, uploaded once in Codemagic > Team settings > Code signing
+        # identities > Android keystores, under exactly this reference name.
+        - freshaf_upload_key
+      groups:
+        # GOOGLE_SERVICES_JSON (Firebase config, base64) and GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # (Play Console API service account JSON), set in Codemagic > Environment variables.
+        - freshaf_android
+      node: 22
+      java: 21
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Firebase config for Android push
+        script: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+          else
+            echo "GOOGLE_SERVICES_JSON not set: the app builds, but Android push stays off"
+          fi
+      - name: Copy the app's screens and plugins into the Android project
+        script: npx cap sync android
+      - name: Build the signed App Bundle
+        # build.gradle reads CM_KEYSTORE_* (set by android_signing) and BUILD_NUMBER.
+        script: cd android && ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        # The first upload of a new app must be done by hand in Play Console; Google's API
+        # refuses until the app exists there. After that, this publishes on its own.
+        submit_as_draft: false

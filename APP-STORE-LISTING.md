@@ -1,4 +1,7 @@
-# FreshAF: App Store listing, review notes and reviewer accounts
+# FreshAF: App Store and Google Play listing, review notes and reviewer accounts
+
+*FreshAF is national: the copy says South Africa, never one city, and never promises a pro
+in every town. The Google Play listing is at the end.*
 
 *Ready to paste into App Store Connect. Every claim below is true of the app as built on
 5 November 2026; if a feature changes, change this file in the same commit. Character
@@ -19,7 +22,7 @@ limits are Apple's and were checked when this was written (`node scripts/check-l
 | **Content rights** | Does not contain third-party content |
 | **Age rating** | 4+ (answer "None" to every question) |
 | **Price** | Free |
-| **Availability** | South Africa only, to start. Every order is fulfilled in Cape Town |
+| **Availability** | South Africa only. Pros are being signed up nationwide; where no pro works yet, the app shows nobody available before anything is booked |
 | **Copyright** | 2026 FreshAF (Pty) Ltd |
 | **Support URL** | https://freshaf.io/contact |
 | **Marketing URL** | https://freshaf.io |
@@ -27,11 +30,11 @@ limits are Apple's and were checked when this was written (`node scripts/check-l
 
 ## Promotional text (max 170, can be changed without a new build)
 
-Mobile car washes and laundry collection across Cape Town's Northern Suburbs. Compare vetted pros, book in under a minute, pay by card or cash.
+Mobile car washes and laundry collection across South Africa. Compare vetted pros near you, book in under a minute, pay by card or cash.
 
 ## Keywords (max 100, comma-separated, no spaces after commas)
 
-valet,mobile wash,laundromat,ironing,duvet,cleaning,Cape Town,Durbanville,Bellville,detailing
+valet,mobile wash,laundromat,ironing,duvet,cleaning,detailing,wash and fold,South Africa,car valet
 
 ## Description (max 4000)
 
@@ -66,15 +69,15 @@ WHY FRESHAF
 FOR PROS
 Run your own car wash or laundry business through FreshAF Pro: set your own prices, choose how far you travel, go online when you want work, and get job alerts on your phone.
 
-Serving Bellville, Durbanville, Brackenfell, Kraaifontein, Kuils River, Parow, Goodwood, Tygervalley, Plattekloof, Welgemoed, Edgemead, Bothasig, Monte Vista, Vredekloof and Stikland, with more of Cape Town to follow.
+FreshAF is signing up pros across South Africa. If no pro works near you yet, the app shows that before you book, so you never pay for a service nobody can do.
 
-FreshAF (Pty) Ltd, Cape Town.
+FreshAF (Pty) Ltd, South Africa.
 
 ---
 
 ## App Review notes (paste into "Notes" under App Review Information)
 
-FreshAF is an on-demand marketplace for physical services: mobile car washes and laundry collection, carried out by independent pros at the customer's address in Cape Town, South Africa.
+FreshAF is an on-demand marketplace for physical services: mobile car washes and laundry collection, carried out by independent pros at the customer's address, anywhere in South Africa where a pro works.
 
 DEMO ACCOUNTS. The sign-in details are in the Sign-in Information fields. Two accounts are provided:
 - a customer account, to book a service;
@@ -83,7 +86,7 @@ Both are marked as demo accounts on our side: the demo customer is only ever mat
 
 TO TRY A BOOKING. Sign in as the demo customer, choose Car Wash, and use the address 1 Main Road, Durbanville, Cape Town (or drop the pin anywhere in Durbanville). The demo pro is online there and appears in the list. You can choose Cash or Card; Card opens the test payment page. To see the job from the other side, sign in to the pro account on a second device.
 
-LOCATION. The app asks for location only when you tap "Use my location", to place the pickup pin. You can type an address instead. Addresses outside Cape Town's Northern Suburbs return no pros, because that is where we operate.
+LOCATION. The app asks for location only when you tap "Use my location", to place the pickup pin. You can type an address instead. An address with no pro working nearby returns no pros; the demo pro works in Durbanville, Cape Town, so please use the address above.
 
 PAYMENTS. Customers pay for a physical service performed outside the app, so payment is taken by our card provider on its own page or in cash on completion (Guideline 3.1.3(e)). There is nothing to buy inside the app itself.
 
@@ -112,3 +115,33 @@ Apple's reviewers test from outside South Africa, at any hour. The accounts must
 ## App Privacy (App Store Connect > App Privacy)
 
 Answer exactly as `APP-STORE-SUBMISSION.md` section D, which matches `ios/App/App/PrivacyInfo.xcprivacy`. In short: data is collected, linked to the user, used for App Functionality only, and **not used for tracking**.
+
+---
+
+## Google Play listing (Play Console > Grow > Store presence > Main store listing)
+
+| Field | Value |
+|---|---|
+| **App name** (max 30) | FreshAF: Car Wash & Laundry |
+| **Short description** (max 80) | Vetted pros wash your car and do your laundry, at your address. |
+| **Full description** (max 4000) | Paste the Description section above, unchanged |
+| **App icon** | `public/img/icon-512.png` (512×512) |
+| **Feature graphic** | 1024×500, `marketing/play-feature-graphic.png` |
+| **Phone screenshots** | At least 2, 1080×1920 or larger (APP-STORE-SUBMISSION.md section C) |
+| **Category** | Lifestyle |
+| **Tags** | Car wash, Laundry, Home services |
+| **Contact email** | The FreshAF support mailbox (as on freshaf.io/contact) |
+| **Website** | https://freshaf.io |
+| **Privacy policy** | https://freshaf.io/privacy |
+| **Account deletion URL** | https://freshaf.io/delete-account |
+| **Countries** | South Africa only |
+| **Price** | Free; no in-app purchases (real-world services are paid outside Play billing) |
+| **Ads** | No, the app contains no ads |
+| **Content rating** | IARC questionnaire: no violence, no user-generated public content, no gambling → Everyone |
+| **Target audience** | 18 and over (bookings and payments) |
+| **Data safety** | Exactly as APP-STORE-SUBMISSION.md section D |
+
+**App access (Play Console > Policy > App content > App access):** "All or some functionality
+is restricted" → add the demo customer and demo pro sign-ins, with the same instructions as
+the App Review notes above (address 1 Main Road, Durbanville). The accounts are the same ones
+Apple uses; set them up as in "Reviewer accounts" above.

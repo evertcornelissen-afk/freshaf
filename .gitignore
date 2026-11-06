@@ -23,3 +23,9 @@ ios/App/App.xcworkspace/
 forms/
 # Documents we send to pros are built into the Desktop FreshAF folder (see marketing/outdir.py),
 # so there is exactly one copy of each on disk and it is the one that gets emailed.
+
+# Android upload key: never commit. Back it up in the password manager (APP-STORE-SUBMISSION.md A3).
+android/keystore.properties
+*.jks
+*.keystore
+android/app/google-services.json

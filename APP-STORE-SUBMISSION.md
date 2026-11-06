@@ -50,7 +50,11 @@ in our build. Three ways round it:
 | `targetSdkVersion 36` (Android 16) — mandatory since 31 Aug 2026 | ✅ 36 |
 | `minSdkVersion` | ✅ 24 (Android 7, ~98% of devices) |
 | Package name fixed and unique | ✅ `io.freshaf.app` |
-| Signed AAB (Android App Bundle, not APK) | ❌ Needs a signing key — step A3 |
+| Signed AAB (Android App Bundle, not APK) | ⚠️ Build proven on this machine 6 Nov (unsigned). Signing wired in `android/app/build.gradle` (key from `android/keystore.properties` or Codemagic); needs the upload key — step A3 |
+| Android build without Android Studio | ✅ `codemagic.yaml` workflow `android-play-internal`: builds, signs, uploads to the internal test track (step A2b) |
+| Android push (Firebase) | ❌ Firebase project + `google-services.json` + `FCM_SERVICE_ACCOUNT` on Render — step A7 |
+| Feature graphic 1024×500 | ✅ `marketing/play-feature-graphic.png` |
+| Play listing text | ✅ `APP-STORE-LISTING.md`, "Google Play listing" |
 | Play Console account | ❌ **$25 one-off** |
 | Organisation account verification (D-U-N-S) | ❌ Needed to publish as FreshAF (Pty) Ltd |
 | Data safety form | ❌ Answers pre-written below |
@@ -132,6 +136,20 @@ npx cap open android
 
 In Android Studio: **Build → Generate Signed App Bundle / APK → Android App Bundle**.
 
+### A2b. Or build in the cloud with Codemagic
+The same Codemagic account as iOS (step B2) builds Android too, workflow
+**FreshAF Android -> Play internal testing**. Once, in Codemagic:
+1. **Team settings → Code signing identities → Android keystores → Add**: upload the upload
+   key from A3, reference name exactly `freshaf_upload_key`.
+2. **Environment variables**, group `freshaf_android`:
+   - `GOOGLE_SERVICES_JSON` = base64 of `google-services.json` (step A7), marked Secure;
+   - `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` = the Play Console API service-account JSON
+     (Play Console → Setup → API access → create service account, grant it Release
+     manager on FreshAF), marked Secure.
+3. The **first** upload must be done by hand in Play Console (Google's API refuses to upload
+   to an app that has never had a release). Download the `.aab` from the first Codemagic
+   build and upload it to Internal testing yourself; every build after that publishes itself.
+
 ### A3. Create the signing key — and never lose it
 Android Studio offers to create one. **Back the keystore file and its password up in two
 places.** If you lose it you cannot ever update the app; you have to publish a brand-new
@@ -162,6 +180,16 @@ placeholder in `public/.well-known/assetlinks.json`:
 ```
 
 Commit and deploy. Until then, links to freshaf.io open in a browser instead of the app.
+
+### A7. Switch on push notifications for Android (Firebase, free)
+1. **console.firebase.google.com → Add project** "FreshAF" (Analytics off; not needed).
+2. **Add app → Android**, package name `io.freshaf.app`. Download `google-services.json`.
+   It is configuration, not a secret, but keep it out of git anyway: Codemagic writes it in at
+   build time from `GOOGLE_SERVICES_JSON` (A2b). For a local build, put it in `android/app/`.
+3. **Project settings → Service accounts → Generate new private key.** This one IS a secret.
+   Render → freshaf → Environment → add `FCM_SERVICE_ACCOUNT` and paste the whole JSON.
+4. After the redeploy the log shows `[FreshAF][push] native: … Android ON` and the admin
+   readiness screen shows Android push live.
 
 ### A6. Release
 Start with **Internal testing** (instant, up to 100 testers, no review). Put it on your own
@@ -230,8 +258,8 @@ then **Product → Archive → Distribute App → App Store Connect**.
 - **App privacy** labels: section D below.
 - **Screenshots**: required for 6.7" and 6.5" iPhone. Section C.
 - **Review notes**: paste the Guideline 4.2 paragraph from this document, plus the demo
-  account, plus a line saying the service area is Cape Town's Northern Suburbs so the reviewer
-  knows why an address elsewhere returns nothing.
+  account, plus the line from APP-STORE-LISTING.md saying an address with no pro nearby returns
+  nobody, and that the demo pro works in Durbanville, so the reviewer uses that address.
 - **Export compliance**: "uses only standard HTTPS encryption" → exempt.
 
 ---
