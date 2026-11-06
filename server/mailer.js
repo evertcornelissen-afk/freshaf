@@ -195,6 +195,40 @@ function bookingConfirmed(o) {
   });
 }
 
+// To the PRO: a job is theirs. Sent on every booking, so a pro who is not looking at FreshAF
+// Pro still finds out. For cash, the amount to collect is spelled out: the pro hands it over
+// at the door and must not undercharge or overcharge.
+function proJobBooked(o) {
+  const when = o.scheduledFor ? esc(o.scheduledFor) : 'As soon as possible';
+  return send({
+    to: o.to,
+    subject: `New booking: ${o.service} #${o.orderId}, you earn ${rand(o.earnsCents)}`,
+    heading: 'You have a new booking',
+    paragraphs: [
+      `Hi ${firstName(o.name)},`,
+      `A customer has booked you. Open FreshAF Pro and start the job when you leave.`,
+      `<table cellpadding="0" cellspacing="0" style="font-size:14px">${[
+        row('Order', `#${o.orderId}`),
+        row('Service', esc(`${o.service}: ${o.pkg}, ${o.unit}`)),
+        row('Customer', esc(String(o.customerName || '').split(' ')[0] || 'Customer')),
+        row(o.returnAddress ? 'Collect from' : 'Where', esc(o.address)),
+        row('When', when),
+        ...(o.notes ? [row('Notes', esc(o.notes))] : []),
+        ...(o.returnAddress ? [
+          row('Return to', esc(o.returnAddress)),
+          row('Hand to', esc(o.returnReceiver || '')),
+          row('Return from', esc(o.returnWindow || '')),
+        ] : []),
+        row('You earn', rand(o.earnsCents)),
+        row('Payment', o.paymentMethod === 'cash'
+          ? `Collect <strong>${rand(o.collectCents)}</strong> in cash from the customer when the job is done`
+          : 'Paid by card to FreshAF. Do not take money from the customer.'),
+      ].join('')}</table>`,
+    ],
+    cta: { label: 'Open FreshAF Pro', url: `${BASE}/supplier?job=${o.orderId}` },
+  });
+}
+
 // A receipt, never a tax invoice, and no VAT line. FreshAF is not VAT-registered (confirmed
 // by Evert, 5 Nov 2026), and a business that is not a VAT vendor may not issue a tax invoice
 // or show VAT. If FreshAF registers, this and terms section 3 change together: the words
@@ -321,4 +355,4 @@ function passwordChanged({ to, name }) {
 
 // layout is exported so an email can be rendered and looked at before it is sent.
 module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
-  passwordReset, passwordChanged, bookingConfirmed, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };
+  passwordReset, passwordChanged, bookingConfirmed, proJobBooked, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };

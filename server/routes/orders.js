@@ -361,6 +361,7 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
   }
   if (isCash || paidByPoints) {
     dispatch.notifyCustomer(order);
+    dispatch.notifyProBooked(order.id);
     return res.json({ order: dispatch.orderPublic(order) });
   }
   const pay = await startPayment(order, customer, res);
@@ -478,6 +479,7 @@ function afterPayment(orderId) {
       const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
       dispatch.notifyCustomer(updated);
       realtime.send(order.requested_supplier_id, 'quote_result', { request_id: fromQuote.id, won: true });
+      dispatch.notifyProBooked(orderId);
       return;
     }
     // The pro took something else while the customer was paying — fall back to dispatch.

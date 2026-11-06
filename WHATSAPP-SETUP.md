@@ -62,6 +62,38 @@ Accept within {{5}} minutes or it goes back to the customer.
 **Buttons:** add one **Call to action → Visit website**, type **Dynamic**, label
 `Open FreshAF Pro`, URL `https://freshaf.io/supplier?offer={{1}}`
 
+### Template 3 (booking confirmed: the job is the pro's)
+
+Sent the moment a customer books a pro (cash) or pays for the booking (card). A published
+price is quoted automatically, so this is often the first the pro hears of the job.
+
+- **Name:** `freshaf_job_booked`
+- **Category:** Utility
+- **Language:** English
+
+**Body:**
+
+```
+You have a new FreshAF booking.
+
+Order: #{{1}}
+Service: {{2}}
+When: {{3}}
+Address: {{4}}
+You earn: {{5}}
+Payment: {{6}}
+
+Open FreshAF Pro to start the job.
+```
+
+**Sample values:** `42`, `Car Wash`, `As soon as possible`, `12 Durban Road, Bellville`,
+`R275`, `Collect R330 cash`
+
+**Buttons:** one **Call to action → Visit website**, type **Dynamic**, label
+`Open FreshAF Pro`, URL `https://freshaf.io/supplier?job={{1}}`
+
+Environment variable (optional, this is the default): `WHATSAPP_TEMPLATE_BOOKED=freshaf_job_booked`
+
 ### Template 2
 
 - **Name:** `freshaf_verify_code`

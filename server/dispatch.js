@@ -289,7 +289,61 @@ function resumeSearchingOrders() {
   if (rows.length) console.log(`[FreshAF] Resumed dispatch for ${rows.length} searching order(s).`);
 }
 
+// A job has just become this pro's: the customer accepted their quote (cash) or paid for it
+// (card). Reach them everywhere at once — live in FreshAF Pro, a phone notification, email,
+// and WhatsApp — because a published price is quoted automatically and the pro may never
+// have seen the request. Each channel fails on its own without stopping the others.
+function notifyProBooked(orderId) {
+  try {
+    const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    if (!o?.supplier_id || o.status !== 'accepted') return;
+    const pro = db.prepare(`SELECT u.name, u.email, u.phone, u.phone_verified_at, s.alert_whatsapp
+      FROM users u JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(o.supplier_id);
+    if (!pro) return;
+    const customer = db.prepare('SELECT name FROM users WHERE id = ?').get(o.customer_id);
+    const { SERVICES } = require('./pricing');
+    const svc = SERVICES[o.service];
+    const service = svc?.name || o.service;
+    const earnsCents = (o.supplier_price_cents || 0) + (o.callout_fee_cents || 0) + (o.return_leg_fee_cents || 0);
+    const collectCents = o.price_cents - (o.points_used_cents || 0);
+    const when = o.scheduled_for || 'As soon as possible';
+    const earnsRand = Math.round(earnsCents / 100);
+
+    realtime.send(o.supplier_id, 'job_booked', { order_id: o.id, service: o.service, earns_cents: earnsCents });
+    push.sendToUser(o.supplier_id, {
+      title: `Booked: ${service.toLowerCase()} #${o.id}, you earn R${earnsRand}`,
+      body: `${when} · ${o.address}\n${o.payment_method === 'cash' ? `Collect R${Math.round(collectCents / 100)} cash` : 'Paid by card'}`,
+      url: '/supplier',
+      tag: `job-${o.id}`,
+    }).catch(() => {});
+
+    if (pro.email && !pro.email.endsWith('@freshaf.invalid')) {
+      require('./mailer').proJobBooked({
+        to: pro.email, name: pro.name, orderId: o.id, service,
+        pkg: svc?.packages?.[o.package]?.name || o.package,
+        unit: svc?.units?.[o.vehicle]?.name || o.vehicle,
+        customerName: customer?.name, address: o.address, notes: o.notes,
+        scheduledFor: o.scheduled_for, earnsCents, collectCents, paymentMethod: o.payment_method,
+        returnAddress: o.return_address, returnReceiver: o.return_receiver, returnWindow: o.return_window_start,
+      }).catch((e) => console.warn(`[FreshAF] Could not email the pro about order ${o.id}: ${e.message}`));
+    }
+
+    // Same rule as job alerts: only to a number the pro verified, with the channel on.
+    if (getSetting('whatsapp_alerts_enabled', '1') === '1' && pro.phone && pro.phone_verified_at && pro.alert_whatsapp) {
+      whatsapp.jobBooked({
+        userId: o.supplier_id, phone: pro.phone, orderId: o.id, service, when, address: o.address,
+        earnsRand,
+        payment: o.payment_method === 'cash' ? `Collect R${Math.round(collectCents / 100)} cash` : 'Paid by card',
+      }).catch(() => {});
+    }
+    console.log(`[FreshAF] Pro ${o.supplier_id} told about booking ${o.id}.`);
+  } catch (e) {
+    console.warn(`[FreshAF] Could not notify the pro about order ${orderId}: ${e.message}`);
+  }
+}
+
 module.exports = {
+  notifyProBooked,
   startDispatch, offerToNext, clearOfferTimer, withdrawPendingOffers,
   resumeSearchingOrders, notifyCustomer, orderPublic, haversineKm,
   cancelOrder, expireUnpaidOrders,

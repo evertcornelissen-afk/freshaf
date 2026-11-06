@@ -15,6 +15,7 @@ const TOKEN = process.env.WHATSAPP_TOKEN || '';
 const LANG = process.env.WHATSAPP_TEMPLATE_LANG || 'en';
 const TPL_JOB = process.env.WHATSAPP_TEMPLATE_JOB || 'freshaf_job_alert';
 const TPL_CODE = process.env.WHATSAPP_TEMPLATE_CODE || 'freshaf_verify_code';
+const TPL_BOOKED = process.env.WHATSAPP_TEMPLATE_BOOKED || 'freshaf_job_booked';
 
 function configured() { return !!(PHONE_ID && TOKEN); }
 
@@ -97,6 +98,21 @@ function jobAlert({ userId, phone, service, earnsRand, distanceKm, address, expi
   });
 }
 
+// Template: freshaf_job_booked — the customer has booked (and, for card, paid). The pro must
+// know at once, wherever they are, because a published price is answered automatically and
+// the pro may not have seen the request at all. Variables, in order: {{1}} order number,
+// {{2}} service, {{3}} when, {{4}} address, {{5}} what the pro earns, {{6}} payment line.
+// The URL button appends the order id to https://freshaf.io/supplier?job=
+function jobBooked({ userId, phone, orderId, service, when, address, earnsRand, payment }) {
+  return sendTemplate({
+    userId,
+    phone,
+    template: TPL_BOOKED,
+    bodyParams: [String(orderId), service, when, address, `R${earnsRand}`, payment],
+    urlSuffix: String(orderId),
+  });
+}
+
 // Template: freshaf_verify_code (Authentication category, copy-code button).
 function verifyCode({ userId, phone, code }) {
   return sendTemplate({ userId, phone, template: TPL_CODE, bodyParams: [code], urlSuffix: null });
@@ -108,9 +124,9 @@ function status() {
   return {
     configured: configured(),
     enabled: getSetting('whatsapp_alerts_enabled', '1') === '1',
-    templates: { job: TPL_JOB, code: TPL_CODE, lang: LANG },
+    templates: { job: TPL_JOB, booked: TPL_BOOKED, code: TPL_CODE, lang: LANG },
     last_24h: Object.fromEntries(recent.map((r) => [r.status, r.c])),
   };
 }
 
-module.exports = { configured, toE164, jobAlert, verifyCode, sendTemplate, status };
+module.exports = { configured, toE164, jobAlert, jobBooked, verifyCode, sendTemplate, status };

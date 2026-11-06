@@ -418,8 +418,22 @@ async function enterDash() {
         : 'New request nearby — send your price', 'info');
       refreshRequests();
     },
+    job_booked: (data) => {
+      ping();
+      toast(`New booking #${data.order_id} — you earn ${rand(data.earns_cents || 0)}. It is in your active jobs.`, 'ok');
+      refreshJobs();
+      refreshRequests();
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(`New booking #${data.order_id} — you earn ${rand(data.earns_cents || 0)}`, {
+            body: 'Tap to open FreshAF Pro', icon: '/img/icon-192.png', tag: `job-${data.order_id}`,
+          });
+        } catch {}
+      }
+    },
     quote_result: (data) => {
-      if (data.won) toast('You won the job — it is in your active jobs now', 'ok');
+      // A win is announced by job_booked (with sound and a notification); this only refreshes.
+      if (data.won) { refreshRequests(); refreshJobs(); return; }
       else if (data.pending_payment) toast('Customer chose you — waiting on their payment', 'info');
       refreshRequests();
       refreshJobs();
