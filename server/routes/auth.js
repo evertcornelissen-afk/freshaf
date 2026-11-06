@@ -96,7 +96,7 @@ const VALID_SERVICES = ['carwash', 'laundry'];
 // Asked for only while WhatsApp is connected (locally it runs against the dry run), so the
 // live sign-up never waits for a code that cannot arrive.
 function signupCodeRequired() {
-  return getSetting('whatsapp_alerts_enabled', '1') === '1'
+  return getSetting('whatsapp_alerts_enabled', '1') === '1' && whatsapp.codesEnabled()
     && (whatsapp.configured() || process.env.NODE_ENV !== 'production');
 }
 const SA_MOBILE = /^27[678]\d{8}$/;

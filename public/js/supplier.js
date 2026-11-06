@@ -693,7 +693,7 @@ async function refreshAlerts() {
       <div class="row spread">
         <div>
           <strong>${escapeHtml(waState.phone || '')}</strong>
-          <div class="muted small-text">Verified — job offers arrive on WhatsApp.</div>
+          <div class="muted small-text">${waState.codes_enabled ? 'Verified: ' : ''}new bookings and job offers arrive on WhatsApp.</div>
         </div>
         <label class="row" style="cursor:pointer;margin:0">
           <input type="checkbox" id="wa-toggle" style="width:auto" ${waState.whatsapp_enabled ? 'checked' : ''}>
@@ -714,6 +714,20 @@ async function refreshAlerts() {
 }
 
 function renderWaEntry(phone) {
+  if (waState && !waState.codes_enabled) {
+    el('wa-box').innerHTML = `
+      <label>Your WhatsApp number</label>
+      <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${phone}" autocomplete="tel">
+      <div class="row mt"><button class="small" id="wa-save">Save number</button></div>`;
+    el('wa-save').onclick = () => withBusy(el('wa-save'), 'Saving…', async () => {
+      try {
+        await api('/api/supplier/phone', { method: 'POST', body: { phone: el('wa-phone').value } });
+        toast('Saved. New bookings go to this WhatsApp number', 'ok');
+        await refreshAlerts();
+      } catch (e) { showError('wa-error', e.message); }
+    });
+    return;
+  }
   el('wa-box').innerHTML = `
     <label>Your WhatsApp number</label>
     <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${phone}" autocomplete="tel">

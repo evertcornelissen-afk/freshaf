@@ -402,7 +402,9 @@ router.get('/alerts', (req, res) => {
     FROM users u JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(req.user.id);
   res.json({
     phone: row?.phone || null,
-    phone_verified: !!row?.phone_verified_at,
+    // Without codes (see whatsapp.codesEnabled) the number on file is the alert number.
+    phone_verified: !!row?.phone_verified_at || (!whatsapp.codesEnabled() && !!row?.phone),
+    codes_enabled: whatsapp.codesEnabled(),
     whatsapp_enabled: !!row?.alert_whatsapp,
     // Only offered once WhatsApp is actually connected. In dry run the code never reaches
     // the pro's phone, so on the live site the card was a dead end ("we sent a code"; none
@@ -417,6 +419,17 @@ router.post('/alerts', (req, res) => {
   db.prepare('UPDATE suppliers SET alert_whatsapp = ? WHERE user_id = ?')
     .run(whatsapp_enabled ? 1 : 0, req.user.id);
   res.json({ ok: true, whatsapp_enabled: !!whatsapp_enabled });
+});
+
+// While codes are not available, a pro changes their alert number directly.
+router.post('/phone', (req, res) => {
+  if (whatsapp.codesEnabled()) return res.status(400).json({ error: 'Confirm the number with a code instead' });
+  const raw = String(req.body?.phone || '').trim();
+  if (!/^27[678]\d{8}$/.test(whatsapp.toE164(raw) || '')) {
+    return res.status(400).json({ error: 'Enter your South African WhatsApp number, e.g. 082 555 1234' });
+  }
+  db.prepare('UPDATE users SET phone = ?, phone_verified_at = NULL WHERE id = ?').run(raw, req.user.id);
+  res.json({ ok: true });
 });
 
 // Step 1: send a code to the number the pro says is theirs.

@@ -162,7 +162,7 @@ function offerToNext(orderId) {
   if (getSetting('whatsapp_alerts_enabled', '1') === '1') {
     const pro = db.prepare(`SELECT u.phone, u.phone_verified_at, s.alert_whatsapp
       FROM users u JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(next.user_id);
-    if (pro?.phone && pro.phone_verified_at && pro.alert_whatsapp) {
+    if (whatsapp.canAlert(pro)) {
       whatsapp.jobAlert({
         userId: next.user_id,
         phone: pro.phone,
@@ -333,7 +333,7 @@ function notifyProBooked(orderId) {
     }
 
     // Same rule as job alerts: only to a number the pro verified, with the channel on.
-    if (getSetting('whatsapp_alerts_enabled', '1') === '1' && pro.phone && pro.phone_verified_at && pro.alert_whatsapp) {
+    if (getSetting('whatsapp_alerts_enabled', '1') === '1' && whatsapp.canAlert(pro)) {
       whatsapp.jobBooked({
         userId: o.supplier_id, phone: pro.phone, orderId: o.id, service, when, address: o.address,
         earnsRand,

@@ -34,6 +34,11 @@ a few jobs a day this is a rounding error, but it is not zero.
 
 ## Step 2 — submit the message templates
 
+**Status 6 Nov 2026 (test number, unverified business):** `freshaf_job_booked`,
+`freshaf_ops_alert` and `freshaf_job_alert` submitted. `freshaf_verify_code` was REFUSED:
+Meta only allows Authentication templates once the business is verified. Until then the
+server runs with codes off (see "Verification codes" below).
+
 WhatsApp will not let a business start a conversation with free text, so both messages have
 to be pre-approved templates. In WhatsApp Manager → Message templates → Create template,
 create these **exactly** — the variable order is what the code sends.
@@ -47,14 +52,18 @@ create these **exactly** — the variable order is what the code sends.
 **Body:**
 
 ```
-New {{1}} job available.
+Customer request for your FreshAF Pro account.
 
-You earn: {{2}}
-Distance: {{3}}
+Service: {{1}}
+Your earnings: {{2}}
+Distance from you: {{3}}
 Address: {{4}}
 
-Accept within {{5}} minutes or it goes back to the customer.
+Accept or decline in FreshAF Pro. This request closes in {{5}} minutes.
 ```
+
+(The first wording, "New {{1}} job available", was flagged by Meta's checker as Marketing.
+Keep this one: Marketing messages cost more and pros can mute them.)
 
 **Sample values** (Meta asks for these): `Car wash`, `R275`, `3.4 km`,
 `12 Durban Road, Bellville`, `1`
@@ -161,6 +170,15 @@ curl -X POST -H "Authorization: Bearer $RENDER_API_KEY" https://api.render.com/v
 
 If nothing arrives, the reason is recorded — check the `whatsapp_log` table, or the server
 log, which prints the exact error Meta returned.
+
+## Verification codes
+
+`WHATSAPP_VERIFY_CODES` (Render env): unset or `off` in production means no codes. The
+number a pro gives at sign-up (labelled "new bookings are sent here") gets alerts straight
+away, and pros change it in FreshAF Pro without a code. Once Meta has verified the business
+and approved `freshaf_verify_code` (Authentication, copy-code button), set
+`WHATSAPP_VERIFY_CODES=on`: sign-up then asks for the WhatsApp code and only verified
+numbers get alerts.
 
 ## How it behaves
 

@@ -22,6 +22,24 @@ const TPL_OPS = process.env.WHATSAPP_TEMPLATE_OPS || 'freshaf_ops_alert';
 
 function configured() { return !!(PHONE_ID && TOKEN); }
 
+// Verification codes need Meta's Authentication template, and Meta only allows that once the
+// business is verified (found 6 Nov 2026: "does not have permission to create message
+// template"). Until WHATSAPP_VERIFY_CODES=on, the number a pro gave us (at sign-up it is
+// labelled "new bookings are sent here", which is their opt-in) gets alerts without a code.
+// Locally the code flow stays on against the dry run, so it remains tested.
+function codesEnabled() {
+  const v = String(process.env.WHATSAPP_VERIFY_CODES || '').toLowerCase();
+  if (v === 'on') return true;
+  if (v === 'off') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
+// May this pro get WhatsApp alerts? A number, the channel left on, and either a verified
+// number or codes not yet available.
+function canAlert(pro) {
+  return !!(pro && pro.phone && pro.alert_whatsapp && (pro.phone_verified_at || !codesEnabled()));
+}
+
 // South African numbers arrive as 082…, 082 123 4567, +27 82…, 2782… — normalise to E.164
 // digits (no plus), which is what the Cloud API expects in the `to` field.
 function toE164(raw) {
@@ -130,7 +148,8 @@ function opsAlert({ phone, orderId, service, proName, proPhone, late }) {
 
 // Template: freshaf_verify_code (Authentication category, copy-code button).
 function verifyCode({ userId, phone, code }) {
-  return sendTemplate({ userId, phone, template: TPL_CODE, bodyParams: [code], urlSuffix: null });
+  // The copy-code button is sent as a URL button whose parameter is the code itself.
+  return sendTemplate({ userId, phone, template: TPL_CODE, bodyParams: [code], urlSuffix: code });
 }
 
 function status() {
@@ -138,10 +157,11 @@ function status() {
     WHERE created_at > datetime('now','-1 day') GROUP BY status`).all();
   return {
     configured: configured(),
+    codes: codesEnabled(),
     enabled: getSetting('whatsapp_alerts_enabled', '1') === '1',
     templates: { job: TPL_JOB, booked: TPL_BOOKED, code: TPL_CODE, ops: TPL_OPS, lang: LANG },
     last_24h: Object.fromEntries(recent.map((r) => [r.status, r.c])),
   };
 }
 
-module.exports = { configured, toE164, jobAlert, jobBooked, opsAlert, verifyCode, sendTemplate, status };
+module.exports = { configured, codesEnabled, canAlert, toE164, jobAlert, jobBooked, opsAlert, verifyCode, sendTemplate, status };

@@ -246,7 +246,7 @@ function openRequest(request) {
     }).catch(() => {});
 
     if (getSetting('whatsapp_alerts_enabled', '1') === '1'
-        && pro.phone && pro.phone_verified_at && pro.alert_whatsapp) {
+        && whatsapp.canAlert(pro)) {
       whatsapp.jobAlert({
         userId: pro.user_id,
         phone: pro.phone,
