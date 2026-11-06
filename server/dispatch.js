@@ -313,7 +313,7 @@ function notifyProBooked(orderId) {
     push.sendToUser(o.supplier_id, {
       title: `Booked: ${service.toLowerCase()} #${o.id}, you earn R${earnsRand}`,
       body: `${when} · ${o.address}\n${o.payment_method === 'cash' ? `Collect R${Math.round(collectCents / 100)} cash` : 'Paid by card'}`,
-      url: '/supplier',
+      url: `/supplier?job=${o.id}`,
       tag: `job-${o.id}`,
     }).catch(() => {});
 

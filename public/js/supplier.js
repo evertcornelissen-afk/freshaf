@@ -409,6 +409,7 @@ async function enterDash() {
   await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices(), refreshAlerts(), refreshRequests()]); // content first, then reveal
   show('view-dash');
   initMap();
+  openDeepLink();
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
     quote_request: (data) => {
@@ -613,7 +614,7 @@ async function refreshJobs() {
     el('active-box').innerHTML = '<p class="empty">No active job.</p>';
   } else {
     el('active-box').innerHTML = active.map((o) => `
-      <div>
+      <div data-job="${o.id}">
         <div class="row spread">
           <strong>${svcBadge(o.service)} Order #${o.id} — ${rand(o.price_cents)}</strong>
           <span class="pill warn live">${statusLabel(o.status, o.service)}</span>
@@ -633,6 +634,37 @@ async function refreshJobs() {
       history.map((o) => `<tr><td>${serviceName(o.service)} #${o.id}</td><td><span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status, o.service)}</span></td><td>${rand(o.price_cents)}</td></tr>`).join('') +
       '</tbody></table></div>';
   }
+}
+
+// Links in WhatsApp, email and phone notifications: /supplier?job=42 opens FreshAF Pro on that
+// job with its next step ("Start driving", "Arrived", …) highlighted, one tap from starting.
+// ?offer=… (job alerts and price requests) opens on the requests and offers. A pro who is
+// signed out signs in first; the link survives that, because sign-in does not reload the page.
+function openDeepLink() {
+  const params = new URLSearchParams(location.search);
+  const job = params.get('job');
+  const offer = params.get('offer');
+  if (!job && !offer) return;
+  history.replaceState(null, '', location.pathname); // a refresh should not jump again
+  if (job) {
+    const card = document.querySelector(`#active-box [data-job="${CSS.escape(job)}"]`);
+    if (!card) {
+      toast(`Order #${job} is no longer active — see your job history`, 'info');
+      el('history-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    card.classList.add('job-focus');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const btn = card.querySelector('button');
+    if (btn) {
+      btn.focus({ preventScroll: true });
+      toast(`Order #${job}: tap “${btn.textContent.trim()}” when you set off`, 'info');
+    }
+    setTimeout(() => card.classList.remove('job-focus'), 6000);
+    return;
+  }
+  const target = document.querySelector('#offers-box .offer, #offers-box > div:not(.empty)') ? el('offers-box') : el('requests-box');
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 window.advanceJob = async (orderId) => {

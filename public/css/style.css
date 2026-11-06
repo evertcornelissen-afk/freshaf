@@ -1024,3 +1024,7 @@ button:active { transform: translateY(0) scale(.975); }
   .vehicle-row .v-type, .vehicle-row .v-reg { flex: 1 1 0 !important; width: auto !important; min-width: 0; }
   .vehicle-row .v-model { order: 5; flex: 1 1 100% !important; }
 }
+
+/* A job opened from a WhatsApp / email / notification link: pulse it so the pro sees which one. */
+.job-focus { border-radius: 12px; animation: jobFocus 1.2s ease-in-out 4; box-shadow: 0 0 0 2px var(--accent); padding: 10px; margin: -10px; }
+@keyframes jobFocus { 0%, 100% { box-shadow: 0 0 0 2px var(--accent); } 50% { box-shadow: 0 0 0 6px rgba(33, 172, 207, .25); } }
