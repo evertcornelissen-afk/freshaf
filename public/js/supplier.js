@@ -205,6 +205,13 @@ function decorate() {
 function setWho() {
   el('who').textContent = me ? `${me.name} · ${me.supplier?.business_name || ''}` : '';
   el('btn-logout').classList.toggle('hidden', !me);
+  // Signed out: always a clear Sign in in the header, never only the form further down.
+  el('btn-go-login').classList.toggle('hidden', !!me);
+  el('btn-go-login').onclick = () => {
+    show('view-auth');
+    const f = el('login-email');
+    if (f) { f.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => f.focus(), 350); }
+  };
 }
 
 async function boot() {
@@ -218,6 +225,8 @@ async function boot() {
     await route();
     hideSplash();
   } catch (e) {
+    me = null;
+    setWho();
     show('view-auth');
     hideSplash();
   }

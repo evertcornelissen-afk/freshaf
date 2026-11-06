@@ -131,6 +131,7 @@ function escapeHtml(s) {
 
 /* ---------- inline SVG icon set ---------- */
 const ICONS = {
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   navigate: '<path d="M3 11l19-9-9 19-2-8-8-2Z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
@@ -756,10 +757,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const bar = document.querySelector('.topbar .row');
   if (bar && !document.getElementById('btn-app-settings')) {
     const b = document.createElement('button');
-    b.className = 'secondary small';
+    b.className = 'secondary small icon-btn';
     b.id = 'btn-app-settings';
     b.type = 'button';
-    b.textContent = 'Settings';
+    b.innerHTML = icon('gear');
+    b.title = 'Settings';
     b.setAttribute('aria-label', 'Settings: alerts and location');
     b.onclick = () => openAppSettings();
     bar.insertBefore(b, bar.firstChild);
