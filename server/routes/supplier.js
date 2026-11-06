@@ -404,7 +404,11 @@ router.get('/alerts', (req, res) => {
     phone: row?.phone || null,
     phone_verified: !!row?.phone_verified_at,
     whatsapp_enabled: !!row?.alert_whatsapp,
-    whatsapp_available: getSetting('whatsapp_alerts_enabled', '1') === '1',
+    // Only offered once WhatsApp is actually connected. In dry run the code never reaches
+    // the pro's phone, so on the live site the card was a dead end ("we sent a code"; none
+    // came). Locally it still shows, so the flow stays testable against the dry run.
+    whatsapp_available: getSetting('whatsapp_alerts_enabled', '1') === '1'
+      && (whatsapp.configured() || process.env.NODE_ENV !== 'production'),
   });
 });
 
