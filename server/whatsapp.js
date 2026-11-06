@@ -60,7 +60,7 @@ function log(userId, phone, template, status, detail) {
 
 // Send one template message. Resolves to { ok, status } and never throws at the caller:
 // a failed alert must not take down dispatch.
-async function sendTemplate({ userId, phone, template, bodyParams = [], urlSuffix = null }) {
+async function sendTemplate({ userId, phone, template, bodyParams = [], urlSuffix = null, lang = LANG }) {
   const to = toE164(phone);
   if (!to) { log(userId, phone, template, 'bad_number', 'Could not normalise to E.164'); return { ok: false, status: 'bad_number' }; }
 
@@ -76,7 +76,7 @@ async function sendTemplate({ userId, phone, template, bodyParams = [], urlSuffi
     recipient_type: 'individual',
     to,
     type: 'template',
-    template: { name: template, language: { code: LANG }, components },
+    template: { name: template, language: { code: lang }, components },
   };
 
   if (!configured()) {
@@ -100,6 +100,7 @@ async function sendTemplate({ userId, phone, template, bodyParams = [], urlSuffi
       return { ok: false, status: 'failed', error: msg };
     }
     log(userId, to, template, 'sent', data?.messages?.[0]?.id || null);
+    console.log(`[FreshAF][whatsapp] ${template} -> +${to} accepted by Meta (${data?.messages?.[0]?.id || 'no id'})`);
     return { ok: true, status: 'sent', id: data?.messages?.[0]?.id };
   } catch (e) {
     log(userId, to, template, 'failed', e.message);
@@ -176,4 +177,21 @@ function status() {
   };
 }
 
-module.exports = { configured, codesEnabled, canAlert, toE164, jobAlert, jobBooked, jobCancelled, opsAlert, verifyCode, sendTemplate, status };
+// One-shot line test: proves the number, key and recipient work without waiting for FreshAF's
+// own templates to be approved. Set WHATSAPP_TEST_ON_BOOT on Render to any new value (e.g. a
+// date); on the next start Meta's pre-approved hello_world goes to ADMIN_ALERT_PHONE, once per
+// value, so restarts and redeploys never repeat it.
+function bootTest() {
+  const tag = String(process.env.WHATSAPP_TEST_ON_BOOT || '').trim();
+  const phone = process.env.ADMIN_ALERT_PHONE;
+  if (!tag || !phone || !configured()) return;
+  const { getSetting, setSetting } = require('./db');
+  const key = `whatsapp_boot_test_${tag}`;
+  if (getSetting(key, '') ) return;
+  setSetting(key, new Date().toISOString());
+  sendTemplate({ userId: null, phone, template: 'hello_world', lang: 'en_US' })
+    .then((r) => console.log(`[FreshAF][whatsapp] boot test hello_world -> ${r.status}${r.id ? ` (${r.id})` : ''}${r.error ? `: ${r.error}` : ''}`))
+    .catch(() => {});
+}
+
+module.exports = { bootTest, configured, codesEnabled, canAlert, toE164, jobAlert, jobBooked, jobCancelled, opsAlert, verifyCode, sendTemplate, status };
