@@ -234,8 +234,10 @@ async function sendAndroid(row, payload) {
   if (r.ok) return true;
   const j = await r.json().catch(() => ({}));
   const code = j?.error?.details?.find?.((d) => d.errorCode)?.errorCode || j?.error?.status || '';
-  if (r.status === 404 || code === 'UNREGISTERED' || code === 'INVALID_ARGUMENT') drop(row.id);
-  else console.warn(`[FreshAF][push] FCM ${r.status} ${code}`);
+  if (r.status === 404 || code === 'UNREGISTERED' || code === 'INVALID_ARGUMENT') {
+    drop(row.id);
+    console.warn(`[FreshAF][push] FCM ${r.status} ${code}: Android token for user ${row.user_id} dropped`);
+  } else console.warn(`[FreshAF][push] FCM ${r.status} ${code}`);
   return false;
 }
 
@@ -254,6 +256,7 @@ async function sendToUser(userId, payload) {
       console.warn(`[FreshAF][push] ${row.platform} send failed: ${e.message}`);
     }
   }
+  if (rows.length) console.log(`[FreshAF][push] "${payload.title || ''}" -> user ${userId}: ${sent}/${rows.length} phone(s) accepted`);
   return sent;
 }
 

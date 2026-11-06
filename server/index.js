@@ -167,6 +167,8 @@ app.get('/api/push/native-config', (req, res) => res.json(nativePush.configured(
 app.post('/api/push/device', authRequired('customer', 'supplier'), (req, res) => {
   try {
     nativePush.register(req.user.id, String(req.body?.platform || ''), String(req.body?.token || ''));
+    // The token itself is never logged.
+    console.log(`[FreshAF][push] ${String(req.body?.platform || '?')} phone registered for user ${req.user.id}`);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
