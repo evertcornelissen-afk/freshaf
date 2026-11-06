@@ -71,6 +71,38 @@
   // Apple's guidance, and a prompt with no context is the one people refuse. Nothing is
   // asked at all until the server confirms it can send to this platform.
   var Push = plugin('PushNotifications');
+  var PUSH_OFF_KEY = 'freshaf_push_off';
+  function localFlag(k) { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }
+  function setLocalFlag(k, on) { try { on ? localStorage.setItem(k, '1') : localStorage.removeItem(k); } catch (e) {} }
+
+  // ---- location permission (Settings screen and the pro's first-run setup) ----
+  var Geo = plugin('Geolocation');
+  window.FreshAFNative.location = {
+    available: !!Geo,
+    // 'granted' | 'denied' | 'prompt' | 'unavailable'
+    status: function () {
+      if (!Geo) return Promise.resolve('unavailable');
+      return Geo.checkPermissions().then(function (p) {
+        var s = (p && (p.location || p.coarseLocation)) || '';
+        return s === 'granted' ? 'granted' : s === 'denied' ? 'denied' : 'prompt';
+      }).catch(function () { return 'unavailable'; });
+    },
+    request: function () {
+      if (!Geo) return Promise.resolve('unavailable');
+      return Geo.requestPermissions().then(function (p) {
+        var s = (p && (p.location || p.coarseLocation)) || '';
+        return s === 'granted' ? 'granted' : 'denied';
+      }).catch(function () { return 'denied'; });
+    },
+  };
+
+  // Opens this app's page in the phone's Settings (Android: App info), the only place a
+  // permission that was refused can be switched back on. Native code in AppSettingsPlugin.
+  var AppSettings = (cap.registerPlugin ? cap.registerPlugin('AppSettings') : plugin('AppSettings'));
+  window.FreshAFNative.openPhoneSettings = function () {
+    if (!AppSettings || !AppSettings.open) return Promise.resolve(false);
+    return AppSettings.open().then(function () { return true; }).catch(function () { return false; });
+  };
   var platform = cap.getPlatform ? cap.getPlatform() : '';
   var pushToken = null;
   var listening = false;
@@ -111,9 +143,13 @@
       }).catch(function () { return 'unavailable'; });
     },
     // ask=false only refreshes an existing grant (on every launch, so the token stays current).
+    // Returns 'off' when the person switched alerts off in Settings: the phone permission
+    // may still be granted, but this phone is not registered until they switch it back on.
     enable: function (ask) {
       var self = this;
       if (!self.available) return Promise.resolve('unavailable');
+      if (!ask && localFlag(PUSH_OFF_KEY)) return Promise.resolve('off');
+      if (ask) setLocalFlag(PUSH_OFF_KEY, false);
       return fetch(window.FRESHAF_API_BASE + '/api/push/native-config')
         .then(function (r) { return r.json(); })
         .then(function (cfg) {
@@ -129,6 +165,15 @@
         })
         .catch(function () { return 'unavailable'; });
     },
+    // Settings > Job alerts off: unlink this phone and drop its push token, and remember
+    // the choice so the next launch does not quietly register it again.
+    disable: function () {
+      setLocalFlag(PUSH_OFF_KEY, true);
+      var done = this.forget();
+      try { if (Push && Push.unregister) Push.unregister().catch(function () {}); } catch (e) {}
+      return done;
+    },
+    isOff: function () { return localFlag(PUSH_OFF_KEY); },
     // Unlink this phone from the account before signing out.
     forget: function () {
       if (!pushToken || typeof api !== 'function') return Promise.resolve();

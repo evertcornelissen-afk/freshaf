@@ -211,7 +211,7 @@ async function boot() {
   try {
     decorate();
     const { user } = await api('/api/auth/me');
-    if (user && user.role !== 'supplier') { window.location.href = '/'; return; }
+    if (user && user.role !== 'supplier') { goPage('/'); return; }
     me = user;
     setWho();
     if (!me) { show('view-auth'); hideSplash(); return; }
@@ -327,7 +327,7 @@ async function refreshAlertsButton() {
   const np = window.FreshAFNative && window.FreshAFNative.push;
   if (np && np.available) {
     const st = await np.enable(false); // refreshes the token if already allowed
-    const show = st === 'prompt' || st === 'denied';
+    const show = st === 'prompt' || st === 'denied' || st === 'off';
     el('btn-enable-alerts').classList.toggle('hidden', !show);
     el('alerts-hint').classList.toggle('hidden', !show);
     return;
@@ -410,6 +410,7 @@ async function enterDash() {
   show('view-dash');
   initMap();
   openDeepLink();
+  maybeFirstRunSetup(); // app only: alerts + location, asked once with the reason
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
     quote_request: (data) => {
@@ -858,7 +859,7 @@ async function refreshEarnings() {
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
     const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
-    if (user.role !== 'supplier') { window.location.href = '/'; return; }
+    if (user.role !== 'supplier') { goPage('/'); return; }
     me = user; setWho(); route();
   } catch (e) { showError('login-error', e.message); }
 }); };

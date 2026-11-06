@@ -1038,3 +1038,16 @@ button:active { transform: translateY(0) scale(.975); }
 /* A job opened from a WhatsApp / email / notification link: pulse it so the pro sees which one. */
 .job-focus { border-radius: 12px; animation: jobFocus 1.2s ease-in-out 4; box-shadow: 0 0 0 2px var(--accent); padding: 10px; margin: -10px; }
 @keyframes jobFocus { 0%, 100% { box-shadow: 0 0 0 2px var(--accent); } 50% { box-shadow: 0 0 0 6px rgba(33, 172, 207, .25); } }
+
+/* ---------- app Settings (native app only, common.js openAppSettings) ---------- */
+.app-settings-modal { max-width: 440px; }
+.set-row { padding: 14px 0; border-top: 1px solid var(--border-soft); }
+.set-row:first-of-type { border-top: none; }
+.set-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.set-row p { margin: 0 0 10px; }
+.set-pill { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.set-on { background: rgba(34, 160, 90, .16); color: #1e8a50; }
+.set-off { background: var(--panel-2); color: var(--muted); }
+.set-blocked { background: rgba(214, 69, 65, .14); color: #c0392b; }
+:root[data-theme="dark"] .set-on, [data-theme="dark"] .set-on { color: #5fd38d; }
+:root[data-theme="dark"] .set-blocked, [data-theme="dark"] .set-blocked { color: #ff8a80; }

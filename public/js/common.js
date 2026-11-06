@@ -605,3 +605,173 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.app-download').forEach((a) => a.classList.add('hidden'));
   }
 });
+
+/* ---------- pages, website and app ----------
+   On the website /supplier is mapped to supplier.html by Express. Inside the app there is
+   no Express: the pages are files in the bundle, and a script that sends a pro to
+   '/supplier' lands on nothing (found 7 Nov 2026: a pro signing in in the Android app never
+   reached the dashboard). Every scripted page change goes through here. */
+function pageUrl(path) {
+  if (!window.FRESHAF_NATIVE) return path;
+  const m = /^\/?([^?#]*)(.*)$/.exec(String(path || '/'));
+  const name = (m && m[1]) || 'index';
+  return `${/\.html$/.test(name) ? name : name + '.html'}${(m && m[2]) || ''}`;
+}
+function goPage(path) { window.location.href = pageUrl(path); }
+
+/* ---------- app Settings (native app only) ----------
+   One place for the two permissions the app needs: alerts (push) and location. Each row
+   says plainly whether it is on, turns it on with the phone's own prompt, and links to the
+   phone's Settings when it was refused, because only the phone can undo a refusal. */
+const APP_SETTINGS_SEEN = 'freshaf_setup_prompted';
+
+async function appSettingsState() {
+  const N = window.FreshAFNative || {};
+  let push = 'unavailable';
+  if (N.push && N.push.available) {
+    push = await N.push.status();
+    if (push === 'granted' && N.push.isOff && N.push.isOff()) push = 'off';
+  }
+  const loc = N.location ? await N.location.status() : 'unavailable';
+  return { push, loc };
+}
+
+function settingsRow({ id, title, status, detail, actions }) {
+  return `<div class="set-row" id="${id}">
+      <div class="set-head"><strong>${title}</strong><span class="set-pill set-${status.kind}">${status.label}</span></div>
+      <p class="muted small-text">${detail}</p>
+      <div class="row">${actions.join('')}</div>
+    </div>`;
+}
+
+async function openAppSettings({ intro = false } = {}) {
+  if (!window.FRESHAF_NATIVE) return;
+  const isPro = /supplier/.test(location.pathname);
+  const alertsName = isPro ? 'Job alerts' : 'Order notifications';
+  document.querySelectorAll('.modal-backdrop.app-settings').forEach((b) => b.remove());
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop app-settings';
+  document.body.appendChild(backdrop);
+  const close = () => {
+    backdrop.remove();
+    if (typeof refreshAlertsButton === 'function') refreshAlertsButton();
+  };
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+
+  async function render(note) {
+    const s = await appSettingsState();
+    const PUSH = {
+      granted: { kind: 'on', label: 'On' },
+      off: { kind: 'off', label: 'Off' },
+      prompt: { kind: 'off', label: 'Not set up' },
+      denied: { kind: 'blocked', label: 'Blocked' },
+      unavailable: { kind: 'off', label: 'Not available' },
+    }[s.push] || { kind: 'off', label: s.push };
+    const LOC = {
+      granted: { kind: 'on', label: 'Allowed' },
+      prompt: { kind: 'off', label: 'Not set up' },
+      denied: { kind: 'blocked', label: 'Blocked' },
+      unavailable: { kind: 'off', label: 'Not available' },
+    }[s.loc] || { kind: 'off', label: s.loc };
+    const settingsBtn = '<button class="secondary small" data-act="phone">Open phone settings</button>';
+    const pushRow = settingsRow({
+      id: 'set-push',
+      title: alertsName,
+      status: PUSH,
+      detail: {
+        granted: isPro ? 'New bookings and job offers reach this phone even when FreshAF is closed.'
+          : 'Updates about your bookings reach this phone even when FreshAF is closed.',
+        off: 'Switched off on this phone. Nothing is sent here until you switch it on.',
+        prompt: isPro ? 'Switch on to be told about new bookings and job offers the moment they come in.'
+          : 'Switch on to be told when your pro is on the way and when the job is done.',
+        denied: 'Notifications for FreshAF are blocked in your phone settings. Open them and allow Notifications.',
+        unavailable: 'Not available on this phone yet.',
+      }[s.push] || '',
+      actions: s.push === 'granted' ? ['<button class="secondary small" data-act="push-off">Switch off</button>']
+        : s.push === 'denied' ? [settingsBtn]
+          : s.push === 'unavailable' ? [] : ['<button class="small" data-act="push-on">Switch on</button>'],
+    });
+    const locRow = settingsRow({
+      id: 'set-loc',
+      title: 'Location',
+      status: LOC,
+      detail: {
+        granted: isPro ? 'Used to place your work pin and show jobs near you. To switch it off, use your phone settings.'
+          : 'Used only when you tap "Use my location" to drop the pin. To switch it off, use your phone settings.',
+        prompt: isPro ? 'Allow so FreshAF can place your work pin and show you jobs nearby.'
+          : 'Allow so "Use my location" can drop your pin. You can always type an address instead.',
+        denied: 'Location for FreshAF is blocked in your phone settings. Open them and allow Location.',
+        unavailable: 'Not available on this phone.',
+      }[s.loc] || '',
+      actions: (s.loc === 'granted' || s.loc === 'denied') ? [settingsBtn]
+        : s.loc === 'unavailable' ? [] : ['<button class="small" data-act="loc-on">Allow location</button>'],
+    });
+    backdrop.innerHTML = `
+      <div class="modal app-settings-modal" role="dialog" aria-label="Settings">
+        <h3>${intro ? 'Set up your phone for jobs' : 'Settings'}</h3>
+        ${intro ? '<p class="muted small-text">Two quick permissions so you never miss a booking. You can change them any time under Settings at the top of the screen.</p>' : ''}
+        ${pushRow}${locRow}
+        ${note ? `<div class="msg error" style="display:block">${note}</div>` : ''}
+        <div class="row mt" style="justify-content:flex-end"><button class="ghost" data-close>Done</button></div>
+      </div>`;
+    backdrop.querySelector('[data-close]').onclick = close;
+    backdrop.querySelectorAll('[data-act]').forEach((b) => {
+      b.onclick = async () => {
+        const N = window.FreshAFNative;
+        b.disabled = true;
+        let msg = '';
+        try {
+          const act = b.dataset.act;
+          if (act === 'push-on') {
+            const st = await N.push.enable(true);
+            if (st === 'denied') msg = 'Notifications were not allowed. Tap Open phone settings and allow Notifications for FreshAF.';
+            else if (st === 'granted') toast(`${alertsName} switched on`, 'ok');
+            else if (st === 'unavailable') msg = 'Alerts are not available right now. Check your internet connection and try again.';
+          } else if (act === 'push-off') {
+            await N.push.disable();
+            toast(`${alertsName} switched off on this phone`, 'ok');
+          } else if (act === 'loc-on') {
+            const st = await N.location.request();
+            if (st !== 'granted') msg = 'Location was not allowed. Tap Open phone settings and allow Location for FreshAF.';
+          } else if (act === 'phone') {
+            const opened = await N.openPhoneSettings();
+            if (!opened) msg = 'Open your phone Settings, then Apps, then FreshAF, and change Notifications or Location there.';
+          }
+        } catch (e) { msg = e.message || 'That did not work. Try again.'; }
+        render(msg);
+      };
+    });
+  }
+  await render('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.FRESHAF_NATIVE) return;
+  const bar = document.querySelector('.topbar .row');
+  if (bar && !document.getElementById('btn-app-settings')) {
+    const b = document.createElement('button');
+    b.className = 'secondary small';
+    b.id = 'btn-app-settings';
+    b.type = 'button';
+    b.textContent = 'Settings';
+    b.setAttribute('aria-label', 'Settings: alerts and location');
+    b.onclick = () => openAppSettings();
+    bar.insertBefore(b, bar.firstChild);
+  }
+  // Coming back from the phone's Settings: show the new state straight away.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && document.querySelector('.modal-backdrop.app-settings')) openAppSettings();
+  });
+});
+
+// A pro's first time in the app: ask for both permissions, with the reason, once.
+function maybeFirstRunSetup() {
+  if (!window.FRESHAF_NATIVE) return;
+  let seen = false;
+  try { seen = localStorage.getItem(APP_SETTINGS_SEEN) === '1'; } catch (e) {}
+  if (seen) return;
+  try { localStorage.setItem(APP_SETTINGS_SEEN, '1'); } catch (e) {}
+  appSettingsState().then((s) => {
+    if (s.push !== 'granted' || s.loc !== 'granted') openAppSettings({ intro: true });
+  });
+}

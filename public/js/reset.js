@@ -49,7 +49,7 @@
       }));
       toast('Password changed. You are signed in.', 'ok');
       setTimeout(() => {
-        window.location.href = r.user && r.user.role === 'supplier' ? '/supplier' : '/';
+        goPage(r.user && r.user.role === 'supplier' ? '/supplier' : '/');
       }, 900);
     } catch (err) {
       el('set-error').textContent = err.message;
