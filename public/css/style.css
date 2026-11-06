@@ -982,3 +982,45 @@ button:active { transform: translateY(0) scale(.975); }
   letter-spacing: .01em; margin-top: 6px;
 }
 .verified-pro svg { width: 14px; height: 14px; flex: 0 0 auto; }
+
+/* ---------- tick-many dropdown (Pro sign-up: service areas) ---------- */
+.multi-pick { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); }
+.multi-pick[open] { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(33, 172, 207, .18); }
+.multi-pick > summary {
+  list-style: none; cursor: pointer; padding: 12px 40px 12px 14px; font-size: .92rem; color: var(--text);
+  position: relative; user-select: none;
+}
+.multi-pick > summary::-webkit-details-marker { display: none; }
+.multi-pick > summary::after {
+  content: ''; position: absolute; right: 16px; top: 50%; width: 8px; height: 8px; margin-top: -6px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg);
+  transition: transform .18s;
+}
+.multi-pick[open] > summary::after { transform: rotate(-135deg); margin-top: -2px; }
+.multi-pick-panel { border-top: 1px solid var(--border-soft); padding: 10px 12px 12px; }
+.multi-pick-panel input[type=search] { margin-bottom: 8px; }
+#area-list { max-height: 300px; overflow-y: auto; overscroll-behavior: contain; }
+.area-group { padding: 4px 0 8px; border-bottom: 1px solid var(--border-soft); }
+.area-group:last-child { border-bottom: none; }
+.area-group label { display: flex; align-items: center; gap: 10px; margin: 0; padding: 7px 2px; cursor: pointer; }
+.area-group input[type=checkbox] { width: auto; flex: none; }
+.area-prov { font-size: .82rem; color: var(--text); }
+.area-opt { font-size: .9rem; font-weight: 500; color: var(--text); padding-left: 24px !important; }
+.area-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.area-chips:empty { display: none; }
+.area-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px;
+  background: rgba(33, 172, 207, .12); color: var(--text); font-size: .8rem; font-weight: 600;
+}
+.area-chip-x {
+  padding: 2px; width: 22px; height: 22px; border-radius: 50%; background: transparent; box-shadow: none;
+  color: var(--muted);
+}
+.area-chip-x:hover { transform: none; box-shadow: none; background: rgba(0, 0, 0, .06); }
+.area-chip-x svg { width: 12px; height: 12px; }
+/* Pro sign-up vehicle rows on phones: make & model gets its own full-width line. */
+@media (max-width: 520px) {
+  .vehicle-row { flex-wrap: wrap !important; }
+  .vehicle-row .v-type, .vehicle-row .v-reg { flex: 1 1 0 !important; width: auto !important; min-width: 0; }
+  .vehicle-row .v-model { order: 5; flex: 1 1 100% !important; }
+}

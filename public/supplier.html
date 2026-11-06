@@ -75,12 +75,22 @@
           <label style="margin:0;cursor:pointer" class="row"><input type="checkbox" id="svc-carwash" checked style="width:auto"> <span>Car wash</span></label>
           <label style="margin:0;cursor:pointer" class="row"><input type="checkbox" id="svc-laundry" style="width:auto"> <span>Laundry</span></label>
         </div>
-        <label>Your full name</label><input id="reg-name">
-        <label>Business / trading name</label><input id="reg-business">
-        <label>SA ID number</label><input id="reg-idnum">
-        <label>Email</label><input id="reg-email" type="email">
-        <label>Mobile number</label><input id="reg-phone">
-        <label>Service area</label><input id="reg-area" placeholder="e.g. the suburbs or towns you will cover">
+        <label for="reg-name">Your full name</label><input id="reg-name" name="name" autocomplete="name">
+        <label for="reg-business">Business / trading name</label><input id="reg-business" name="organization" autocomplete="organization">
+        <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocomplete="username email">
+        <label for="reg-phone">Mobile number</label><input id="reg-phone" name="tel" type="tel" autocomplete="tel">
+        <!-- Never autofilled: browsers otherwise drop the saved email or username in here. -->
+        <label for="reg-idnum">SA ID number</label><input id="reg-idnum" name="sa-id-number" inputmode="numeric" maxlength="13" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="13 digits">
+        <label>Service areas: tick every area you will cover</label>
+        <details class="multi-pick" id="area-pick">
+          <summary id="area-summary">Choose your service areas</summary>
+          <div class="multi-pick-panel">
+            <input type="search" id="area-search" placeholder="Search a city or town" autocomplete="off">
+            <div id="area-list"></div>
+          </div>
+        </details>
+        <div class="area-chips" id="area-chips"></div>
+        <label for="reg-area-other">Other areas not listed (optional)</label><input id="reg-area-other" placeholder="e.g. Hartenbos, Groot Brakrivier" autocomplete="off">
         <h3>Work vehicles — add every vehicle you use</h3>
         <div id="vehicles-rows"></div>
         <button type="button" class="secondary small" id="btn-add-vehicle">Add a vehicle</button>
@@ -89,10 +99,10 @@
         <div id="equipment-list"></div>
         <label>Other equipment not listed</label><input id="reg-equipment-other" placeholder="e.g. foam cannon, steam cleaner">
         <h3>Payout details (where we pay your earnings)</h3>
-        <label>Bank</label><input id="reg-bank" placeholder="e.g. Capitec, FNB, Standard Bank">
-        <label>Account number</label><input id="reg-account">
-        <label>Branch code</label><input id="reg-branch">
-        <label>Password (min 8 characters)</label><input id="reg-password" type="password">
+        <label>Bank</label><input id="reg-bank" placeholder="e.g. Capitec, FNB, Standard Bank" autocomplete="off">
+        <label>Account number</label><input id="reg-account" inputmode="numeric" autocomplete="off">
+        <label>Branch code</label><input id="reg-branch" inputmode="numeric" autocomplete="off">
+        <label>Password (min 8 characters)</label><input id="reg-password" name="new-password" type="password" autocomplete="new-password">
         <label class="row" style="margin-top:16px;cursor:pointer;font-size:.85rem;color:var(--muted)">
           <input type="checkbox" id="reg-terms" style="width:auto">
           <span>I accept the <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank">Privacy Policy</a></span>

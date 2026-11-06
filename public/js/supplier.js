@@ -20,13 +20,106 @@ const EQUIPMENT = {
     { key: 'products', label: 'Own cleaning products' },
   ],
   laundry: [
-    { key: 'washing_machines', label: 'Washing machines', qty: 'How many' },
-    { key: 'tumble_dryers', label: 'Tumble dryers', qty: 'How many' },
-    { key: 'industrial', label: 'Industrial machines', qty: 'How many' },
+    { key: 'washing_machines', label: 'Washing machines', qty: 'Qty' },
+    { key: 'tumble_dryers', label: 'Tumble dryers', qty: 'Qty' },
+    { key: 'industrial', label: 'Industrial machines', qty: 'Qty' },
     { key: 'iron_station', label: 'Ironing station' },
     { key: 'packaging', label: 'Packaging / garment bags' },
   ],
 };
+
+/* ---------- service areas: nationwide, grouped by province, tick as many as you cover ---------- */
+const SERVICE_AREAS = {
+  'Gauteng': ['Johannesburg CBD', 'Sandton', 'Randburg', 'Roodepoort', 'Soweto', 'Midrand', 'Fourways',
+    'Pretoria / Tshwane', 'Centurion', 'Ekurhuleni (East Rand)', 'Kempton Park', 'Benoni', 'Boksburg',
+    'Germiston', 'Krugersdorp / West Rand', 'Vereeniging / Vaal'],
+  'Western Cape': ['Cape Town CBD & Atlantic Seaboard', 'Southern Suburbs', 'Northern Suburbs', 'Cape Flats',
+    'Blaauwberg / West Coast', 'Helderberg / Somerset West', 'Stellenbosch', 'Paarl / Wellington',
+    'George', 'Mossel Bay', 'Knysna / Plettenberg Bay', 'Hermanus / Overberg', 'Worcester / Breede Valley'],
+  'KwaZulu-Natal': ['Durban', 'Umhlanga', 'Ballito / North Coast', 'Pinetown / Westville', 'Amanzimtoti / South Coast',
+    'Pietermaritzburg', 'Richards Bay', 'Newcastle', 'Port Shepstone'],
+  'Eastern Cape': ['Gqeberha (Port Elizabeth)', 'East London', 'Mthatha', 'Makhanda', 'Jeffreys Bay'],
+  'Free State': ['Bloemfontein', 'Welkom', 'Bethlehem', 'Sasolburg'],
+  'Limpopo': ['Polokwane', 'Tzaneen', 'Thohoyandou', 'Mokopane', 'Bela-Bela'],
+  'Mpumalanga': ['Mbombela (Nelspruit)', 'Emalahleni (Witbank)', 'Middelburg', 'Secunda'],
+  'North West': ['Rustenburg', 'Mahikeng', 'Potchefstroom', 'Klerksdorp', 'Brits / Hartbeespoort'],
+  'Northern Cape': ['Kimberley', 'Upington', 'Springbok'],
+};
+const escAttr = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+function renderAreaPicker() {
+  el('area-list').innerHTML = Object.entries(SERVICE_AREAS).map(([prov, towns]) => `
+    <div class="area-group" data-prov="${escAttr(prov)}">
+      <label class="area-prov"><input type="checkbox" class="area-all" data-prov="${escAttr(prov)}"> <span>${prov}: all areas</span></label>
+      ${towns.map((t) => `<label class="area-opt"><input type="checkbox" class="area-check" data-prov="${escAttr(prov)}" value="${escAttr(t)}"> <span>${t}</span></label>`).join('')}
+    </div>`).join('');
+  el('area-list').addEventListener('change', (e) => {
+    const box = e.target;
+    if (box.classList.contains('area-all')) {
+      document.querySelectorAll(`.area-check[data-prov="${CSS.escape(box.dataset.prov)}"]`).forEach((c) => { c.checked = box.checked; });
+    }
+    syncAreas();
+  });
+  el('area-search').addEventListener('input', () => {
+    const q = el('area-search').value.trim().toLowerCase();
+    document.querySelectorAll('.area-group').forEach((g) => {
+      const provHit = g.dataset.prov.toLowerCase().includes(q);
+      let any = false;
+      g.querySelectorAll('.area-opt').forEach((o) => {
+        const hit = !q || provHit || o.textContent.toLowerCase().includes(q);
+        o.classList.toggle('hidden', !hit);
+        any = any || hit;
+      });
+      g.classList.toggle('hidden', !any);
+    });
+  });
+  // A chip's x unticks that area.
+  el('area-chips').addEventListener('click', (e) => {
+    const b = e.target.closest('.area-chip-x');
+    if (!b) return;
+    document.querySelectorAll('.area-check').forEach((c) => {
+      if (b.dataset.prov ? c.dataset.prov === b.dataset.prov : c.value === b.dataset.area) c.checked = false;
+    });
+    syncAreas();
+  });
+  syncAreas();
+}
+
+function selectedAreas() {
+  return [...document.querySelectorAll('.area-check:checked')].map((c) => c.value);
+}
+
+function syncAreas() {
+  // A province box shows ticked only when every area in it is.
+  document.querySelectorAll('.area-all').forEach((all) => {
+    const boxes = [...document.querySelectorAll(`.area-check[data-prov="${CSS.escape(all.dataset.prov)}"]`)];
+    const n = boxes.filter((c) => c.checked).length;
+    all.checked = n === boxes.length;
+    all.indeterminate = n > 0 && n < boxes.length;
+  });
+  const picked = selectedAreas();
+  el('area-summary').textContent = picked.length
+    ? `${picked.length} area${picked.length === 1 ? '' : 's'} selected`
+    : 'Choose your service areas';
+  // A whole province is one chip, not a dozen.
+  const chip = (text, attr, val) => `<span class="area-chip">${text}<button type="button" class="area-chip-x" ${attr}="${escAttr(val)}" aria-label="Remove ${escAttr(text)}">${icon('x')}</button></span>`;
+  const fullProv = new Set([...document.querySelectorAll('.area-all')].filter((a) => a.checked).map((a) => a.dataset.prov));
+  el('area-chips').innerHTML = [
+    ...[...fullProv].map((p) => chip(`${p} (all areas)`, 'data-prov', p)),
+    ...[...document.querySelectorAll('.area-check:checked')].filter((c) => !fullProv.has(c.dataset.prov)).map((c) => chip(c.value, 'data-area', c.value)),
+  ].join('');
+}
+
+// One line for the record: grouped by province, plus anything typed under "Other".
+function serviceAreaText() {
+  const byProv = {};
+  document.querySelectorAll('.area-check:checked').forEach((c) => { (byProv[c.dataset.prov] ||= []).push(c.value); });
+  const parts = Object.entries(byProv).map(([prov, towns]) =>
+    towns.length === SERVICE_AREAS[prov].length ? `${prov} (all)` : `${prov}: ${towns.join(', ')}`);
+  const other = el('reg-area-other').value.trim();
+  if (other) parts.push(`Other: ${other}`);
+  return parts.join('; ');
+}
 
 function addVehicleRow(prefill = {}) {
   const row = document.createElement('div');
@@ -92,6 +185,7 @@ function decorate() {
   el('h-apply').insertAdjacentHTML('afterbegin', icon('briefcase'));
   addVehicleRow();
   renderEquipmentList();
+  renderAreaPicker();
   el('btn-add-vehicle').onclick = () => addVehicleRow();
   el('svc-carwash').addEventListener('change', renderEquipmentList);
   el('svc-laundry').addEventListener('change', renderEquipmentList);
@@ -707,6 +801,10 @@ el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn
 el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting application…', async () => {
   try {
     if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
+    const serviceArea = serviceAreaText();
+    if (!serviceArea) throw new Error('Tick at least one service area, or type it under Other areas');
+    const idNum = el('reg-idnum').value.replace(/\s/g, '');
+    if (!/^\d{13}$/.test(idNum)) throw new Error('Your SA ID number is 13 digits');
     const services = [];
     if (el('svc-carwash').checked) services.push('carwash');
     if (el('svc-laundry').checked) services.push('laundry');
@@ -715,8 +813,8 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
       body: {
         role: 'supplier', name: el('reg-name').value, email: el('reg-email').value,
         phone: el('reg-phone').value, password: el('reg-password').value,
-        business_name: el('reg-business').value, id_number: el('reg-idnum').value,
-        service_area: el('reg-area').value,
+        business_name: el('reg-business').value, id_number: idNum,
+        service_area: serviceArea,
         vehicles: collectVehicles(), equipment: collectEquipment(),
         services, accept_terms: true,
         bank_name: el('reg-bank').value, bank_account: el('reg-account').value, bank_branch: el('reg-branch').value,
