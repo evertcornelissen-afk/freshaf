@@ -56,7 +56,8 @@ app.use(cookieParser());
 // default, not a promise, and one page rule would change it.
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store, private');
-  res.set('Vary', 'Cookie, Authorization');
+  res.vary('Cookie');
+  res.vary('Authorization'); // added to, not replacing, the Vary: Origin set for the app
   next();
 });
 

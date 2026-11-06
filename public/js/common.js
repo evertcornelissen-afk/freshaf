@@ -9,11 +9,14 @@
 // bundle instead of the server. The native shell sets window.FRESHAF_API_BASE before
 // any of this runs; see mobile/README.md.
 //
-// credentials follows from the same fact: 'same-origin' on the web keeps the session
-// cookie exactly as strict as it is today, and 'include' is required in the app because
-// the request genuinely is cross-origin there.
+// credentials: 'same-origin' on the web keeps the session cookie exactly as strict as it
+// is. In the app the request is cross-origin and authenticates with the Bearer token, so
+// it sends NO cookies ('omit'). It must: the server deliberately never sends
+// Access-Control-Allow-Credentials (server/index.js), and a credentialed cross-origin
+// request without it is thrown away by the web view, so every call "fails to reach"
+// the server. That was the app's "can't reach FreshAF" on 7 Nov 2026.
 const API_BASE = (typeof window !== 'undefined' && window.FRESHAF_API_BASE) || '';
-const API_CREDENTIALS = API_BASE ? 'include' : 'same-origin';
+const API_CREDENTIALS = API_BASE ? 'omit' : 'same-origin';
 
 function apiUrl(path) {
   // Absolute URLs (the payment hand-off) are passed through untouched.

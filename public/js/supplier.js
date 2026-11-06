@@ -270,7 +270,10 @@ async function renderDocs() {
         const fd = new FormData();
         fd.append('kind', kind);
         fd.append('file', file);
-        const res = await fetch('/api/supplier/documents', { method: 'POST', body: fd, credentials: 'same-origin' });
+        // Through apiUrl/authHeaders like every other call, so it also works inside the app.
+        const res = await fetch(apiUrl('/api/supplier/documents'), {
+          method: 'POST', body: fd, headers: authHeaders(), credentials: API_CREDENTIALS,
+        });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Upload failed');
         toast('Document uploaded', 'ok');
