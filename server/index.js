@@ -286,6 +286,7 @@ process.on('SIGINT', () => shutdown(0, 'SIGINT received'));
 
 const PORT = Number(process.env.PORT || 5757);
 require('./daily-summary').start(); // the 07:00 email to the FreshAF inbox
+require('./demo-autopilot').start(); // demo bookings play through if nobody works them
 server = app.listen(PORT, () => {
   console.log(`[FreshAF] Fresh and Fast — running at http://localhost:${PORT}`);
   console.log(`[FreshAF] Customer app:    http://localhost:${PORT}/`);

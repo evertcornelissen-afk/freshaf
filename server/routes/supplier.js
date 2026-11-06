@@ -483,3 +483,4 @@ router.get('/earnings', (req, res) => {
 });
 
 module.exports = router;
+module.exports.completeOrder = completeOrder; // the demo autopilot closes demo jobs the same way
