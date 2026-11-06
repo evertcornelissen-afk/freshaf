@@ -229,6 +229,28 @@ function proJobBooked(o) {
   });
 }
 
+// The pro was told about a booking by email (and WhatsApp), so a cancellation must reach
+// them the same way: a pro who never opened the app would otherwise still drive out.
+function proJobCancelled({ to, name, orderId, service, address, by, reason }) {
+  const who = by === 'admin' ? 'FreshAF' : by === 'customer' ? 'The customer' : 'The booking system';
+  return send({
+    to,
+    subject: `Cancelled: ${service} #${orderId}. You do not need to go`,
+    heading: 'Booking cancelled',
+    paragraphs: [
+      `Hi ${firstName(name)},`,
+      `${who} cancelled order #${orderId}. <strong>You do not need to go to this address.</strong>`,
+      `<table cellpadding="0" cellspacing="0" style="font-size:14px">${[
+        row('Order', `#${orderId}`),
+        row('Service', esc(service)),
+        row('Where', esc(address)),
+        ...(reason ? [row('Reason', esc(reason))] : []),
+      ].join('')}</table>`,
+    ],
+    cta: { label: 'Open FreshAF Pro', url: `${BASE}/supplier` },
+  });
+}
+
 // A receipt, never a tax invoice, and no VAT line. FreshAF is not VAT-registered (confirmed
 // by Evert, 5 Nov 2026), and a business that is not a VAT vendor may not issue a tax invoice
 // or show VAT. If FreshAF registers, this and terms section 3 change together: the words
@@ -355,4 +377,4 @@ function passwordChanged({ to, name }) {
 
 // layout is exported so an email can be rendered and looked at before it is sent.
 module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
-  passwordReset, passwordChanged, bookingConfirmed, proJobBooked, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };
+  passwordReset, passwordChanged, bookingConfirmed, proJobBooked, proJobCancelled, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };

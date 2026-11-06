@@ -236,6 +236,22 @@ function cancelOrder(orderId, { by = 'customer', reason = null } = {}) {
       title: 'Job cancelled', body: `Order #${order.id} at ${order.address} was cancelled. You do not need to go.`,
       url: '/supplier', tag: `job-${order.id}`,
     }).catch(() => {});
+    // The booking reached the pro by email and WhatsApp; so must the cancellation.
+    try {
+      const pro = db.prepare(`SELECT u.name, u.email, u.phone, u.phone_verified_at, s.alert_whatsapp
+        FROM users u LEFT JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(order.supplier_id);
+      const service = order.service === 'laundry' ? 'Laundry' : 'Car wash';
+      if (pro?.email && !pro.email.endsWith('@freshaf.invalid')) {
+        require('./mailer').proJobCancelled({ to: pro.email, name: pro.name, orderId: order.id, service,
+          address: order.address, by, reason }).catch(() => {});
+      }
+      if (getSetting('whatsapp_alerts_enabled', '1') === '1' && whatsapp.canAlert(pro)) {
+        whatsapp.jobCancelled({ userId: order.supplier_id, phone: pro.phone, orderId: order.id, service,
+          address: order.address }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn(`[FreshAF] Could not tell pro about cancelled order ${order.id}: ${e.message}`);
+    }
   }
   const fresh = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
   notifyCustomer(fresh); // live update in the app; cancellations are emailed below

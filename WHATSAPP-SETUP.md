@@ -137,7 +137,45 @@ Sent only to the number in `ADMIN_ALERT_PHONE`, when an ASAP booking is still no
 5 minutes after it was booked, or a scheduled one 5 minutes after its start time. The same
 alert always goes to the FreshAF inbox by email, and the pro gets a second priority push.
 
+### Template 5 (the pro's booking was cancelled)
+
+- **Name:** `freshaf_job_cancelled`
+- **Category:** Utility
+- **Language:** English
+- **Body:**
+
+```
+FreshAF booking cancelled.
+
+Order: #{{1}}
+Service: {{2}}
+Address: {{3}}
+
+You do not need to go to this address. Open FreshAF Pro to see your other jobs.
+```
+
+Sample values: `57`, `Car wash`, `12 Wellington Road, Durbanville`. No button.
+
+Sent to the pro whenever a booking they were given is cancelled (by the customer, by FreshAF,
+or by an unfinished card checkout). The same message always goes by email and push. Found in
+the 6 Nov 2026 live test: before this, a pro who only reads WhatsApp was told about a booking
+but never about its cancellation.
+
 Approval is usually minutes for Utility and Authentication templates.
+
+## Step 2b — register the sending number (once per number)
+
+A number that has not been registered shows **Pending** in WhatsApp Manager → Phone numbers,
+and every send fails with `(#133010) Account not registered`. This is what happened on
+6 Nov 2026 with Meta's test number. Register it once:
+
+1. Copy the permanent access key (the same one in Render's `WHATSAPP_TOKEN`).
+2. In PowerShell, in the `freshaf` folder:
+   `powershell -ExecutionPolicy Bypass -File scripts\wa-register.ps1`
+3. Type a 6-digit PIN you choose. It becomes the number's two-step verification PIN; keep it
+   in the password manager.
+
+The status changes to **Connected**. Do it again when you move to FreshAF's own SIM number.
 
 ## Step 3 — set the environment variables on Render
 
