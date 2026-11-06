@@ -6,6 +6,7 @@ Allow: /
 Disallow: /admin
 Disallow: /pay/
 Disallow: /payment-complete
+Disallow: /download/
 Disallow: /api/
 
 Sitemap: https://freshaf.io/sitemap.xml

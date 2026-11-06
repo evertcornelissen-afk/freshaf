@@ -196,6 +196,19 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.type('application/json').sendFile(path.join(PUBLIC_DIR, '.well-known', 'assetlinks.json'));
 });
+// Test build of the Android app for sideloading onto test phones before Play Store release.
+// Unlisted (linked from nowhere, not indexed). Kept outside public/ on purpose: Capacitor
+// copies public/ into the app, so an APK there would end up inside the next APK.
+// Remove this route and downloads/ once the app is on Play internal testing.
+app.get('/download/freshaf-test.apk', (req, res) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.set('Cache-Control', 'no-store');
+  res.type('application/vnd.android.package-archive');
+  res.download(path.join(__dirname, '..', 'downloads', 'freshaf-test.apk'), 'freshaf-test.apk', (err) => {
+    if (err && !res.headersSent) res.status(404).send('Not found');
+  });
+});
+
 app.use(express.static(PUBLIC_DIR));
 app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.html')));
 // The admin dashboard is NOT served from the public site. It runs on the operator's own
