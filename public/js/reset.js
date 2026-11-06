@@ -24,7 +24,7 @@
       const btn = el('btn-request');
       try {
         const r = await withBusy(btn, 'Sending…', () => api('/api/auth/forgot', {
-          method: 'POST', body: { email: el('reset-email').value.trim() },
+          method: 'POST', body: { email: el('reset-email').value.trim().toLowerCase() },
         }));
         el('request-done').textContent = r.message;
         el('request-form').classList.add('hidden');

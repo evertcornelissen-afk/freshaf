@@ -128,7 +128,7 @@
       <h2 id="h-signin">Sign in</h2>
       <div class="msg error" id="login-error"></div>
       <form id="login-form" method="post" action="/api/auth/login">
-        <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocomplete="username email" required>
+        <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username email" required>
         <label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password" required>
         <div class="mt"><button type="submit" id="btn-login" style="width:100%">Sign in</button></div>
       </form>
@@ -145,7 +145,7 @@
       <div class="msg error" id="reg-error"></div>
       <form id="register-form" method="post" action="/api/auth/register">
       <label for="reg-name">Full name</label><input id="reg-name" name="name" autocomplete="name">
-      <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocomplete="username email">
+      <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username email">
       <label for="reg-phone">Mobile number</label><input id="reg-phone" name="phone" placeholder="e.g. 082 555 1234" autocomplete="tel">
       <label for="reg-address">Preferred address (home or work)</label><input id="reg-address" name="address" placeholder="e.g. 12 Main Road, Suburb, City" autocomplete="street-address">
       <label for="reg-password">Password (min 8 characters)</label><input id="reg-password" name="password" type="password" autocomplete="new-password">

@@ -61,7 +61,7 @@
         <h2 id="h-signin">Supplier sign in</h2>
         <div class="msg error" id="login-error"></div>
         <form id="login-form" method="post" action="/api/auth/login">
-          <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocomplete="username email" required>
+          <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username email" required>
           <label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password" required>
           <div class="mt"><button type="submit" id="btn-login">Sign in</button></div>
         </form>
@@ -77,7 +77,7 @@
         </div>
         <label for="reg-name">Your full name</label><input id="reg-name" name="name" autocomplete="name">
         <label for="reg-business">Business / trading name</label><input id="reg-business" name="organization" autocomplete="organization">
-        <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocomplete="username email">
+        <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username email">
         <label for="reg-phone">WhatsApp number: new bookings are sent here</label>
         <div class="row" style="gap:8px;align-items:stretch">
           <input id="reg-phone" name="tel" type="tel" autocomplete="tel" placeholder="e.g. 082 555 1234" style="flex:1;min-width:0">

@@ -218,6 +218,25 @@ Home (logged out) → register/login → **category chooser: Car Wash or Laundry
 - Colours: petrol `#10424F`, cyan `#1799C2`. Logo is an italic two-tone wordmark
   (`public/img/logo.svg`, dark variant `logo-dark.svg`).
 
+## Standing rule: emails are never case-sensitive (Evert, 7 Nov 2026)
+Emails and usernames must **never** be case-sensitive anywhere in FreshAF: customer and pro
+sign-up, sign-in, password reset, duplicate-account checks, admin import and search, the
+admin app, and any lookup by email.
+- Every incoming email goes through `normEmail()` in `server/email.js` (trim + lower-case)
+  before it is stored or looked up. Stored emails are lower-case.
+- Lookups use `lower(email) = ?`. The column is also `COLLATE NOCASE`, and a unique index on
+  `lower(email)` (`users_email_lower`, created at start-up in `server/db.js`) makes
+  "Evert@…" and "evert@…" impossible as two accounts.
+- The front ends send the email trimmed and lower-cased, and email inputs carry
+  `autocapitalize="none" autocorrect="off" spellcheck="false"` so phones do not capitalise them.
+- At every start-up `server/db.js` tidies any stored email with capitals or spaces and logs
+  `[FreshAF] Email check: N case-duplicate(s), N tidied.` Accounts whose emails differ only
+  by capitals are **never merged automatically**: they are logged as
+  `DUPLICATE ACCOUNTS differing only by capitals` for a person to resolve.
+- Anything new that takes an email must use `normEmail()` and `lower(email)`. Tests:
+  `scratchpad/test-email-case.js` pattern (sign-up with capitals stored lower, duplicate by
+  case refused, sign-in and reset with any capitals).
+
 ## Documents on Evert's Desktop
 - `FreshAF Marketing Plan.docx` — 13-page plan (for investor/partner meetings)
 - `FreshAF Supplier Outreach Tracker.xlsx` — 20 researched Northern Suburbs businesses, live

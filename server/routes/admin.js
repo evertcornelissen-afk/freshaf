@@ -54,7 +54,7 @@ router.post('/suppliers/import', (req, res) => {
 
   const results = [];
   for (const r of rows) {
-    const email = r.email?.trim().toLowerCase();
+    const email = require('../email').normEmail(r.email);
     const services = (Array.isArray(r.services) ? r.services : ['carwash']).filter((s) => ['carwash', 'laundry'].includes(s));
     if (!r.name?.trim() || !email || !r.business_name?.trim() || !r.id_number?.trim() || !services.length) {
       results.push({ email: email || '(missing)', status: 'invalid', reason: 'name, email, business_name, id_number and services are required' });
@@ -66,7 +66,7 @@ router.post('/suppliers/import', (req, res) => {
       results.push({ email, status: 'invalid', reason: 'that is not an email address - check the columns line up' });
       continue;
     }
-    if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+    if (db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(email)) {
       results.push({ email, status: 'skipped', reason: 'email already registered' });
       continue;
     }

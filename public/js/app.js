@@ -591,7 +591,7 @@ el('reg-address').addEventListener('input', () => { regGeo = null; }); // typed 
 // submitted, so these are submit handlers rather than button clicks.
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
-    const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
+    const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value.trim().toLowerCase(), password: el('login-password').value } });
     if (user.role === 'supplier') { goPage('/supplier'); return; }
     if (user.role !== 'customer') { goPage('/'); return; }
     me = user; setTopbar(); await enterApp();
@@ -605,7 +605,7 @@ el('register-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('
     const { user } = await api('/api/auth/register', {
       method: 'POST',
       body: {
-        role: 'customer', name: el('reg-name').value, email: el('reg-email').value,
+        role: 'customer', name: el('reg-name').value, email: el('reg-email').value.trim().toLowerCase(),
         phone: el('reg-phone').value, password: el('reg-password').value,
         home_address: el('reg-address').value, accept_terms: true,
         home_lat: regGeo?.lat, home_lng: regGeo?.lng,

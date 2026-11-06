@@ -858,7 +858,7 @@ async function refreshEarnings() {
 
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
   try {
-    const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
+    const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value.trim().toLowerCase(), password: el('login-password').value } });
     if (user.role !== 'supplier') { goPage('/'); return; }
     me = user; setWho(); route();
   } catch (e) { showError('login-error', e.message); }
@@ -920,7 +920,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
     const { user } = await api('/api/auth/register', {
       method: 'POST',
       body: {
-        role: 'supplier', name: el('reg-name').value, email: el('reg-email').value,
+        role: 'supplier', name: el('reg-name').value, email: el('reg-email').value.trim().toLowerCase(),
         phone: el('reg-phone').value, password: el('reg-password').value,
         business_name: el('reg-business').value, id_number: idNum,
         service_area: serviceArea,

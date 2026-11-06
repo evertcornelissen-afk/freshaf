@@ -313,8 +313,30 @@ if (!getSetting('callout_free_km')) setSetting('callout_free_km', '5');
 if (!getSetting('callout_per_km_cents')) setSetting('callout_per_km_cents', '1000');
 if (!getSetting('callout_cap_cents')) setSetting('callout_cap_cents', '15000');
 
+// Emails are never case-sensitive (server/email.js). Tidy any stored address that has
+// capitals or spaces, once per start-up (a no-op after the first). Two accounts whose
+// emails differ only by capitals are NOT merged automatically: that needs a person. They
+// are listed in the log and left as they are, and the unique index waits until they are
+// resolved.
+{
+  const caseDupes = db.prepare(`SELECT lower(trim(email)) AS e, group_concat(id) AS ids, COUNT(*) AS n
+    FROM users GROUP BY lower(trim(email)) HAVING n > 1`).all();
+  for (const d of caseDupes) {
+    console.warn(`[FreshAF] DUPLICATE ACCOUNTS differing only by capitals: ${d.e} -> user ids ${d.ids}. Not merged; resolve by hand.`);
+  }
+  const dupeSet = new Set(caseDupes.map((d) => d.e));
+  const messy = db.prepare('SELECT id, email FROM users WHERE email COLLATE BINARY != lower(trim(email))').all()
+    .filter((u) => !dupeSet.has(u.email.trim().toLowerCase()));
+  for (const u of messy) db.prepare('UPDATE users SET email = ? WHERE id = ?').run(u.email.trim().toLowerCase(), u.id);
+  if (messy.length) console.log(`[FreshAF] Emails tidied to lower case: ${messy.length} account(s).`);
+  if (!caseDupes.length) {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower ON users (lower(email))');
+  }
+  console.log(`[FreshAF] Email check: ${caseDupes.length} case-duplicate(s), ${messy.length} tidied.`);
+}
+
 // Seed admin account
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@freshaf.co.za';
+const ADMIN_EMAIL = require('./email').normEmail(process.env.ADMIN_EMAIL || 'admin@freshaf.co.za');
 const DEFAULT_ADMIN_PASSWORD = 'FreshAF!Admin2026';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 const adminExists = db.prepare("SELECT id, email, password_hash FROM users WHERE role = 'admin' LIMIT 1").get();
@@ -351,7 +373,7 @@ if (!adminExists) {
     // Refuse rather than crash on the UNIQUE constraint if a customer already signed
     // up with that address: locking the operator out of their own dashboard over a
     // config typo is worse than ignoring the change and saying so.
-    const taken = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?')
+    const taken = db.prepare('SELECT id FROM users WHERE lower(email) = ? AND id != ?')
       .get(ADMIN_EMAIL, adminExists.id);
     if (taken) {
       console.error(`[FreshAF] ADMIN_EMAIL is ${ADMIN_EMAIL}, but another account already`

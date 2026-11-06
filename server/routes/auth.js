@@ -8,6 +8,7 @@ const { setAuthCookie, clearAuthCookie, readSession, renewIfStale, authRequired,
 const mailer = require('../mailer');
 const secrets = require('../secrets');
 const { rateLimit, forgive, forgiveKey } = require('../ratelimit');
+const { normEmail } = require('../email');
 const jwt = require('jsonwebtoken');
 const { SSE_SECRET } = require('../auth');
 
@@ -27,7 +28,7 @@ const loginByIp = rateLimit({
 });
 const loginByEmail = rateLimit({
   name: 'login-email', windowMs: 15 * 60_000, max: 10,
-  keyBy: (req) => String(req.body?.email || '').trim().toLowerCase() || 'none',
+  keyBy: (req) => normEmail(req.body?.email) || 'none',
   message: 'Too many sign-in attempts for this account. Wait a few minutes and try again.',
 });
 const registerLimit = rateLimit({
@@ -48,7 +49,7 @@ const forgotByIp = rateLimit({
 });
 const forgotByEmail = rateLimit({
   name: 'forgot-email', windowMs: 60 * 60_000, max: 3,
-  keyBy: (req) => String(req.body?.email || '').trim().toLowerCase() || 'none',
+  keyBy: (req) => normEmail(req.body?.email) || 'none',
   message: 'A reset link was sent recently. Check your inbox and spam folder before asking for another.',
 });
 // A reset token is 256 random bits, so this is about load, not guessing.
@@ -205,8 +206,8 @@ router.post('/register', registerLimit, (req, res) => {
   // Store one canonical form. The column is UNIQUE COLLATE NOCASE so matching was already
   // case-insensitive, but storing lower case keeps exports, comparisons and support lookups
   // from ever disagreeing about whether two addresses are the same person.
-  const cleanEmail = email.trim().toLowerCase();
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
+  const cleanEmail = normEmail(email);
+  const existing = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(cleanEmail);
   if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
   let info;
@@ -264,7 +265,7 @@ router.post('/login', loginByIp, loginByEmail, (req, res) => {
   // Matched without regard to capitals (found 7 Nov 2026): accounts are stored lower-case,
   // but phone keyboards and password managers often send "Info@...", which never matched,
   // so a correct password was answered with "Incorrect email or password".
-  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanEmail = normEmail(email);
   const user = cleanEmail && db.prepare('SELECT * FROM users WHERE lower(email) = ? ORDER BY id LIMIT 1').get(cleanEmail);
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return res.status(401).json({ error: 'Incorrect email or password' });
@@ -311,7 +312,7 @@ router.get('/me', (req, res) => {
 // Step one: send a reset link. The answer is identical whether or not the address has an
 // account, so this cannot be used to find out who our customers and pros are.
 router.post('/forgot', forgotByIp, forgotByEmail, (req, res) => {
-  const email = String(req.body?.email || '').trim().toLowerCase();
+  const email = normEmail(req.body?.email);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return res.status(400).json({ error: 'Enter the email address you signed up with' });
   }
@@ -357,7 +358,7 @@ router.post('/reset', resetLimit, (req, res) => {
   rotateSession(user.id);
   // A new password lifts any sign-in lockout on the account: whoever just proved they own
   // the mailbox should not then be told "too many attempts" with the right password.
-  forgiveKey('login-email', String(user.email || '').toLowerCase());
+  forgiveKey('login-email', normEmail(user.email));
   mailer.passwordChanged({ to: user.email, name: user.name }).catch(() => {});
 
   const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);

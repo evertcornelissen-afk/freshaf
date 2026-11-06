@@ -429,7 +429,7 @@ el('sup-filter').onchange = refreshSuppliers;
 
 el('btn-login').onclick = async () => {
   try {
-    const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value, password: el('login-password').value } });
+    const { user } = await api('/api/auth/login', { method: 'POST', body: { email: el('login-email').value.trim().toLowerCase(), password: el('login-password').value } });
     if (user.role !== 'admin') { window.location.href = user.role === 'supplier' ? '/supplier' : '/'; return; }
     me = user;
     el('who').textContent = me.name;
