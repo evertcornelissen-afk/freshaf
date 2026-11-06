@@ -7,7 +7,7 @@ const { setAuthCookie, clearAuthCookie, readSession, renewIfStale, authRequired,
   wantsToken, signSseTicket, rotateSession } = require('../auth');
 const mailer = require('../mailer');
 const secrets = require('../secrets');
-const { rateLimit, forgive } = require('../ratelimit');
+const { rateLimit, forgive, forgiveKey } = require('../ratelimit');
 const jwt = require('jsonwebtoken');
 const { SSE_SECRET } = require('../auth');
 
@@ -261,13 +261,18 @@ router.post('/register', registerLimit, (req, res) => {
 
 router.post('/login', loginByIp, loginByEmail, (req, res) => {
   const { email, password } = req.body || {};
-  const user = email && db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim());
+  // Matched without regard to capitals (found 7 Nov 2026): accounts are stored lower-case,
+  // but phone keyboards and password managers often send "Info@...", which never matched,
+  // so a correct password was answered with "Incorrect email or password".
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const user = cleanEmail && db.prepare('SELECT * FROM users WHERE lower(email) = ? ORDER BY id LIMIT 1').get(cleanEmail);
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
-  // A correct password clears the address budget, so a household or office behind one
-  // address is not locked out by whoever fumbled their password first this morning.
+  // A correct password clears both budgets, so a household or office behind one address,
+  // or the owner who fumbled their own password a few times, is not left locked out.
   forgive('login-ip', req);
+  forgiveKey('login-email', cleanEmail);
   setAuthCookie(res, user);
   // The app gets a Bearer token because it cannot receive the cookie; see server/auth.js.
   res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signUser(user) } : {}) });
@@ -313,7 +318,7 @@ router.post('/forgot', forgotByIp, forgotByEmail, (req, res) => {
   const answer = { ok: true, message: `If there is a FreshAF account for ${email}, a reset link is on its way. `
     + `It works once and expires in ${RESET_TTL_MIN} minutes. Check your spam folder if it has not arrived in a few minutes.` };
 
-  const user = db.prepare('SELECT id, name, email, role FROM users WHERE email = ?').get(email);
+  const user = db.prepare('SELECT id, name, email, role FROM users WHERE lower(email) = ? ORDER BY id LIMIT 1').get(email);
   // The admin password is set from the server environment on every boot, so an emailed
   // reset could not stick anyway. Refusing it keeps a compromised mailbox from being a
   // way into the admin account.
@@ -350,6 +355,9 @@ router.post('/reset', resetLimit, (req, res) => {
   db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE id = ?").run(row.id);
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), user.id);
   rotateSession(user.id);
+  // A new password lifts any sign-in lockout on the account: whoever just proved they own
+  // the mailbox should not then be told "too many attempts" with the right password.
+  forgiveKey('login-email', String(user.email || '').toLowerCase());
   mailer.passwordChanged({ to: user.email, name: user.name }).catch(() => {});
 
   const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);

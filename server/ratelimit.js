@@ -71,4 +71,9 @@ function forgive(name, req) {
   BUCKETS.delete(`${name}:${clientKey(req)}`);
 }
 
-module.exports = { rateLimit, forgive, clientKey, _buckets: BUCKETS };
+// Clear a bucket keyed by something other than the address (e.g. the account's email).
+function forgiveKey(name, key) {
+  BUCKETS.delete(`${name}:${key}`);
+}
+
+module.exports = { rateLimit, forgive, forgiveKey, clientKey, _buckets: BUCKETS };
