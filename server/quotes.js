@@ -6,7 +6,7 @@
 // within a second. Pros who price per job — most small operators — get a notification and
 // send back their own price and when they can come. The customer picks from whatever arrives.
 const { db, getSetting } = require('./db');
-const { priceFor, platformFee } = require('./pricing');
+const { priceFor, platformFee, quote: publishedPrice } = require('./pricing');
 const realtime = require('./realtime');
 const push = require('./push');
 const whatsapp = require('./whatsapp');
@@ -44,7 +44,34 @@ function calloutFor(distanceKm) {
 // Every pro who could do this job, whether or not they have published a price.
 // A pro mid-job cannot take another one *right now*, but they can absolutely take a
 // booking for Saturday — so the busy filter only applies to as-soon-as-possible work.
+// Demo accounts exist so a payment reviewer (Stitch) can run the real checkout on the live
+// site, unattended, from wherever they are. So a demo customer's request is answered by
+// every approved demo pro who offers the service: online or not, busy or not, and however
+// far away. Without this the reviewer sits on "waiting for quotes" unless the owner happens
+// to be watching FreshAF Pro. Real customers and real pros never take this path: demo and
+// real accounts never see each other (see server/db.js).
+function isDemoUser(userId) {
+  return !!db.prepare('SELECT is_demo FROM users WHERE id = ?').get(userId)?.is_demo;
+}
+
+function demoPros(request) {
+  return db.prepare(`
+    SELECT s.user_id, s.business_name, s.lat, s.lng, s.radius_km, s.rating_sum, s.rating_count,
+           u.name AS pro_name, u.phone, u.phone_verified_at, s.alert_whatsapp,
+           (SELECT price_cents FROM supplier_prices sp
+             WHERE sp.user_id = s.user_id AND sp.service = ? AND sp.package = ?) AS listed_price_cents
+    FROM suppliers s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.status = 'approved' AND u.is_demo = 1
+      AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+  `).all(request.service, request.package, request.service).map((r) => ({
+    ...r,
+    distance: r.lat == null ? 0 : dispatch.haversineKm(request.lat, request.lng, r.lat, r.lng),
+  }));
+}
+
 function eligiblePros(request) {
+  if (isDemoUser(request.customer_id)) return demoPros(request);
   const { maxRadius } = settings();
   const busyClause = request.scheduled_for ? '' : `
       AND s.user_id NOT IN (
@@ -169,13 +196,17 @@ function whenLabel(scheduledFor) {
 // Ask everyone, and auto-answer for anyone who already published a price.
 function openRequest(request) {
   const pros = eligiblePros(request);
+  const demo = isDemoUser(request.customer_id);
   let auto = 0;
   const asked = [];
 
   for (const pro of pros) {
-    const listed = pro.listed_price_cents != null
+    let listed = pro.listed_price_cents != null
       ? priceFor(request.service, request.package, request.vehicle, pro.listed_price_cents)
       : null;
+    // A demo pro with no price for this package answers at FreshAF's published price, so a
+    // demo request always gets a bookable quote straight away.
+    if (listed == null && demo) listed = publishedPrice(request.service, request.package, request.vehicle);
     if (listed != null) {
       insertQuote({
         requestId: request.id, supplierId: pro.user_id, supplierPrice: listed,
@@ -251,7 +282,7 @@ const staleTimer = setInterval(expireStale, 60 * 1000);
 staleTimer.unref?.();
 
 module.exports = {
-  returnLegFor,
+  returnLegFor, isDemoUser,
   openRequest, listQuotes, insertQuote, notifyCustomer, getRequest,
   eligiblePros, calloutFor, settings, expireStale, quotePublic, serviceLabel, whenLabel,
 };

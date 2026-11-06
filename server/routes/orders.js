@@ -289,13 +289,17 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
   if (q.status !== 'open') return res.status(409).json({ error: 'That quote is no longer available' });
   if (q.request_status !== 'open') return res.status(409).json({ error: 'This request is closed' });
 
-  const active = db.prepare(`SELECT id FROM orders WHERE customer_id = ? AND service = ?
+  // A demo customer (the payment reviewer) may book again and again, and the demo pro may
+  // hold any number of demo jobs: a reviewer who abandons a checkout and starts over must
+  // not hit "you already have an active order". Real accounts keep both rules.
+  const demo = quotes.isDemoUser(req.user.id);
+  const active = demo ? null : db.prepare(`SELECT id FROM orders WHERE customer_id = ? AND service = ?
     AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, q.service);
   if (active) return res.status(409).json({ error: 'You already have an active order for this service. Complete or cancel it first.' });
 
   // For work happening now the pro must still be free. A booking for a future date is
   // fine even if they are mid-job today.
-  if (!q.scheduled_for) {
+  if (!q.scheduled_for && !demo) {
     const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ?
       AND status IN ('accepted','en_route','in_progress') AND scheduled_for IS NULL`).get(q.supplier_id);
     if (busy) return res.status(409).json({ error: 'That pro has just taken another job. Please pick another quote.' });
@@ -466,7 +470,7 @@ function afterPayment(orderId) {
   if (!order) return;
   const fromQuote = db.prepare("SELECT id FROM quote_requests WHERE order_id = ? AND status = 'booked'").get(orderId);
   if (fromQuote && order.requested_supplier_id) {
-    const busy = order.scheduled_for ? null : db.prepare(`SELECT id FROM orders WHERE supplier_id = ? AND id != ?
+    const busy = (order.scheduled_for || quotes.isDemoUser(order.customer_id)) ? null : db.prepare(`SELECT id FROM orders WHERE supplier_id = ? AND id != ?
       AND status IN ('accepted','en_route','in_progress') AND scheduled_for IS NULL`).get(order.requested_supplier_id, orderId);
     if (!busy) {
       db.prepare(`UPDATE orders SET supplier_id = ?, status = 'accepted',
