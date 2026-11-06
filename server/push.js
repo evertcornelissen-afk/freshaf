@@ -32,9 +32,17 @@ async function sendToUser(userId, payload) {
     .catch((e) => console.warn(`[FreshAF][push] native send failed: ${e.message}`));
   const rows = db.prepare('SELECT id, subscription FROM push_subscriptions WHERE user_id = ?').all(userId);
   const body = JSON.stringify(payload);
+  // priority: a job the pro must act on. Sent with high urgency, so a phone in battery saver
+  // still wakes for it, and it stays on screen until tapped (see sw.js). ttl: how long the
+  // push service keeps trying a phone that is offline — long for a booking (still worth
+  // knowing an hour later), short for an offer that expires in a minute.
+  const options = {
+    TTL: Number.isFinite(payload.ttl) ? payload.ttl : 120,
+    urgency: payload.priority ? 'high' : 'normal',
+  };
   for (const row of rows) {
     try {
-      await webpush.sendNotification(JSON.parse(row.subscription), body, { TTL: 120 });
+      await webpush.sendNotification(JSON.parse(row.subscription), body, options);
     } catch (e) {
       // 404/410 = subscription expired or revoked — clean it up.
       if (e.statusCode === 404 || e.statusCode === 410) {

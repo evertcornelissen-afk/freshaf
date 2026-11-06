@@ -5,13 +5,19 @@ const CACHE = 'freshaf-v2';
 self.addEventListener('push', (e) => {
   let data = {};
   try { data = e.data.json(); } catch {}
+  // A booking or a job offer is a priority alert: it stays on screen until the pro taps it,
+  // buzzes again if an update replaces it, and vibrates long enough to notice in a pocket.
+  const urgent = data.priority === true;
   e.waitUntil(self.registration.showNotification(data.title || 'FreshAF', {
     body: data.body || 'You have a new notification',
     icon: '/img/icon-192.png',
     badge: '/img/icon-192.png',
     tag: data.tag || 'freshaf',
     data: { url: data.url || '/supplier' },
-    vibrate: [200, 100, 200],
+    requireInteraction: urgent,
+    renotify: urgent,
+    silent: false,
+    vibrate: urgent ? [600, 200, 600, 200, 600, 200, 900] : [200, 100, 200],
   }));
 });
 

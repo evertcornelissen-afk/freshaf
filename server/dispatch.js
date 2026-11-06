@@ -151,8 +151,10 @@ function offerToNext(orderId) {
   push.sendToUser(next.user_id, {
     title: `New ${serviceLabel.toLowerCase()} job — you earn R${earnsRand}`,
     body: `${next.distance.toFixed(1)} km away · ${order.address}\nOpen FreshAF Pro to accept before it expires.`,
-    url: '/supplier',
+    url: '/supplier?offer=' + offerId,
     tag: `offer-${offerId}`,
+    priority: true,
+    ttl: timeoutSec,
   }).catch(() => {});
 
   // WhatsApp is where these pros actually live, so alert there too — but only to a
@@ -315,6 +317,8 @@ function notifyProBooked(orderId) {
       body: `${when} · ${o.address}\n${o.payment_method === 'cash' ? `Collect R${Math.round(collectCents / 100)} cash` : 'Paid by card'}`,
       url: `/supplier?job=${o.id}`,
       tag: `job-${o.id}`,
+      priority: true,
+      ttl: 3600,
     }).catch(() => {});
 
     if (pro.email && !pro.email.endsWith('@freshaf.invalid')) {
