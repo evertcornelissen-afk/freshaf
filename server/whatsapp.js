@@ -9,7 +9,9 @@
 // before the Meta account exists.
 const { db, getSetting } = require('./db');
 
-const API_VERSION = 'v21.0';
+// Meta retires each Graph API version about two years after release; v25.0 is what Meta's own
+// WhatsApp console used when this was set up (6 Nov 2026). Override with WHATSAPP_API_VERSION.
+const API_VERSION = process.env.WHATSAPP_API_VERSION || 'v25.0';
 const PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const TOKEN = process.env.WHATSAPP_TOKEN || '';
 const LANG = process.env.WHATSAPP_TEMPLATE_LANG || 'en';
