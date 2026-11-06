@@ -1137,3 +1137,15 @@ html.native-app .topbar .brand { flex: 1 1 auto; min-width: 0; }
 .drawer-switch input:checked + .drawer-toggle { background: var(--accent-dim); border-color: var(--accent-dim); }
 .drawer-switch input:checked + .drawer-toggle::after { transform: translateX(18px); background: #fff; }
 body.drawer-open { overflow: hidden; }
+
+/* ---------- Customer | Pro switch on the sign-in screens (standard segmented control) ---------- */
+.role-seg { display: flex; padding: 3px; margin: 0 0 16px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border-soft); }
+.role-seg > * {
+  flex: 1; display: flex; align-items: center; justify-content: center; min-height: 38px; margin: 0; padding: 0 12px;
+  border-radius: 999px; font-size: .88rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.role-seg .seg-on { background: var(--panel); color: var(--petrol); box-shadow: 0 1px 4px rgba(0, 0, 0, .12); cursor: default; }
+.role-seg .seg-on:hover { transform: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
+.role-seg .seg-off { color: var(--muted); background: transparent; }
+.role-seg .seg-off:hover { color: var(--petrol); }
+[data-theme="dark"] .role-seg .seg-on { color: var(--text); }

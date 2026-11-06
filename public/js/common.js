@@ -43,8 +43,16 @@ async function api(path, opts = {}) {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
   } catch (e) {
-    // Free-tier hosting sleeps when idle — surface that instead of a cryptic failure.
-    throw new Error('The server is waking up — please wait a few seconds and try again.');
+    // No answer at all: no signal, or the few seconds while the server restarts after an
+    // update. Reads and sign-in are safe to repeat, so try once more by ourselves; anything
+    // that books or pays is never repeated automatically.
+    const method = String(opts.method || 'GET').toUpperCase();
+    const safe = method === 'GET' || /\/api\/auth\/(login|forgot|me)$/.test(path);
+    if (safe && !opts.__retried) {
+      await new Promise((r) => setTimeout(r, 2500));
+      return api(path, { ...opts, __retried: true });
+    }
+    throw new Error('Could not reach FreshAF. Check your internet connection and try again in a moment.');
   }
   let data = {};
   try { data = await res.json(); } catch { /* empty body */ }
@@ -819,7 +827,10 @@ function openAppMenu() {
       <div class="drawer-head">${who}<button type="button" class="drawer-close" data-close aria-label="Close menu">${icon('x')}</button></div>
       <div class="drawer-list">
         ${u ? menuItem('account', 'user', pro ? 'My dashboard' : 'Account')
-            : menuItem('login', 'user', 'Log in') + menuItem('signup', 'spark', pro ? 'Apply to become a pro' : 'Sign up')}
+            // Both sign-ins, always: the one for this page first, then the other side.
+            : menuItem('login', pro ? 'briefcase' : 'user', pro ? 'Pro sign in' : 'Customer sign in')
+              + menuItem('other-login', pro ? 'user' : 'briefcase', pro ? 'Customer sign in' : 'Pro sign in')
+              + menuItem('signup', 'spark', pro ? 'Apply to become a pro' : 'Sign up')}
         ${menuItem('settings', 'gear', 'Settings', `<small>${pro ? 'Job alerts' : 'Notifications'}, location</small>`)}
         <label class="drawer-item drawer-switch">${icon('moon')}<span>Night mode</span>
           <input type="checkbox" id="drawer-dark" ${dark ? 'checked' : ''} aria-label="Night mode"><i class="drawer-toggle"></i></label>
@@ -852,6 +863,7 @@ function openAppMenu() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
+      if (act === 'other-login') { goPage(pro ? '/?signin=1' : '/supplier#signin'); return; }
       if (act === 'login') {
         if (pro) { const s = document.getElementById('btn-go-login'); if (s) s.click(); }
         else if (typeof show === 'function') show('view-login');

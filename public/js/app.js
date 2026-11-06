@@ -84,6 +84,12 @@ async function boot() {
       // A manifest shortcut has to work for someone who has not signed in yet —
       // that is most of the people tapping it. chooseService remembers the choice
       // and sends them to sign-up with it still selected.
+      // "Customer sign in" from the menu or the Customer | Pro switch on the pro page.
+      if (new URLSearchParams(window.location.search).get('signin')) {
+        history.replaceState({}, '', window.FRESHAF_NATIVE ? location.pathname : '/');
+        show('view-login');
+        return;
+      }
       const want = new URLSearchParams(window.location.search).get('service');
       if (want === 'carwash' || want === 'laundry') {
         history.replaceState({}, '', '/');

@@ -221,7 +221,13 @@ async function boot() {
     if (user && user.role !== 'supplier') { goPage('/'); return; }
     me = user;
     setWho();
-    if (!me) { show('view-auth'); hideSplash(); return; }
+    if (!me) {
+      show('view-auth');
+      hideSplash();
+      // Arriving from "Pro sign in" (menu or the Customer | Pro switch): straight to the form.
+      if (/signin/.test(location.hash)) setTimeout(() => el('btn-go-login').click(), 150);
+      return;
+    }
     await route();
     hideSplash();
   } catch (e) {

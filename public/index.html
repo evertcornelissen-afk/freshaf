@@ -125,6 +125,10 @@
   <!-- LOGIN -->
   <div id="view-login" class="hidden">
     <div class="card" style="max-width:440px;margin:40px auto">
+      <div class="role-seg" role="tablist" aria-label="Who is signing in">
+        <button type="button" class="seg-on" role="tab" aria-selected="true">Customer</button>
+        <a class="seg-off" role="tab" aria-selected="false" href="/supplier#signin">Pro</a>
+      </div>
       <h2 id="h-signin">Sign in</h2>
       <div class="msg error" id="login-error"></div>
       <form id="login-form" method="post" action="/api/auth/login">

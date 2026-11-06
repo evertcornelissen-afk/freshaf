@@ -59,7 +59,11 @@
     </div>
     <div class="grid2">
       <div class="card">
-        <h2 id="h-signin">Supplier sign in</h2>
+        <div class="role-seg" role="tablist" aria-label="Who is signing in">
+          <a class="seg-off" role="tab" aria-selected="false" href="/?signin=1">Customer</a>
+          <button type="button" class="seg-on" role="tab" aria-selected="true">Pro</button>
+        </div>
+        <h2 id="h-signin">Pro sign in</h2>
         <div class="msg error" id="login-error"></div>
         <form id="login-form" method="post" action="/api/auth/login">
           <label for="login-email">Email</label><input id="login-email" name="email" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username email" required>
