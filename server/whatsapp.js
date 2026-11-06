@@ -16,6 +16,7 @@ const LANG = process.env.WHATSAPP_TEMPLATE_LANG || 'en';
 const TPL_JOB = process.env.WHATSAPP_TEMPLATE_JOB || 'freshaf_job_alert';
 const TPL_CODE = process.env.WHATSAPP_TEMPLATE_CODE || 'freshaf_verify_code';
 const TPL_BOOKED = process.env.WHATSAPP_TEMPLATE_BOOKED || 'freshaf_job_booked';
+const TPL_OPS = process.env.WHATSAPP_TEMPLATE_OPS || 'freshaf_ops_alert';
 
 function configured() { return !!(PHONE_ID && TOKEN); }
 
@@ -113,6 +114,18 @@ function jobBooked({ userId, phone, orderId, service, when, address, earnsRand, 
   });
 }
 
+// Template: freshaf_ops_alert — to the FreshAF team, never a pro: a booking the pro has not
+// started on time (booking-watch.js). Variables, in order: {{1}} order number, {{2}} service,
+// {{3}} pro, {{4}} pro phone, {{5}} how late. Meta rejects empty variables, hence the fallbacks.
+function opsAlert({ phone, orderId, service, proName, proPhone, late }) {
+  return sendTemplate({
+    userId: null,
+    phone,
+    template: TPL_OPS,
+    bodyParams: [String(orderId), service || 'Booking', proName || 'the pro', proPhone || 'no number on file', late || 'late'],
+  });
+}
+
 // Template: freshaf_verify_code (Authentication category, copy-code button).
 function verifyCode({ userId, phone, code }) {
   return sendTemplate({ userId, phone, template: TPL_CODE, bodyParams: [code], urlSuffix: null });
@@ -124,9 +137,9 @@ function status() {
   return {
     configured: configured(),
     enabled: getSetting('whatsapp_alerts_enabled', '1') === '1',
-    templates: { job: TPL_JOB, booked: TPL_BOOKED, code: TPL_CODE, lang: LANG },
+    templates: { job: TPL_JOB, booked: TPL_BOOKED, code: TPL_CODE, ops: TPL_OPS, lang: LANG },
     last_24h: Object.fromEntries(recent.map((r) => [r.status, r.c])),
   };
 }
 
-module.exports = { configured, toE164, jobAlert, jobBooked, verifyCode, sendTemplate, status };
+module.exports = { configured, toE164, jobAlert, jobBooked, opsAlert, verifyCode, sendTemplate, status };

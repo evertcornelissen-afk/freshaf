@@ -271,6 +271,22 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_log_created ON whatsapp_log(created_at);
 addColumn('users', 'phone_verified_at TEXT');
 addColumn('suppliers', 'alert_whatsapp INTEGER NOT NULL DEFAULT 1');
 
+// Pro sign-up: the WhatsApp number is proved with a code BEFORE the account exists, so new
+// bookings reach the pro from day one with no separate step later. Keyed by the number.
+// send_failed: WhatsApp could not deliver to it, so the pro may apply and confirm later.
+db.exec(`
+CREATE TABLE IF NOT EXISTS signup_phone_codes (
+  phone TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  send_failed INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  sent_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
+// Set when the FreshAF team was told a booking was not started on time (booking-watch.js).
+addColumn('orders', 'escalated_at TEXT');
+
 if (!getSetting('whatsapp_alerts_enabled')) setSetting('whatsapp_alerts_enabled', '1');
 if (!getSetting('commission_pct')) setSetting('commission_pct', '15');
 // FreshAF's margin: added to what we pay the pro to reach our selling price. It has to

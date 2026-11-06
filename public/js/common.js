@@ -56,7 +56,12 @@ async function api(path, opts = {}) {
     if (data && data.token) window.FreshAFNative.setToken(data.token);
     else if (/\/api\/auth\/(logout|delete-account)$/.test(path)) window.FreshAFNative.setToken(null);
   }
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    const err = new Error(data.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 

@@ -432,6 +432,11 @@ async function enterDash() {
         } catch {}
       }
     },
+    job_reminder: (data) => {
+      ping();
+      toast(`Order #${data.order_id} is waiting for you. Tap “On my way” when you set off.`, 'error');
+      refreshJobs();
+    },
     quote_result: (data) => {
       // A win is announced by job_booked (with sound and a notification); this only refreshes.
       if (data.won) { refreshRequests(); refreshJobs(); return; }
@@ -844,9 +849,52 @@ el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn
   } catch (e) { showError('login-error', e.message); }
 }); };
 
+// Sign-up: the pro confirms their WhatsApp number with a code, so new bookings reach them
+// from the first one. Asked for only while WhatsApp is connected (see /api/auth/phone-code).
+const regPhone = { required: false, sentTo: null, canSkip: false };
+(async () => {
+  try { regPhone.required = !!(await api('/api/auth/phone-code')).required; } catch { regPhone.required = false; }
+  el('btn-reg-code').style.display = regPhone.required ? '' : 'none';
+})();
+const regPhoneHint = (text, isError) => {
+  const h = el('reg-phone-hint');
+  h.textContent = text;
+  h.style.display = text ? '' : 'none';
+  h.style.color = isError ? '#c0392b' : '';
+};
+el('reg-phone').addEventListener('input', () => {
+  if (regPhone.sentTo && el('reg-phone').value !== regPhone.sentTo) {
+    regPhoneHint('You changed the number. Tap "Send code" again.', false);
+  }
+});
+el('btn-reg-code').onclick = () => withBusy(el('btn-reg-code'), 'Sending…', async () => {
+  try {
+    const r = await api('/api/auth/phone-code', { method: 'POST', body: { phone: el('reg-phone').value } });
+    regPhone.sentTo = el('reg-phone').value;
+    regPhone.canSkip = false;
+    el('reg-code-row').style.display = '';
+    regPhoneHint(r.dry_run
+      ? 'Test mode: the code is in the server log, not on WhatsApp.'
+      : 'Code sent. Open WhatsApp and look for the message from FreshAF.', false);
+    el('reg-code').focus();
+  } catch (e) {
+    regPhone.canSkip = !!e.data?.can_skip;
+    if (regPhone.canSkip) { regPhone.sentTo = el('reg-phone').value; el('reg-code-row').style.display = 'none'; }
+    regPhoneHint(e.message, true);
+  }
+}).then(() => { if (regPhone.sentTo) el('btn-reg-code').textContent = 'Resend'; });
+
 el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting application…', async () => {
   try {
     if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
+    if (!el('reg-phone').value.trim()) throw new Error('Your WhatsApp number is required: new bookings are sent there');
+    if (regPhone.required) {
+      if (!regPhone.sentTo) throw new Error('Tap "Send code" to confirm your WhatsApp number');
+      if (el('reg-phone').value !== regPhone.sentTo) throw new Error('You changed your WhatsApp number. Tap "Send code" again');
+      if (!regPhone.canSkip && !/^\d{6}$/.test(el('reg-code').value.trim())) {
+        throw new Error('Enter the 6-digit code we sent to your WhatsApp');
+      }
+    }
     const serviceArea = serviceAreaText();
     if (!serviceArea) throw new Error('Tick at least one service area, or type it under Other areas');
     const idNum = el('reg-idnum').value.replace(/\s/g, '');
@@ -863,6 +911,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
         service_area: serviceArea,
         vehicles: collectVehicles(), equipment: collectEquipment(),
         services, accept_terms: true,
+        phone_code: regPhone.canSkip ? undefined : el('reg-code').value.trim(),
         bank_name: el('reg-bank').value, bank_account: el('reg-account').value, bank_branch: el('reg-branch').value,
       },
     });

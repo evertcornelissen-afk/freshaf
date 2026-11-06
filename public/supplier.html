@@ -78,7 +78,16 @@
         <label for="reg-name">Your full name</label><input id="reg-name" name="name" autocomplete="name">
         <label for="reg-business">Business / trading name</label><input id="reg-business" name="organization" autocomplete="organization">
         <label for="reg-email">Email</label><input id="reg-email" name="email" type="email" autocomplete="username email">
-        <label for="reg-phone">Mobile number</label><input id="reg-phone" name="tel" type="tel" autocomplete="tel">
+        <label for="reg-phone">WhatsApp number: new bookings are sent here</label>
+        <div class="row" style="gap:8px;align-items:stretch">
+          <input id="reg-phone" name="tel" type="tel" autocomplete="tel" placeholder="e.g. 082 555 1234" style="flex:1;min-width:0">
+          <button type="button" class="secondary small" id="btn-reg-code" style="display:none;white-space:nowrap">Send code</button>
+        </div>
+        <div id="reg-code-row" style="display:none">
+          <label for="reg-code">6-digit code from WhatsApp</label>
+          <input id="reg-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456">
+        </div>
+        <p class="muted small-text" id="reg-phone-hint" style="display:none;margin:6px 0 0"></p>
         <!-- Never autofilled: browsers otherwise drop the saved email or username in here. -->
         <label for="reg-idnum">SA ID number</label><input id="reg-idnum" name="sa-id-number" inputmode="numeric" maxlength="13" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="13 digits">
         <label>Service areas: tick every area you will cover</label>

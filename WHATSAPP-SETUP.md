@@ -32,11 +32,11 @@ a few jobs a day this is a rounding error, but it is not zero.
    a token with the `whatsapp_business_messaging` scope and **no expiry**. The temporary
    24-hour token on the API Setup page is only good for a first test.
 
-## Step 2 — submit the two message templates
+## Step 2 — submit the message templates
 
 WhatsApp will not let a business start a conversation with free text, so both messages have
 to be pre-approved templates. In WhatsApp Manager → Message templates → Create template,
-create these two **exactly** — the variable order is what the code sends.
+create these **exactly** — the variable order is what the code sends.
 
 ### Template 1
 
@@ -103,6 +103,31 @@ Environment variable (optional, this is the default): `WHATSAPP_TEMPLATE_BOOKED=
   variable. If Meta's builder gives you fixed wording for this category, accept it — the
   code only needs to arrive.
 
+### Template 4 (to the FreshAF team: a booking the pro has not started)
+
+- **Name:** `freshaf_ops_alert`
+- **Category:** Utility
+- **Language:** English
+- **Body:**
+
+```
+FreshAF booking not started.
+
+Order: #{{1}}
+Service: {{2}}
+Pro: {{3}}, {{4}}
+Status: {{5}}
+
+The pro has not tapped On my way. Phone them, or cancel the booking in the admin app so the customer can book someone else.
+```
+
+Sample values for Meta's review: `57`, `Car wash`, `Sipho Dlamini`, `082 555 1234`,
+`booked 5 min ago, not on the way yet`. No button.
+
+Sent only to the number in `ADMIN_ALERT_PHONE`, when an ASAP booking is still not on the way
+5 minutes after it was booked, or a scheduled one 5 minutes after its start time. The same
+alert always goes to the FreshAF inbox by email, and the pro gets a second priority push.
+
 Approval is usually minutes for Utility and Authentication templates.
 
 ## Step 3 — set the environment variables on Render
@@ -114,6 +139,7 @@ WHATSAPP_PHONE_NUMBER_ID=<the phone number ID from step 1>
 WHATSAPP_TOKEN=<the permanent system-user token>
 WHATSAPP_TEMPLATE_JOB=freshaf_job_alert
 WHATSAPP_TEMPLATE_CODE=freshaf_verify_code
+ADMIN_ALERT_PHONE=<the FreshAF team WhatsApp number that gets late-booking alerts>
 ```
 
 `WHATSAPP_TEMPLATE_LANG` defaults to `en` — set it only if you registered the templates
@@ -137,6 +163,11 @@ If nothing arrives, the reason is recorded — check the `whatsapp_log` table, o
 log, which prints the exact error Meta returned.
 
 ## How it behaves
+
+- **Pro sign-up asks for the WhatsApp code** once WhatsApp is connected, so every new pro is
+  verified from the first booking. If WhatsApp cannot reach the number (for example while
+  only Meta's test number is connected, which delivers to 5 listed numbers only), the pro
+  may still apply and confirm the number later in FreshAF Pro.
 
 - A pro only gets WhatsApp alerts once they have **verified** the number, and only while
   their toggle is on. Web Push keeps working independently — WhatsApp is added, not swapped.

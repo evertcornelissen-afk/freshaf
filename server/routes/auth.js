@@ -1,7 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { db } = require('../db');
+const { db, getSetting } = require('../db');
 const crypto = require('crypto');
+const whatsapp = require('../whatsapp');
 const { setAuthCookie, clearAuthCookie, readSession, renewIfStale, authRequired, signUser,
   wantsToken, signSseTicket, rotateSession } = require('../auth');
 const mailer = require('../mailer');
@@ -89,10 +90,56 @@ function mePayload(user) {
 
 const VALID_SERVICES = ['carwash', 'laundry'];
 
+/* ---------- pro sign-up: prove the WhatsApp number ---------- */
+// New bookings go to the pro's WhatsApp. A code at sign-up proves the number is theirs, so
+// every approved pro is reachable from the first booking without a separate step later.
+// Asked for only while WhatsApp is connected (locally it runs against the dry run), so the
+// live sign-up never waits for a code that cannot arrive.
+function signupCodeRequired() {
+  return getSetting('whatsapp_alerts_enabled', '1') === '1'
+    && (whatsapp.configured() || process.env.NODE_ENV !== 'production');
+}
+const SA_MOBILE = /^27[678]\d{8}$/;
+const signupCodeLimit = rateLimit({
+  name: 'signup-code', windowMs: 60 * 60_000, max: 8,
+  message: 'Too many codes requested from this connection. Try again later.',
+});
+
+router.get('/phone-code', (req, res) => res.json({ required: signupCodeRequired() }));
+
+router.post('/phone-code', signupCodeLimit, async (req, res) => {
+  if (!signupCodeRequired()) return res.json({ ok: true, required: false });
+  const to = whatsapp.toE164(req.body?.phone);
+  if (!to || !SA_MOBILE.test(to)) {
+    return res.status(400).json({ error: 'Enter your South African WhatsApp number, e.g. 082 555 1234' });
+  }
+  const prev = db.prepare('SELECT sent_at FROM signup_phone_codes WHERE phone = ?').get(to);
+  if (prev) {
+    const waited = db.prepare("SELECT (julianday('now') - julianday(?)) * 86400 AS s").get(prev.sent_at).s;
+    if (waited < 60) return res.status(429).json({ error: `Wait ${Math.ceil(60 - waited)}s before asking for another code` });
+  }
+  const code = String(crypto.randomInt(100000, 1000000));
+  db.prepare(`INSERT INTO signup_phone_codes (phone, code, attempts, send_failed, expires_at, sent_at)
+    VALUES (?, ?, 0, 0, datetime('now','+15 minutes'), datetime('now'))
+    ON CONFLICT(phone) DO UPDATE SET code = excluded.code, attempts = 0, send_failed = 0,
+      expires_at = excluded.expires_at, sent_at = excluded.sent_at`).run(to, code);
+  const result = await whatsapp.verifyCode({ userId: null, phone: to, code });
+  if (!result.ok) {
+    // Not the pro's fault (no WhatsApp on that number, or Meta refused it). They may still
+    // apply; the number shows as unconfirmed and they confirm it later in FreshAF Pro.
+    db.prepare('UPDATE signup_phone_codes SET send_failed = 1 WHERE phone = ?').run(to);
+    return res.status(502).json({
+      error: 'We could not reach that number on WhatsApp. Check the number. If it is right, you can still apply and confirm it later in FreshAF Pro.',
+      can_skip: true,
+    });
+  }
+  res.json({ ok: true, required: true, dry_run: result.status === 'dry_run' });
+});
+
 router.post('/register', registerLimit, (req, res) => {
   const { role, name, email, phone, password, home_address, home_lat, home_lng, accept_terms,
     business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
-    bank_name, bank_account, bank_branch, vehicles, equipment } = req.body || {};
+    bank_name, bank_account, bank_branch, vehicles, equipment, phone_code } = req.body || {};
 
   // Structured onboarding data: multiple vehicles + itemised equipment.
   const cleanVehicles = (Array.isArray(vehicles) ? vehicles : []).slice(0, 10)
@@ -128,6 +175,31 @@ router.post('/register', registerLimit, (req, res) => {
     }
     supplierServices = Array.isArray(services) ? services.filter((s) => VALID_SERVICES.includes(s)) : [];
     if (!supplierServices.length) return res.status(400).json({ error: 'Choose at least one service you offer' });
+  }
+
+  // A pro's WhatsApp number: required, because that is where new bookings are sent.
+  let phoneProved = null;
+  if (role === 'supplier') {
+    const to = whatsapp.toE164(phone);
+    if (!to) return res.status(400).json({ error: 'Your WhatsApp number is required: new bookings are sent there' });
+    if (signupCodeRequired()) {
+      const row = db.prepare('SELECT * FROM signup_phone_codes WHERE phone = ?').get(to);
+      const code = String(phone_code || '').trim();
+      if (!row) return res.status(400).json({ error: 'Tap "Send code" to confirm your WhatsApp number' });
+      if (code) {
+        if (db.prepare("SELECT datetime('now') > ? AS x").get(row.expires_at).x) {
+          return res.status(400).json({ error: 'That WhatsApp code has expired. Tap "Resend" for a new one' });
+        }
+        if (row.attempts >= 5) return res.status(429).json({ error: 'Too many wrong codes. Tap "Resend" for a new one' });
+        if (code !== row.code) {
+          db.prepare('UPDATE signup_phone_codes SET attempts = attempts + 1 WHERE phone = ?').run(to);
+          return res.status(400).json({ error: 'That WhatsApp code does not match' });
+        }
+        phoneProved = to;
+      } else if (!row.send_failed) {
+        return res.status(400).json({ error: 'Enter the 6-digit code we sent to your WhatsApp' });
+      }
+    }
   }
 
   // Store one canonical form. The column is UNIQUE COLLATE NOCASE so matching was already
@@ -172,6 +244,10 @@ router.post('/register', registerLimit, (req, res) => {
         bank_name?.trim() || null, secrets.encryptField(bank_account?.trim() || null),
         secrets.encryptField(bank_branch?.trim() || null),
         JSON.stringify(cleanVehicles), JSON.stringify(cleanEquipment));
+    if (phoneProved) {
+      db.prepare("UPDATE users SET phone_verified_at = datetime('now') WHERE id = ?").run(userId);
+      db.prepare('DELETE FROM signup_phone_codes WHERE phone = ?').run(phoneProved);
+    }
     mailer.proApplicationReceived({ to: cleanEmail, name: name.trim() }).catch(() => {});
     mailer.adminNewPro({ name: name.trim(), business: business_name.trim(), email: cleanEmail,
       phone: phone?.trim(), services: supplierServices }).catch(() => {});
