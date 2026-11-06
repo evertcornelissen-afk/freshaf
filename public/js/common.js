@@ -600,10 +600,16 @@ function switchView(ids, active) {
    install from the browser menu. The Android test build is offered only as a footer button
    (downloaded when tapped), and hidden inside the app, where it means nothing. */
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
+// "Inside an app" means any of: the FreshAF app, an Android web view, or the website added
+// to the home screen (standalone). The APK button is for people in a normal browser only.
+function insideAnApp() {
+  if (window.FRESHAF_NATIVE) return true;
+  if (/; wv\)/.test(navigator.userAgent || '')) return true;
+  try { if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) return true; } catch (e) {}
+  return false;
+}
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.FRESHAF_NATIVE) {
-    document.querySelectorAll('.app-download').forEach((a) => a.classList.add('hidden'));
-  }
+  if (insideAnApp()) document.querySelectorAll('.app-download').forEach((a) => a.remove());
 });
 
 /* ---------- pages, website and app ----------

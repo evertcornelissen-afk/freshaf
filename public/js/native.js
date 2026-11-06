@@ -16,6 +16,16 @@
   window.FRESHAF_NATIVE = isNative;
   if (!isNative) return; // the website carries on exactly as before
 
+  // Website-only things (the "Download Android app (APK)" button) never show in the app:
+  // a class for CSS, and the button removed outright, now and once the page has loaded.
+  document.documentElement.classList.add('native-app');
+  function dropWebsiteOnly() {
+    var els = document.querySelectorAll('.app-download, .website-only');
+    for (var i = 0; i < els.length; i++) els[i].parentNode.removeChild(els[i]);
+  }
+  dropWebsiteOnly();
+  document.addEventListener('DOMContentLoaded', dropWebsiteOnly);
+
   // Where the real API lives. The app is a client of the live service.
   window.FRESHAF_API_BASE = 'https://freshaf.io';
 
@@ -57,10 +67,12 @@
     var a = e.target && e.target.closest && e.target.closest('a[href]');
     if (!a) return;
     var href = a.getAttribute('href') || '';
-    var name = href.replace(/^\//, '');
+    // '/reset-password?pro=1' is a clean URL with a query string; keep the query.
+    var m = /^\/?([^?#]*)(.*)$/.exec(href);
+    var name = m ? m[1] : '';
     if (CLEAN_URLS.indexOf(name) === -1) return;
     e.preventDefault();
-    window.location.href = name + '.html';
+    window.location.href = name + '.html' + (m ? m[2] : '');
   }, true);
 
   // ---- native chrome -------------------------------------------------------

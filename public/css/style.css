@@ -764,6 +764,10 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 }
 .site-footer a.app-download:hover { background: var(--panel-2); color: var(--petrol); }
 .site-footer a.app-download.hidden { display: none; }
+/* Never inside an app: the FreshAF app (native.js sets .native-app) or the website opened
+   from the home screen. common.js also removes it in those cases and in Android web views. */
+html.native-app .app-download { display: none !important; }
+@media (display-mode: standalone) { .app-download { display: none !important; } }
 
 /* ============================================================
    MOTION SYSTEM
