@@ -131,6 +131,7 @@ function escapeHtml(s) {
 
 /* ---------- inline SVG icon set ---------- */
 const ICONS = {
+  moon: '<path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   navigate: '<path d="M3 11l19-9-9 19-2-8-8-2Z"/>',
@@ -754,18 +755,7 @@ async function openAppSettings({ intro = false } = {}) {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!window.FRESHAF_NATIVE) return;
-  const bar = document.querySelector('.topbar .row');
-  if (bar && !document.getElementById('btn-app-settings')) {
-    const b = document.createElement('button');
-    b.className = 'secondary small icon-btn';
-    b.id = 'btn-app-settings';
-    b.type = 'button';
-    b.innerHTML = icon('gear');
-    b.title = 'Settings';
-    b.setAttribute('aria-label', 'Settings: alerts and location');
-    b.onclick = () => openAppSettings();
-    bar.insertBefore(b, bar.firstChild);
-  }
+  // Settings is reached from the app menu (openAppMenu below), not a header button.
   // Coming back from the phone's Settings: show the new state straight away.
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && document.querySelector('.modal-backdrop.app-settings')) openAppSettings();
@@ -783,3 +773,128 @@ function maybeFirstRunSetup() {
     if (s.push !== 'granted' || s.loc !== 'granted') openAppSettings({ intro: true });
   });
 }
+
+/* ---------- app menu (native app only) ----------
+   Evert's standing rule (7 Nov 2026): standard mobile app conventions everywhere. In the app
+   the header is a Material-style top bar: the menu button (three lines, label "Menu") at the
+   start, the brand, and one primary action (Sign in) while signed out. Everything else lives
+   in the navigation drawer it opens: Log in / Sign up, Settings (job alerts, location), Night
+   mode, Account, Log out, and the legal pages. */
+function appUser() {
+  try { return (typeof me !== 'undefined' && me) ? me : null; } catch (e) { return null; }
+}
+function isProPage() { return /supplier/.test(location.pathname); }
+
+function closeAppMenu() {
+  const d = document.getElementById('app-drawer');
+  if (!d) return;
+  d.classList.remove('open');
+  document.body.classList.remove('drawer-open');
+  const btn = document.getElementById('btn-app-menu');
+  if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
+}
+
+function menuItem(act, iconName, label, extra = '') {
+  return `<button type="button" class="drawer-item" data-act="${act}">${icon(iconName)}<span>${label}</span>${extra}</button>`;
+}
+
+function openAppMenu() {
+  let d = document.getElementById('app-drawer');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'app-drawer';
+    d.className = 'app-drawer';
+    document.body.appendChild(d);
+    d.addEventListener('click', (e) => { if (e.target === d) closeAppMenu(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && d.classList.contains('open')) closeAppMenu(); });
+  }
+  const u = appUser();
+  const pro = isProPage();
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const who = u
+    ? `<strong>${escapeHtml(u.name || '')}</strong><span>${escapeHtml(pro && u.supplier?.business_name ? u.supplier.business_name : (u.email || ''))}</span>`
+    : `<strong>FreshAF${pro ? ' Pro' : ''}</strong><span>Not signed in</span>`;
+  d.innerHTML = `
+    <nav class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu">
+      <div class="drawer-head">${who}<button type="button" class="drawer-close" data-close aria-label="Close menu">${icon('x')}</button></div>
+      <div class="drawer-list">
+        ${u ? menuItem('account', 'user', pro ? 'My dashboard' : 'Account')
+            : menuItem('login', 'user', 'Log in') + menuItem('signup', 'spark', pro ? 'Apply to become a pro' : 'Sign up')}
+        ${menuItem('settings', 'gear', 'Settings', `<small>${pro ? 'Job alerts' : 'Notifications'}, location</small>`)}
+        <label class="drawer-item drawer-switch">${icon('moon')}<span>Night mode</span>
+          <input type="checkbox" id="drawer-dark" ${dark ? 'checked' : ''} aria-label="Night mode"><i class="drawer-toggle"></i></label>
+        <div class="drawer-sep"></div>
+        ${menuItem('page:/terms', 'shield', 'Terms & Conditions')}
+        ${menuItem('page:/privacy', 'lock', 'Privacy Policy')}
+        ${menuItem('page:/contact', 'home', 'Contact & support')}
+        ${pro ? menuItem('page:/', 'car', 'Customer app') : menuItem('page:/supplier', 'briefcase', 'Become a pro')}
+        ${u ? '<div class="drawer-sep"></div>' + menuItem('logout', 'logout', 'Log out') : ''}
+      </div>
+    </nav>`;
+  d.querySelector('[data-close]').onclick = closeAppMenu;
+  d.querySelector('#drawer-dark').onchange = (e) => {
+    const t = e.target.checked ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem('freshaf_theme', t); } catch (err) {}
+    const sw = document.getElementById('theme-switch');
+    if (sw) sw.checked = e.target.checked;
+  };
+  d.querySelectorAll('[data-act]').forEach((b) => {
+    b.onclick = () => {
+      const act = b.dataset.act;
+      closeAppMenu();
+      if (act === 'settings') { openAppSettings(); return; }
+      if (act === 'logout') { const lo = document.getElementById('btn-logout'); if (lo) lo.click(); return; }
+      if (act.startsWith('page:')) { goPage(act.slice(5)); return; }
+      if (act === 'account') {
+        const acc = document.getElementById('btn-account');
+        if (acc && !pro) { acc.click(); return; }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (act === 'login') {
+        if (pro) { const s = document.getElementById('btn-go-login'); if (s) s.click(); }
+        else if (typeof show === 'function') show('view-login');
+        return;
+      }
+      if (act === 'signup') {
+        if (pro) {
+          if (typeof show === 'function') show('view-auth');
+          const h = document.getElementById('h-apply');
+          // Clear of the sticky top bar, not underneath it.
+          if (h) {
+            const bar = document.querySelector('.topbar');
+            const y = h.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0) - 24;
+            window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          }
+        } else if (typeof show === 'function') show('view-register');
+      }
+    };
+  });
+  // Next frame, so the slide-in transition runs.
+  requestAnimationFrame(() => {
+    d.classList.add('open');
+    document.body.classList.add('drawer-open');
+    const btn = document.getElementById('btn-app-menu');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    const first = d.querySelector('.drawer-item');
+    if (first) first.focus({ preventScroll: true });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.FRESHAF_NATIVE) return;
+  const bar = document.querySelector('.topbar');
+  if (bar && !document.getElementById('btn-app-menu')) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'btn-app-menu';
+    b.className = 'menu-btn';
+    b.setAttribute('aria-label', 'Menu');
+    b.setAttribute('aria-haspopup', 'dialog');
+    b.setAttribute('aria-expanded', 'false');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+    b.onclick = openAppMenu;
+    bar.insertBefore(b, bar.firstChild);
+  }
+});

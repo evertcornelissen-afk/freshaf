@@ -217,7 +217,7 @@
   var App = plugin('App');
   if (App && App.addListener) {
     App.addListener('backButton', function (ev) {
-      var openModal = document.querySelector('.modal-backdrop:not([hidden]), dialog[open]');
+      var openModal = document.querySelector('.app-drawer.open, .modal-backdrop:not([hidden]), dialog[open]');
       if (openModal) {
         var close = openModal.querySelector('[data-close], .modal-close');
         if (close) { close.click(); return; }

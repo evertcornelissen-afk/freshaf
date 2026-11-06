@@ -1071,3 +1071,69 @@ button:active { transform: translateY(0) scale(.975); }
 :root[data-theme="dark"] .set-on, [data-theme="dark"] .set-on { color: #5fd38d; }
 :root[data-theme="dark"] .set-blocked, [data-theme="dark"] .set-blocked { color: #ff8a80; }
 @media (max-width: 420px) { .topbar .who { display: none; } }
+
+/* ---------- app top bar + navigation drawer (native app only; common.js openAppMenu) ----------
+   Standard mobile pattern: menu button at the start, brand, one primary action. The theme
+   switch, account and sign-out move into the drawer, so the bar never overflows. */
+.menu-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 40px; height: 40px; padding: 0; margin: 0 4px 0 -6px; border-radius: 50%;
+  background: transparent; box-shadow: none; color: var(--petrol);
+}
+.menu-btn:hover { background: var(--panel-2); box-shadow: none; transform: none; }
+.menu-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+[data-theme="dark"] .menu-btn { color: var(--text); }
+html.native-app .topbar .theme-toggle,
+html.native-app #btn-account,
+html.native-app #btn-logout,
+html.native-app .topbar .who { display: none !important; }
+html.native-app .topbar .brand { flex: 1 1 auto; min-width: 0; }
+
+.app-drawer {
+  position: fixed; inset: 0; z-index: 900; background: rgba(8, 24, 30, 0);
+  visibility: hidden; transition: background .22s ease, visibility 0s linear .22s;
+}
+.app-drawer.open { background: rgba(8, 24, 30, .45); visibility: visible; transition: background .22s ease; }
+.drawer-panel {
+  position: absolute; top: 0; bottom: 0; left: 0; width: min(84vw, 320px);
+  background: var(--panel); box-shadow: 0 0 40px rgba(0, 0, 0, .25);
+  display: flex; flex-direction: column; overflow-y: auto;
+  transform: translateX(-100%); transition: transform .24s cubic-bezier(.2, .8, .2, 1);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.app-drawer.open .drawer-panel { transform: none; }
+.drawer-head {
+  display: flex; flex-direction: column; gap: 2px; position: relative;
+  padding: calc(22px + env(safe-area-inset-top)) 20px 16px; border-bottom: 1px solid var(--border-soft);
+}
+.drawer-head strong { font-size: 1rem; color: var(--text); padding-right: 40px; }
+.drawer-head span { font-size: .8rem; color: var(--muted); padding-right: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-close {
+  position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 10px; width: 40px; height: 40px;
+  padding: 0; border-radius: 50%; background: transparent; box-shadow: none; color: var(--muted);
+}
+.drawer-close:hover { background: var(--panel-2); box-shadow: none; transform: none; }
+.drawer-close .icon, .drawer-close svg, .drawer-item .icon, .drawer-item .icon svg { width: 20px; height: 20px; flex: none; }
+.drawer-list { display: flex; flex-direction: column; padding: 8px 0; }
+.drawer-item {
+  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 52px; margin: 0;
+  padding: 0 20px; border-radius: 0; background: transparent; box-shadow: none;
+  color: var(--text); font-size: .95rem; font-weight: 600; text-align: left; justify-content: flex-start;
+  cursor: pointer; white-space: normal;
+}
+.drawer-item:hover, .drawer-item:focus-visible { background: var(--panel-2); box-shadow: none; transform: none; outline: none; }
+.drawer-item .icon { color: var(--muted); flex: none; }
+.drawer-item small { margin-left: auto; color: var(--muted); font-size: .72rem; font-weight: 500; }
+.drawer-sep { height: 1px; background: var(--border-soft); margin: 8px 0; }
+.drawer-switch input { display: none; }
+.drawer-toggle {
+  margin-left: auto; width: 40px; height: 22px; border-radius: 99px; flex: none; position: relative;
+  background: var(--panel-3); border: 1px solid var(--border); transition: background .2s;
+}
+.drawer-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--muted); transition: transform .2s, background .2s;
+}
+.drawer-switch input:checked + .drawer-toggle { background: var(--accent-dim); border-color: var(--accent-dim); }
+.drawer-switch input:checked + .drawer-toggle::after { transform: translateX(18px); background: #fff; }
+body.drawer-open { overflow: hidden; }
