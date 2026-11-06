@@ -754,6 +754,16 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 }
 .site-footer a { color: var(--faint); font-size: .8rem; font-weight: 500; }
 .site-footer a:hover { color: var(--accent-dim); }
+/* Test build of the Android app, downloaded only when tapped (never prompted). Its own row,
+   as a plain outlined button; hidden inside the app itself (common.js). */
+.site-footer a.app-download {
+  flex-basis: 100%; max-width: 320px; margin: 6px auto 0; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; min-height: 44px;
+  padding: 10px 18px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--panel); color: var(--petrol); font-size: .88rem; font-weight: 700;
+}
+.site-footer a.app-download:hover { background: var(--panel-2); color: var(--petrol); }
+.site-footer a.app-download.hidden { display: none; }
 
 /* ============================================================
    MOTION SYSTEM

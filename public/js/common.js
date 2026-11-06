@@ -593,3 +593,15 @@ function switchView(ids, active) {
   if (typeof initMotion === 'function') initMotion(n);
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
+
+/* ---------- no automatic prompts ----------
+   Chrome on Android shows its own "Install app" banner by itself, because the site can be
+   installed. Nothing should pop up unasked, so the banner is suppressed; people can still
+   install from the browser menu. The Android test build is offered only as a footer button
+   (downloaded when tapped), and hidden inside the app, where it means nothing. */
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.FRESHAF_NATIVE) {
+    document.querySelectorAll('.app-download').forEach((a) => a.classList.add('hidden'));
+  }
+});
