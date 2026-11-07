@@ -36,6 +36,9 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
 2. ✅ **DONE 7 Nov.** Privacy policy approved by Evert and published at https://freshaf.io/privacy.
 3. **Reviewer accounts** (reviewers must be able to sign in without anyone awake):
    - DONE 7 Nov: `review@freshaf.io` and `review-pro@freshaf.io` are aliases of admin@freshaf.io.
+   - Either run `powershell -ExecutionPolicy Bypass -File scripts\make-reviewer-logins.ps1`
+     (asks for the admin password, saves both logins to `REVIEWER-LOGINS.md` in the freshaf
+     folder: git-ignored, readable only by Evert's Windows user, never printed), or:
    - Admin app → **Store reviewer accounts** → **Create reviewer accounts**. It makes a demo
      customer and a demo pro (approved, priced, car wash + laundry, ONLINE in Durbanville, 25 km)
      and shows both passwords once. **Copy sign-in details** → password manager.
