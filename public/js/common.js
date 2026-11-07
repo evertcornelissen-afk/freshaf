@@ -648,8 +648,52 @@ function goPage(path) { window.location.href = pageUrl(path); }
    phone's Settings when it was refused, because only the phone can undo a refusal. */
 const APP_SETTINGS_SEEN = 'freshaf_setup_prompted';
 
+// The website's stand-in for window.FreshAFNative: the same calls, done with browser APIs.
+// Pros get web push job alerts (supplier.js subscribePush); customers' booking updates come
+// by email and on the page, so for them notifications are shown as not available here.
+const WEB_PUSH_OFF = 'freshaf_web_push_off';
+const WEB_PERMS = {
+  push: {
+    get available() {
+      return /supplier/.test(location.pathname) && 'Notification' in window
+        && 'serviceWorker' in navigator && 'PushManager' in window;
+    },
+    status: async () => (Notification.permission === 'granted' ? 'granted'
+      : Notification.permission === 'denied' ? 'denied' : 'prompt'),
+    isOff: () => { try { return localStorage.getItem(WEB_PUSH_OFF) === '1'; } catch (e) { return false; } },
+    enable: async () => {
+      try { localStorage.removeItem(WEB_PUSH_OFF); } catch (e) {}
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted' && typeof subscribePush === 'function') await subscribePush();
+      return perm === 'granted' ? 'granted' : perm === 'denied' ? 'denied' : 'prompt';
+    },
+    disable: async () => {
+      try { localStorage.setItem(WEB_PUSH_OFF, '1'); } catch (e) {}
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        const sub = reg && await reg.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+      } catch (e) { /* nothing to undo */ }
+    },
+  },
+  location: {
+    available: 'geolocation' in navigator,
+    status: async () => {
+      try {
+        const r = await navigator.permissions.query({ name: 'geolocation' });
+        return r.state === 'granted' ? 'granted' : r.state === 'denied' ? 'denied' : 'prompt';
+      } catch (e) { return 'prompt'; }
+    },
+    request: () => new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(() => resolve('granted'), () => resolve('denied'), { timeout: 15000 });
+    }),
+  },
+  openPhoneSettings: async () => false,
+};
+function permsApi() { return window.FRESHAF_NATIVE ? (window.FreshAFNative || {}) : WEB_PERMS; }
+
 async function appSettingsState() {
-  const N = window.FreshAFNative || {};
+  const N = permsApi();
   let push = 'unavailable';
   if (N.push && N.push.available) {
     push = await N.push.status();
@@ -668,7 +712,9 @@ function settingsRow({ id, title, status, detail, actions }) {
 }
 
 async function openAppSettings({ intro = false } = {}) {
-  if (!window.FRESHAF_NATIVE) return;
+  const web = !window.FRESHAF_NATIVE;
+  const device = web ? 'browser' : 'phone';
+  const where = web ? 'your browser\'s site settings for freshaf.io (the icon left of the web address)' : 'your phone settings';
   const isPro = /supplier/.test(location.pathname);
   const alertsName = isPro ? 'Job alerts' : 'Order notifications';
   document.querySelectorAll('.modal-backdrop.app-settings').forEach((b) => b.remove());
@@ -696,19 +742,20 @@ async function openAppSettings({ intro = false } = {}) {
       denied: { kind: 'blocked', label: 'Blocked' },
       unavailable: { kind: 'off', label: 'Not available' },
     }[s.loc] || { kind: 'off', label: s.loc };
-    const settingsBtn = '<button class="secondary small" data-act="phone">Open phone settings</button>';
+    const settingsBtn = web ? '' : '<button class="secondary small" data-act="phone">Open phone settings</button>';
     const pushRow = settingsRow({
       id: 'set-push',
       title: alertsName,
       status: PUSH,
       detail: {
-        granted: isPro ? 'New bookings and job offers reach this phone even when FreshAF is closed.'
-          : 'Updates about your bookings reach this phone even when FreshAF is closed.',
-        off: 'Switched off on this phone. Nothing is sent here until you switch it on.',
+        granted: isPro ? `New bookings and job offers reach this ${device} even when FreshAF is closed.`
+          : `Updates about your bookings reach this ${device} even when FreshAF is closed.`,
+        off: `Switched off on this ${device}. Nothing is sent here until you switch it on.`,
         prompt: isPro ? 'Switch on to be told about new bookings and job offers the moment they come in.'
           : 'Switch on to be told when your pro is on the way and when the job is done.',
-        denied: 'Notifications for FreshAF are blocked in your phone settings. Open them and allow Notifications.',
-        unavailable: 'Not available on this phone yet.',
+        denied: `Notifications for FreshAF are blocked in ${where}. Open them and allow Notifications.`,
+        unavailable: web && !isPro ? 'Updates about your bookings come by email and show on this page. For alerts on your phone, use the FreshAF app.'
+          : `Not available on this ${device}.`,
       }[s.push] || '',
       actions: s.push === 'granted' ? ['<button class="secondary small" data-act="push-off">Switch off</button>']
         : s.push === 'denied' ? [settingsBtn]
@@ -719,12 +766,12 @@ async function openAppSettings({ intro = false } = {}) {
       title: 'Location',
       status: LOC,
       detail: {
-        granted: isPro ? 'Used to place your work pin and show jobs near you. To switch it off, use your phone settings.'
-          : 'Used only when you tap "Use my location" to drop the pin. To switch it off, use your phone settings.',
+        granted: isPro ? `Used to place your work pin and show jobs near you. To switch it off, use ${where}.`
+          : `Used only when you tap "Use my location" to drop the pin. To switch it off, use ${where}.`,
         prompt: isPro ? 'Allow so FreshAF can place your work pin and show you jobs nearby.'
           : 'Allow so "Use my location" can drop your pin. You can always type an address instead.',
-        denied: 'Location for FreshAF is blocked in your phone settings. Open them and allow Location.',
-        unavailable: 'Not available on this phone.',
+        denied: `Location for FreshAF is blocked in ${where}. Open them and allow Location.`,
+        unavailable: `Not available on this ${device}.`,
       }[s.loc] || '',
       actions: (s.loc === 'granted' || s.loc === 'denied') ? [settingsBtn]
         : s.loc === 'unavailable' ? [] : ['<button class="small" data-act="loc-on">Allow location</button>'],
@@ -740,22 +787,22 @@ async function openAppSettings({ intro = false } = {}) {
     backdrop.querySelector('[data-close]').onclick = close;
     backdrop.querySelectorAll('[data-act]').forEach((b) => {
       b.onclick = async () => {
-        const N = window.FreshAFNative;
+        const N = permsApi();
         b.disabled = true;
         let msg = '';
         try {
           const act = b.dataset.act;
           if (act === 'push-on') {
             const st = await N.push.enable(true);
-            if (st === 'denied') msg = 'Notifications were not allowed. Tap Open phone settings and allow Notifications for FreshAF.';
+            if (st === 'denied') msg = web ? `Notifications were not allowed. Allow them in ${where}.` : 'Notifications were not allowed. Tap Open phone settings and allow Notifications for FreshAF.';
             else if (st === 'granted') toast(`${alertsName} switched on`, 'ok');
             else if (st === 'unavailable') msg = 'Alerts are not available right now. Check your internet connection and try again.';
           } else if (act === 'push-off') {
             await N.push.disable();
-            toast(`${alertsName} switched off on this phone`, 'ok');
+            toast(`${alertsName} switched off on this ${device}`, 'ok');
           } else if (act === 'loc-on') {
             const st = await N.location.request();
-            if (st !== 'granted') msg = 'Location was not allowed. Tap Open phone settings and allow Location for FreshAF.';
+            if (st !== 'granted') msg = web ? `Location was not allowed. Allow it in ${where}.` : 'Location was not allowed. Tap Open phone settings and allow Location for FreshAF.';
           } else if (act === 'phone') {
             const opened = await N.openPhoneSettings();
             if (!opened) msg = 'Open your phone Settings, then Apps, then FreshAF, and change Notifications or Location there.';
@@ -902,7 +949,7 @@ function openAppMenu() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window.FRESHAF_NATIVE) return;
+  // Website and app alike (Evert, 7 Nov 2026: the website matches the app).
   const bar = document.querySelector('.topbar');
   if (bar && !document.getElementById('btn-app-menu')) {
     const b = document.createElement('button');

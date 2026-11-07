@@ -1083,11 +1083,12 @@ button:active { transform: translateY(0) scale(.975); }
 .menu-btn:hover { background: var(--panel-2); box-shadow: none; transform: none; }
 .menu-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 [data-theme="dark"] .menu-btn { color: var(--text); }
-html.native-app .topbar .theme-toggle,
-html.native-app #btn-account,
-html.native-app #btn-logout,
-html.native-app .topbar .who { display: none !important; }
-html.native-app .topbar .brand { flex: 1 1 auto; min-width: 0; }
+/* Website and app: the theme switch, account and sign-out live in the menu. */
+.topbar .theme-toggle,
+#btn-account,
+#btn-logout,
+.topbar .who { display: none !important; }
+.topbar .brand { flex: 1 1 auto; min-width: 0; }
 
 .app-drawer {
   position: fixed; inset: 0; z-index: 900; background: rgba(8, 24, 30, 0);
