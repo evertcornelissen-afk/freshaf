@@ -220,6 +220,18 @@ app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.
 // Honest note on what that buys: hiding the page does not hide the API. The real
 // protection is ADMIN_API_KEY below — an admin password alone no longer opens anything.
 
+// Map tiles. OpenStreetMap's free servers are for light use only and do not allow app
+// traffic at volume, so production points MAP_TILES_URL at a paid provider (for example
+// Stadia Maps or MapTiler, key included in the URL - such keys are public by design and
+// restricted on the provider's side). Unset: OpenStreetMap, as before.
+app.get('/api/map-config', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.json({
+    tiles: process.env.MAP_TILES_URL || null,
+    attribution: process.env.MAP_TILES_ATTRIBUTION || null,
+  });
+});
+
 // Public reliability signal. Deliberately tiny: whether data outlived a restart, and
 // since when. No counts, no names, nothing an attacker can use — but it is the one
 // question ("are customer accounts being wiped?") that has to be answerable without

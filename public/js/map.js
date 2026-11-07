@@ -11,6 +11,18 @@
   const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
   const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // The tile source can be switched on the server (MAP_TILES_URL) without a new app build.
+  // The map starts on OpenStreetMap and swaps once the answer arrives, so a slow or failed
+  // request never leaves a blank map.
+  let tileConfig = null;
+  function loadTileConfig() {
+    if (!tileConfig) {
+      const url = typeof window.apiUrl === 'function' ? window.apiUrl('/api/map-config') : '/api/map-config';
+      tileConfig = fetch(url, { credentials: 'omit' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    }
+    return tileConfig;
+  }
+
   // Google's pin: a red teardrop with a dark core and a soft ground shadow.
   const PIN_SVG = '<svg viewBox="0 0 28 40" width="28" height="40" aria-hidden="true">'
     + '<path d="M14 0C6.3 0 0 6.2 0 13.9 0 24.3 14 40 14 40s14-15.7 14-26.1C28 6.2 21.7 0 14 0z" fill="#EA4335"/>'
@@ -43,7 +55,14 @@
       worldCopyJump: true,
     }).setView(center, zoom);
 
-    L.tileLayer(TILES, { attribution: ATTRIBUTION, maxZoom: 19, className: 'fm-tiles' }).addTo(m);
+    let tiles = L.tileLayer(TILES, { attribution: ATTRIBUTION, maxZoom: 19, className: 'fm-tiles' }).addTo(m);
+    loadTileConfig().then((c) => {
+      if (!c || !c.tiles || c.tiles === TILES) return;
+      const next = L.tileLayer(c.tiles, { attribution: c.attribution || ATTRIBUTION, maxZoom: 19, className: 'fm-tiles' });
+      next.addTo(m);
+      m.removeLayer(tiles);
+      tiles = next;
+    });
 
     let pin = null;
     let me = null;
