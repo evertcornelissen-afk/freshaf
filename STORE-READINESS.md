@@ -34,7 +34,7 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
    **Upload key:** `powershell -ExecutionPolicy Bypass -File scripts\make-upload-key.ps1`. Choose
    the password yourself; save the `.jks` file and the password in your password manager.
 2. ✅ **DONE 7 Nov.** Privacy policy approved by Evert and published at https://freshaf.io/privacy.
-3. **Reviewer accounts** (reviewers must be able to sign in without anyone awake):
+3. ✅ **DONE 7 Nov 13:53.** Reviewer accounts created by Evert (script): demo customer review@freshaf.io and demo pro review-pro@freshaf.io, approved and ONLINE (Durbanville, 25 km, car wash + laundry). Logins in `REVIEWER-LOGINS.md` (git-ignored). Original step, kept for resets:
    - DONE 7 Nov: `review@freshaf.io` and `review-pro@freshaf.io` are aliases of admin@freshaf.io.
    - Either run `powershell -ExecutionPolicy Bypass -File scripts\make-reviewer-logins.ps1`
      (asks for the admin password, saves both logins to `REVIEWER-LOGINS.md` in the freshaf
