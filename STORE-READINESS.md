@@ -27,7 +27,11 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
 ## Evert's steps, in this order
 
 **Now (no developer account needed):**
-1. **Upload key:** `powershell -ExecutionPolicy Bypass -File scripts\make-upload-key.ps1`. Choose
+1. ✅ **DONE 7 Nov 10:29.** Upload key `%USERPROFILE%\FreshAF-keysreshaf-upload.jks`; upload-key
+   certificate SHA-256 `8D:B4:CE:AC:7C:15:D6:06:70:E0:CB:22:DB:97:85:51:58:30:84:BC:1D:FA:6D:00:9D:3B:3C:ED:C2:75:1D:A5`
+   (not secret; Play shows it under App signing). First signed bundle, versionCode 10:
+   `Desktop\FreshAF-releasereshaf-1.0-vc10.aab`. Original step:
+   **Upload key:** `powershell -ExecutionPolicy Bypass -File scripts\make-upload-key.ps1`. Choose
    the password yourself; save the `.jks` file and the password in your password manager.
 2. **Approve the privacy policy update** in `PRIVACY-DRAFT-stores.md` (or send it to the lawyer).
    Claude publishes it once you say "approved". Both stores compare it with the privacy answers.
