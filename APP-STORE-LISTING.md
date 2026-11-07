@@ -84,7 +84,7 @@ DEMO ACCOUNTS. The sign-in details are in the Sign-in Information fields. Two ac
 - a pro account, to see the pro side (job offers, prices, earnings).
 Both are marked as demo accounts on our side: the demo customer is only ever matched with the demo pro, and card payments for the demo customer go to a test payment page. Nothing you do will send a real person to a real address or charge a real card.
 
-TO TRY A BOOKING. Sign in as the demo customer, choose Car Wash, and use the address 1 Main Road, Durbanville, Cape Town (or drop the pin anywhere in Durbanville). The demo pro is online there and appears in the list. You can choose Cash or Card; Card opens the test payment page. To see the job from the other side, sign in to the pro account on a second device.
+TO TRY A BOOKING. Sign in as the demo customer, choose Car Wash, and use the address 1 Main Road, Durbanville, Cape Town (or drop the pin anywhere in Durbanville). The demo pro is online there and answers with a price straight away. You can choose Cash or Card; Card opens a test checkout where no real card is charged. If nobody works the job from the pro side, it moves itself along (on the way, in progress, done) within a few minutes. To see the job from the other side, sign in to the pro account on a second device.
 
 LOCATION. The app asks for location only when you tap "Use my location", to place the pickup pin. You can type an address instead. An address with no pro working nearby returns no pros; the demo pro works in Durbanville, Cape Town, so please use the address above.
 
@@ -100,9 +100,9 @@ WHAT IS NATIVE. The app's screens ship inside the binary; only data comes from o
 
 Apple's reviewers test from outside South Africa, at any hour. The accounts must work without anyone from FreshAF being awake.
 
-1. **Create two accounts on freshaf.io** in the normal way: one customer (sign up on the site) and one pro (apply on freshaf.io/supplier). Use addresses you control, for example `appreview@freshaf.io` and `appreview-pro@freshaf.io` as aliases of the admin mailbox, so any email the app sends them reaches you.
-2. **Admin dashboard:** approve the pro, then press **Make demo** on both accounts (Suppliers and Customer sign-ups lists). From then on they only see each other, and the demo customer's card payments go to the test page.
-3. **Sign in as the demo pro** once on a phone: set prices for every package, set the travel radius to 25 km, drop the location pin in Durbanville, and go **online**. Leave it online for the review period.
+1. **Email aliases:** make `review@freshaf.io` and `review-pro@freshaf.io` aliases of the admin mailbox, so any email the app sends them (including a password reset) reaches you.
+2. **Admin dashboard > Store reviewer accounts > Create reviewer accounts.** One press makes both: a demo customer and a demo pro that is approved, priced at the suggested prices for car wash and laundry, and online in Durbanville with a 25 km radius. Both passwords are shown once: press **Copy sign-in details** and keep them in the password manager. Demo accounts only see each other.
+3. **Pressing it again** resets both passwords and puts the pro back online (use it if a password is lost, or after the review). The card shows whether the pro is still online.
 4. **Book one test order as the demo customer** and complete it from the pro side, so you have watched the whole flow work the way the reviewer will.
 5. Put both email addresses and passwords into **App Store Connect > App Review Information > Sign-in Information** (and the pro one in the Notes, since that field takes one account). Never put them in this file or anywhere in the repository.
 6. **Before submitting, check push is live:** the admin readiness screen must show iOS push
