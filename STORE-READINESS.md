@@ -30,13 +30,12 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
 1. ✅ **DONE 7 Nov 10:29.** Upload key `%USERPROFILE%\FreshAF-keys\freshaf-upload.jks`; upload-key
    certificate SHA-256 `8D:B4:CE:AC:7C:15:D6:06:70:E0:CB:22:DB:97:85:51:58:30:84:BC:1D:FA:6D:00:9D:3B:3C:ED:C2:75:1D:A5`
    (not secret; Play shows it under App signing). First signed bundle, versionCode 10:
-   `Desktop\FreshAF-release\freshaf-1.0-vc10.aab`. Original step:
+   `Desktop\FreshAF-release\freshaf-1.0-vc10.aab`. Key file + password backed up in Evert's password manager (7 Nov). Original step:
    **Upload key:** `powershell -ExecutionPolicy Bypass -File scripts\make-upload-key.ps1`. Choose
    the password yourself; save the `.jks` file and the password in your password manager.
 2. ✅ **DONE 7 Nov.** Privacy policy approved by Evert and published at https://freshaf.io/privacy.
 3. **Reviewer accounts** (reviewers must be able to sign in without anyone awake):
-   - Make `review@freshaf.io` and `review-pro@freshaf.io` aliases of admin@freshaf.io (GoDaddy
-     email admin), so a reviewer's password reset reaches you.
+   - DONE 7 Nov: `review@freshaf.io` and `review-pro@freshaf.io` are aliases of admin@freshaf.io.
    - Admin app → **Store reviewer accounts** → **Create reviewer accounts**. It makes a demo
      customer and a demo pro (approved, priced, car wash + laundry, ONLINE in Durbanville, 25 km)
      and shows both passwords once. **Copy sign-in details** → password manager.
