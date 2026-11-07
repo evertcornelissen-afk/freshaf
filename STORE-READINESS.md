@@ -71,6 +71,17 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
     `APNS_KEY` (the .p8 contents). Claude checks the log shows "iOS ON" and tests on TestFlight.
 11. TestFlight on your iPhone → book from the demo customer → push arrives → **Submit for Review**.
 
+**Map tiles (needs Evert's cost approval, do before real customers):** the code is ready
+(7 Nov): set `MAP_TILES_URL` on Render and every map, app included, switches without a new
+build. Recommended: **Stadia Maps Starter, about US$20/month** (1 million credits; one map
+tile = 1 credit, roughly 25 000 map views a month; overage off by default, so no surprise
+bills). Alternative: MapTiler Flex, about US$25/month for 500 000 requests. Check the price
+on stadiamaps.com/pricing before paying. Evert: sign up, pick Starter, create an API key,
+then in Render set
+`MAP_TILES_URL = https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=<key>`
+and `MAP_TILES_ATTRIBUTION = &copy; Stadia Maps &copy; OpenMapTiles &copy; OpenStreetMap contributors`.
+Claude then checks the maps live.
+
 **Before real customers:** Claude removes the APK footer button and `/download/freshaf-test.apk`
 (Play replaces it), and moves map tiles to a paid provider (OpenStreetMap's free servers do not
 allow app traffic at volume — cost to approve then).
