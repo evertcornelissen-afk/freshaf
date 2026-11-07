@@ -296,7 +296,9 @@ the payment provider is a processor, not a recipient, and nothing is sold or use
 | Government ID (Pros only) | Yes | Vetting; **encrypted at rest** | Required for Pros |
 | Bank details (Pros only) | Yes | Paying the Pro; **encrypted at rest** | Required for Pros |
 | Purchase history | Yes | Order history, receipts, tax records | Required |
-| Photos (optional) | Yes | Job condition photos | Optional |
+| Photos (optional) | Yes | Job condition photos; laundry handover photo taken by the pro | Optional |
+| Ratings and notes ("Other user-generated content") | Yes | Rate the job, notes for the pro | Optional |
+| **Device or other IDs** (push token) | Yes | Booking and job alerts to this phone (Firebase Cloud Messaging / Apple Push) | Optional (alerts can be off) |
 | Payment card details | **No** | Entered on the provider's own pages; never reach FreshAF | — |
 | Advertising ID / tracking | **No** | No ads, no third-party analytics, no tracking | — |
 
