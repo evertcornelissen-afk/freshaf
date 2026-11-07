@@ -33,6 +33,7 @@ function decorate() {
   el('h-orderlog').insertAdjacentHTML('afterbegin', icon('clock'));
   el('h-customers').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-settings').insertAdjacentHTML('afterbegin', icon('shield'));
+  el('h-reviewers').insertAdjacentHTML('afterbegin', icon('user'));
   initScrollChrome();
 }
 
@@ -110,6 +111,50 @@ el('btn-copy-creds').onclick = async () => {
   toast('Credentials copied — share them with your suppliers', 'ok');
 };
 
+/* ---------- store reviewer accounts ----------
+   The passwords come back once, from this button, and live only on this page until it is
+   closed. Copy them into Play Console / App Store Connect (and your password manager). */
+let reviewerCreds = null;
+
+async function refreshReviewers() {
+  try {
+    const s = await api('/api/admin/reviewer-accounts');
+    const line = (label, a, extra) => a
+      ? `${label}: <strong>${escapeHtml(a.email)}</strong>${a.is_demo ? ' <span class="pill warn">DEMO</span>' : ' <span class="pill bad">NOT DEMO</span>'}${extra || ''}`
+      : `${label}: <span class="muted">not created yet</span>`;
+    el('rev-status').innerHTML = line('Customer', s.customer) + '<br>' + line('Pro', s.pro, s.pro
+      ? ` <span class="pill ${s.pro.status === 'approved' ? 'ok' : 'bad'}">${escapeHtml(s.pro.status || '?')}</span> <span class="pill ${s.pro.online ? 'ok' : 'bad'}">${s.pro.online ? 'online' : 'OFFLINE'}</span>`
+      : '');
+    if (s.customer) el('rev-customer').value = s.customer.email;
+    if (s.pro) el('rev-pro').value = s.pro.email;
+    el('btn-reviewers').textContent = s.customer || s.pro ? 'Reset passwords and put the pro online' : 'Create reviewer accounts';
+  } catch (e) { showError('rev-error', e.message); }
+}
+
+el('btn-reviewers').onclick = async () => {
+  el('rev-error').style.display = 'none';
+  try {
+    const r = await api('/api/admin/reviewer-accounts', { method: 'POST',
+      body: { customer_email: el('rev-customer').value, pro_email: el('rev-pro').value } });
+    reviewerCreds = r;
+    el('rev-result').innerHTML = '<table><thead><tr><th>Account</th><th>Email</th><th>Password</th></tr></thead><tbody>'
+      + [['Customer', r.customer], ['Pro', r.pro]].map(([k, c]) =>
+        `<tr><td>${k}</td><td>${escapeHtml(c.email)}</td><td><code>${escapeHtml(c.password)}</code></td></tr>`).join('')
+      + '</tbody></table><p class="muted small-text">Shown once. Any earlier password for these accounts no longer works.</p>';
+    el('btn-copy-reviewers').classList.remove('hidden');
+    toast('Reviewer accounts ready: pro online in Durbanville', 'ok');
+    await Promise.all([refreshReviewers(), refreshSuppliers(), refreshCustomers()]);
+  } catch (e) { showError('rev-error', e.message); }
+};
+
+el('btn-copy-reviewers').onclick = async () => {
+  if (!reviewerCreds) return;
+  const c = reviewerCreds;
+  await navigator.clipboard.writeText(
+    `FreshAF reviewer accounts (demo)\nCustomer: ${c.customer.email} / ${c.customer.password}\nPro: ${c.pro.email} / ${c.pro.password}`);
+  toast('Sign-in details copied', 'ok');
+};
+
 async function boot() {
   try {
     decorate();
@@ -128,7 +173,7 @@ async function boot() {
 }
 
 async function enterDash() {
-  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings()]); // content first
+  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings(), refreshReviewers()]); // content first
   show('view-dash');
   setInterval(() => { refreshStats(); refreshOrders(); }, 15000);
 }

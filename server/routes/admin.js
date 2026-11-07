@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const { db, getSetting, setSetting, DEFAULT_ADMIN_PASSWORD } = require('../db');
-const { authRequired } = require('../auth');
+const { authRequired, rotateSession } = require('../auth');
 const realtime = require('../realtime');
 const push = require('../push');
 const balance = require('../balance');
@@ -89,6 +89,107 @@ router.post('/suppliers/import', (req, res) => {
       services: services.join(','), radius_km: radius });
   }
   res.json({ results, created: results.filter((x) => x.status === 'created').length });
+});
+
+// Store reviewer accounts (Google Play "App access", Apple "Sign-in Information").
+//
+// One demo customer and one demo pro that a reviewer can use with nobody awake: the pro is
+// approved, prices every package at the suggested price, offers car wash and laundry, and
+// stays ONLINE in Durbanville with a 25 km radius. Both are demo accounts, so they only ever
+// see each other (and other demo accounts): no real customer or pro is involved, card
+// payments go to the test page, and the demo autopilot plays a booking through to done.
+//
+// Pressing it again resets both passwords (and puts the pro back online) - use that if a
+// password is lost or after the store review. The passwords are returned once, here, and
+// are never stored or logged anywhere else.
+const REVIEW_PIN = { lat: -33.8317, lng: 18.6464, address: 'Main Road, Durbanville, Cape Town, 7550' };
+
+function reviewerPassword() {
+  // 12 characters, letters and digits only, so nothing is lost copying it into a store form.
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  return Array.from(crypto.randomBytes(12), (b) => abc[b % abc.length]).join('');
+}
+
+function reviewerStatus() {
+  const ids = { customer: Number(getSetting('reviewer_customer_id', '0')), pro: Number(getSetting('reviewer_pro_id', '0')) };
+  const out = {};
+  for (const [k, id] of Object.entries(ids)) {
+    const u = id ? db.prepare('SELECT id, email, is_demo FROM users WHERE id = ?').get(id) : null;
+    out[k] = u ? { user_id: u.id, email: u.email, is_demo: !!u.is_demo } : null;
+  }
+  if (out.pro) {
+    const s = db.prepare('SELECT status, online, lat, lng, radius_km, services FROM suppliers WHERE user_id = ?').get(out.pro.user_id);
+    Object.assign(out.pro, { status: s?.status, online: !!s?.online, radius_km: s?.radius_km, services: s?.services });
+  }
+  return out;
+}
+
+router.get('/reviewer-accounts', (req, res) => res.json(reviewerStatus()));
+
+router.post('/reviewer-accounts', (req, res) => {
+  const { normEmail } = require('../email');
+  const { SERVICES } = require('../pricing');
+  const want = {
+    customer: normEmail(req.body?.customer_email),
+    pro: normEmail(req.body?.pro_email),
+  };
+  for (const [k, email] of Object.entries(want)) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '')) {
+      return res.status(400).json({ error: `Enter a valid email for the reviewer ${k === 'pro' ? 'pro' : 'customer'}` });
+    }
+  }
+  if (want.customer === want.pro) return res.status(400).json({ error: 'Use two different email addresses' });
+
+  const known = { customer: Number(getSetting('reviewer_customer_id', '0')), pro: Number(getSetting('reviewer_pro_id', '0')) };
+  const role = { customer: 'customer', pro: 'supplier' };
+  // Refuse to take over somebody else's account: an email already in use is accepted only
+  // when it is the reviewer account this button made before.
+  for (const k of ['customer', 'pro']) {
+    const hit = db.prepare('SELECT id, role FROM users WHERE lower(email) = ?').get(want[k]);
+    if (hit && hit.id !== known[k]) {
+      return res.status(409).json({ error: `${want[k]} already belongs to another account. Use a new address for the reviewer.` });
+    }
+  }
+
+  const creds = {};
+  for (const k of ['customer', 'pro']) {
+    const password = reviewerPassword();
+    const hash = bcrypt.hashSync(password, 10);
+    let id = known[k] && db.prepare('SELECT id FROM users WHERE id = ? AND role = ?').get(known[k], role[k])?.id;
+    if (id) {
+      // Reset: new password, signs out every earlier session of this account.
+      db.prepare('UPDATE users SET email = ?, password_hash = ?, is_demo = 1 WHERE id = ?').run(want[k], hash, id);
+      rotateSession(id);
+    } else {
+      const info = db.prepare(`INSERT INTO users (role, name, email, phone, password_hash, home_address, home_lat, home_lng, is_demo)
+        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, 1)`)
+        .run(role[k], k === 'pro' ? 'Demo Pro' : 'App Reviewer', want[k], hash,
+          k === 'customer' ? REVIEW_PIN.address : null,
+          k === 'customer' ? REVIEW_PIN.lat : null, k === 'customer' ? REVIEW_PIN.lng : null);
+      id = Number(info.lastInsertRowid);
+      setSetting(k === 'pro' ? 'reviewer_pro_id' : 'reviewer_customer_id', String(id));
+    }
+    if (k === 'pro') {
+      const exists = db.prepare('SELECT user_id FROM suppliers WHERE user_id = ?').get(id);
+      if (!exists) {
+        db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, service_area, equipment_notes, services, status)
+          VALUES (?, 'FreshAF Demo Pro', ?, 'Durbanville, Cape Town', 'Demo account for app store review', 'carwash,laundry', 'approved')`)
+          .run(id, secrets.encryptField('DEMO-NOT-A-PERSON'));
+      }
+      db.prepare(`UPDATE suppliers SET status = 'approved', status_reason = NULL, services = 'carwash,laundry',
+        online = 1, lat = ?, lng = ?, radius_km = 25, alert_whatsapp = 0 WHERE user_id = ?`)
+        .run(REVIEW_PIN.lat, REVIEW_PIN.lng, id);
+      for (const svc of Object.values(SERVICES)) {
+        for (const p of Object.values(svc.packages)) {
+          db.prepare(`INSERT INTO supplier_prices (user_id, service, package, price_cents) VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, service, package) DO NOTHING`).run(id, svc.key, p.key, p.base);
+        }
+      }
+    }
+    creds[k] = { email: want[k], password, user_id: id };
+  }
+  console.log(`[FreshAF] Store reviewer accounts set: customer ${creds.customer.user_id}, pro ${creds.pro.user_id} (demo, pro online in Durbanville)`);
+  res.json({ ...creds, status: reviewerStatus() });
 });
 
 router.get('/suppliers', (req, res) => {

@@ -1,8 +1,7 @@
 # DRAFT — FreshAF Privacy Policy update for the app stores
 
-**Status: NOT PUBLISHED. Needs Evert's approval** (and ideally the lawyer's read). When
-approved it replaces the body of `public/privacy.html` and the "Last updated" date changes in
-the same commit.
+**Status: APPROVED by Evert and PUBLISHED 7 Nov 2026** at https://freshaf.io/privacy
+(`public/privacy.html`, "Last updated: 7 November 2026"). This file is kept as the record.
 
 **Why now:** both stores check that the privacy policy matches the privacy answers given in
 the store (Google Play Data safety, Apple App Privacy). The live policy (12 July 2026) still

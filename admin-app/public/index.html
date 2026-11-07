@@ -120,6 +120,27 @@
     </div>
 
     <div class="card">
+      <h2 id="h-reviewers">Store reviewer accounts</h2>
+      <p class="muted small-text">One <strong>demo customer</strong> and one <strong>demo pro</strong> for the Google Play
+      "App access" and Apple "Sign-in Information" forms. The pro is approved, priced at the suggested prices for car wash
+      and laundry, and stays <strong>online in Durbanville</strong> (25 km). Demo accounts only see each other, card
+      payments use the test page, and a booking plays itself through to done if nobody works it.<br>
+      Use addresses you can read (for example aliases of admin@freshaf.io), so a reviewer's password reset reaches you.
+      Pressing the button again <strong>resets both passwords</strong> and puts the pro back online.</p>
+      <div class="msg error" id="rev-error"></div>
+      <div id="rev-status" class="small-text mt"></div>
+      <div class="row mt" style="flex-wrap:wrap;gap:10px">
+        <input id="rev-customer" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Reviewer customer email" value="review@freshaf.io" style="flex:1;min-width:220px">
+        <input id="rev-pro" type="email" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Reviewer pro email" value="review-pro@freshaf.io" style="flex:1;min-width:220px">
+      </div>
+      <div class="row mt">
+        <button class="small" id="btn-reviewers">Create reviewer accounts</button>
+        <button class="secondary small hidden" id="btn-copy-reviewers">Copy sign-in details</button>
+      </div>
+      <div class="table-scroll mt" id="rev-result"></div>
+    </div>
+
+    <div class="card">
       <div class="row spread">
         <h2 id="h-customers">Customer sign-ups</h2>
         <div class="row">

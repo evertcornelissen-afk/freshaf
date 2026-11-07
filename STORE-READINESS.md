@@ -20,7 +20,7 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
 | Cloud builds: iOS → TestFlight, Android → Play internal track | `codemagic.yaml` |
 | Native push: Android LIVE and tested (7 Nov, booking #10); iOS code ready, needs the APNs key | `server/native-push.js` |
 | Account deletion in app + web URL | Account → Delete account; `https://freshaf.io/delete-account` |
-| Privacy policy URL | `https://freshaf.io/privacy` (update drafted, see step 2) |
+| Privacy policy URL | `https://freshaf.io/privacy` (store version approved + published 7 Nov) |
 | Data safety / App Privacy answers (incl. push token as "Device or other IDs") | `APP-STORE-SUBMISSION.md` section D |
 | Stays signed in, Settings (alerts, location), standard menu, Customer/Pro sign-in | app build v9 |
 
@@ -33,14 +33,16 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
    `Desktop\FreshAF-release\freshaf-1.0-vc10.aab`. Original step:
    **Upload key:** `powershell -ExecutionPolicy Bypass -File scripts\make-upload-key.ps1`. Choose
    the password yourself; save the `.jks` file and the password in your password manager.
-2. **Approve the privacy policy update** in `PRIVACY-DRAFT-stores.md` (or send it to the lawyer).
-   Claude publishes it once you say "approved". Both stores compare it with the privacy answers.
+2. ✅ **DONE 7 Nov.** Privacy policy approved by Evert and published at https://freshaf.io/privacy.
 3. **Reviewer accounts** (reviewers must be able to sign in without anyone awake):
-   - On freshaf.io create one **customer** and one **pro** with addresses you control (not your
-     own daily accounts), e.g. a new Gmail or `review@`/`review-pro@` aliases of admin@freshaf.io.
-   - Admin app: **approve** the pro, then **Make demo** on both. Sign in as the pro once: set
-     prices, location pin in Durbanville, radius 25 km, **go online**, leave online.
-   - Keep the two email/password pairs for steps 6 and 8 only (never in chat or the code).
+   - Make `review@freshaf.io` and `review-pro@freshaf.io` aliases of admin@freshaf.io (GoDaddy
+     email admin), so a reviewer's password reset reaches you.
+   - Admin app → **Store reviewer accounts** → **Create reviewer accounts**. It makes a demo
+     customer and a demo pro (approved, priced, car wash + laundry, ONLINE in Durbanville, 25 km)
+     and shows both passwords once. **Copy sign-in details** → password manager.
+   - Lost a password, or after review: press it again; it resets both and puts the pro online.
+   - The two email/password pairs go only into Play "App access" (step 6) and Apple "Sign-in
+     Information" (step 8).
 4. **Real pros tomorrow:** reviewers book from outside SA, so the demo pro covers them; real pros
    are for real customers. Both stores reject an app that looks empty.
 
