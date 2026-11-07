@@ -36,6 +36,10 @@ function authHeaders() {
 }
 
 async function api(path, opts = {}) {
+  // In the app the saved sign-in is read from phone storage asynchronously. Until this
+  // waited for it, the first request of every cold start (/api/auth/me) went out without
+  // it and the app showed the person as signed out, every time it was reopened.
+  if (window.FRESHAF_READY) { try { await window.FRESHAF_READY; } catch (e) { /* signed out */ } }
   let res;
   try {
     res = await fetch(apiUrl(path), {

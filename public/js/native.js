@@ -31,6 +31,14 @@
 
   var TOKEN_KEY = 'freshaf_token';
   var Preferences = cap.Plugins && cap.Plugins.Preferences;
+  // Encrypted storage (Android Keystore, TokenStorePlugin). Where it is not available (iOS
+  // until its Keychain plugin ships, or a phone whose keystore misbehaves) the token stays
+  // in Preferences, which is private to the app. Never both: a write to one clears the other.
+  var Secure = cap.registerPlugin ? cap.registerPlugin('TokenStore') : null;
+  function secureGet() {
+    if (!Secure || !Secure.get) return Promise.reject(new Error('no secure store'));
+    return Secure.get({ key: TOKEN_KEY }).then(function (r) { return (r && r.value) || null; });
+  }
 
   // Held in memory once read, because api() is called on paths where awaiting native
   // storage on every request would add latency to every screen.
@@ -40,16 +48,36 @@
     getToken: function () { return token; },
     setToken: function (t) {
       token = t || null;
-      if (!Preferences) return Promise.resolve();
-      return t ? Preferences.set({ key: TOKEN_KEY, value: t })
-               : Preferences.remove({ key: TOKEN_KEY });
+      var prefsSet = function () {
+        if (!Preferences) return Promise.resolve();
+        return t ? Preferences.set({ key: TOKEN_KEY, value: t }) : Preferences.remove({ key: TOKEN_KEY });
+      };
+      if (!Secure || !Secure.set) return prefsSet();
+      var op = t ? Secure.set({ key: TOKEN_KEY, value: t }) : Secure.remove({ key: TOKEN_KEY });
+      return op.then(function () {
+        if (Preferences) return Preferences.remove({ key: TOKEN_KEY }).catch(function () {});
+      }).catch(prefsSet);
     },
+    // Signed in until the person taps Log out: the token survives restarts, the app being
+    // killed in the background, and app updates. A token found only in the old place
+    // (Preferences, app versions before encrypted storage) is moved, not lost.
     loadToken: function () {
-      if (!Preferences) return Promise.resolve(null);
-      return Preferences.get({ key: TOKEN_KEY }).then(function (r) {
-        token = (r && r.value) || null;
-        return token;
-      }).catch(function () { return null; });
+      var fromPrefs = function () {
+        if (!Preferences) return Promise.resolve(null);
+        return Preferences.get({ key: TOKEN_KEY }).then(function (r) { return (r && r.value) || null; })
+          .catch(function () { return null; });
+      };
+      return secureGet().catch(function () { return null; }).then(function (s) {
+        if (s) return s;
+        return fromPrefs().then(function (p) {
+          if (p && Secure && Secure.set) {
+            Secure.set({ key: TOKEN_KEY, value: p }).then(function () {
+              if (Preferences) Preferences.remove({ key: TOKEN_KEY }).catch(function () {});
+            }).catch(function () { /* stays in Preferences */ });
+          }
+          return p;
+        });
+      }).then(function (t) { token = t; return t; });
     },
   };
 

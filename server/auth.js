@@ -55,6 +55,16 @@ function signUser(user) {
     JWT_SECRET, { expiresIn: '30d' });
 }
 
+// The app's sign-in (Evert, 7 Nov 2026: stay signed in until you tap Log out). It lives
+// 180 days and is replaced silently every day the app is opened (renewIfStale), so in
+// practice it never runs out. It is still revocable: it carries the account's session key,
+// so Log out on a device, a password reset or deleting the account ends it everywhere.
+const APP_TOKEN_DAYS = 180;
+function signAppToken(user) {
+  return jwt.sign({ id: user.id, role: user.role, name: user.name, sk: sessionKeyFor(user), app: 1 },
+    JWT_SECRET, { expiresIn: `${APP_TOKEN_DAYS}d` });
+}
+
 // The live account behind a verified token, or null. Role and name come from the
 // database, not the token, so a role change takes effect on the next request.
 function currentUser(payload) {
@@ -137,10 +147,15 @@ function readToken(req) {
 // The website gets a new cookie. The app gets a new token in the body of /api/auth/me,
 // which it calls on every launch; common.js stores any token it is handed.
 const RENEW_AFTER_SEC = 7 * 24 * 3600;
+const APP_RENEW_AFTER_SEC = 24 * 3600; // the app slides daily (see signAppToken)
 function renewIfStale(req, res, s) {
-  if (!s || Date.now() / 1000 - s.iat < RENEW_AFTER_SEC) return null;
-  if (s.via === 'cookie') { setAuthCookie(res, s.user); return null; }
-  return wantsToken(req) ? signUser(s.user) : null;
+  if (!s) return null;
+  const age = Date.now() / 1000 - s.iat;
+  if (s.via === 'cookie') {
+    if (age >= RENEW_AFTER_SEC) setAuthCookie(res, s.user);
+    return null;
+  }
+  return wantsToken(req) && age >= APP_RENEW_AFTER_SEC ? signAppToken(s.user) : null;
 }
 
 // A client that cannot use cookies asks for the token explicitly. It is returned ONLY on
@@ -182,6 +197,6 @@ function sseAuth() {
   };
 }
 
-module.exports = { setAuthCookie, clearAuthCookie, readToken, readSession, renewIfStale,
+module.exports = { signAppToken, setAuthCookie, clearAuthCookie, readToken, readSession, renewIfStale,
   authRequired, signUser, wantsToken, sseAuth, signSseTicket, rotateSession,
   SSE_SECRET: JWT_SECRET, COOKIE_NAME };

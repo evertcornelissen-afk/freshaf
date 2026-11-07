@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const { db, getSetting } = require('../db');
 const crypto = require('crypto');
 const whatsapp = require('../whatsapp');
-const { setAuthCookie, clearAuthCookie, readSession, renewIfStale, authRequired, signUser,
+const { setAuthCookie, clearAuthCookie, readSession, renewIfStale, authRequired, signUser, signAppToken,
   wantsToken, signSseTicket, rotateSession } = require('../auth');
 const mailer = require('../mailer');
 const secrets = require('../secrets');
@@ -257,7 +257,7 @@ router.post('/register', registerLimit, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   setAuthCookie(res, user);
   // The app gets a Bearer token because it cannot receive the cookie; see server/auth.js.
-  res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signUser(user) } : {}) });
+  res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signAppToken(user) } : {}) });
 });
 
 router.post('/login', loginByIp, loginByEmail, (req, res) => {
@@ -276,7 +276,7 @@ router.post('/login', loginByIp, loginByEmail, (req, res) => {
   forgiveKey('login-email', cleanEmail);
   setAuthCookie(res, user);
   // The app gets a Bearer token because it cannot receive the cookie; see server/auth.js.
-  res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signUser(user) } : {}) });
+  res.json({ user: mePayload(user), ...(wantsToken(req) ? { token: signAppToken(user) } : {}) });
 });
 
 // EventSource cannot send an Authorization header, so the native app cannot open the
@@ -363,7 +363,7 @@ router.post('/reset', resetLimit, (req, res) => {
 
   const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
   setAuthCookie(res, fresh);
-  res.json({ user: mePayload(fresh), ...(wantsToken(req) ? { token: signUser(fresh) } : {}) });
+  res.json({ user: mePayload(fresh), ...(wantsToken(req) ? { token: signAppToken(fresh) } : {}) });
 });
 
 // Update profile details (name, phone, preferred address).
