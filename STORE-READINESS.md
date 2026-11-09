@@ -48,7 +48,7 @@ The test APK link (freshaf.io footer + /download/freshaf-test.apk) stays until l
 4. **Real pros tomorrow:** reviewers book from outside SA, so the demo pro covers them; real pros
    are for real customers. Both stores reject an app that looks empty.
 
-**D-U-N-S status:** requested via Apple's lookup tool (Evert, Fri 6 Nov); D&B acknowledged it to admin@freshaf.io on Sun 8 Nov 00:32 (donotreply@iresearch.dnb.com): **Tracking ID 11193219, Case 11252150**, submitted 7 Nov 22:31 UTC. D&B promises contact within 5 business days, so by **Fri 13 Nov**. If nothing by then: Apple Developer support (developer.apple.com/contact > Membership and Account > Program Enrollment, phone callback) quoting the case number. The number is free: ignore paid "expedite" offers and anyone not from dnb.com / dnbsame.com.
+**D-U-N-S status:** requested via Apple's lookup tool (Evert, Fri 6 Nov); D&B acknowledged it to admin@freshaf.io on Sun 8 Nov 00:32 (donotreply@iresearch.dnb.com): **Tracking ID 11193219, Case 11252150, Request key 4NVGG9ZW9U**, submitted 7 Nov 22:31 UTC, type "Add business - Mini Inquiry" (new listing; the Duns field was still blank on 9 Nov). D&B promises contact within 5 business days, so by **Fri 13 Nov**. If nothing by then: Apple Developer support (developer.apple.com/contact > Membership and Account > Program Enrollment, phone callback) quoting the case number. The number is free: ignore paid "expedite" offers and anyone not from dnb.com / dnbsame.com.
 
 **When the D-U-N-S number arrives (D&B email):**
 5. **Google Play Console** (play.google.com/console): Organisation account as FreshAF (Pty) Ltd,
