@@ -286,7 +286,9 @@ async function boot() {
       // Arriving from "Pro sign in" (menu or the Customer | Pro switch): straight to the form.
       if (/signin/.test(location.hash)) setTimeout(() => el('btn-go-login').click(), 150);
       // Arriving from "Become a pro": straight to the application form.
-      else if (/apply/.test(location.hash)) setTimeout(scrollToApply, 250);
+      // A jump, not an animation: on arrival nothing needs to glide, and a jump cannot be
+      // interrupted by the page still settling.
+      else if (/apply/.test(location.hash)) setTimeout(() => scrollToApply(false), 250);
       return;
     }
     await route();

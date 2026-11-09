@@ -863,12 +863,12 @@ function closeAppMenu() {
 // after any view switch: switchView() scrolls to the top, and a second scroll started in the
 // same instant was cancelled by it, so "Apply to become a pro" in the menu closed the menu
 // and left the page where it was (found 9 Nov 2026).
-function scrollToApply() {
+function scrollToApply(smooth = true) {
   const h = document.getElementById('h-apply');
   if (!h) return;
   const bar = document.querySelector('.topbar');
   const y = h.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0) - 24;
-  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+  window.scrollTo({ top: Math.max(0, y), behavior: smooth ? 'smooth' : 'instant' });
 }
 
 function menuItem(act, iconName, label, extra = '') {
