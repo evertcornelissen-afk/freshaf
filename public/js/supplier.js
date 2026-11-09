@@ -200,6 +200,50 @@ function decorate() {
   el('h-history').insertAdjacentHTML('afterbegin', icon('clock'));
   el('btn-sup-geolocate').insertAdjacentHTML('afterbegin', icon('navigate'));
   initScrollChrome();
+  addIphoneGuide();
+}
+
+// iPhone pros (9 Nov 2026): the App Store app waits on the D-U-N-S number, so on an iPhone the
+// pro portal runs from Safari. Added to the Home Screen it opens full screen like an app, and
+// (iOS 16.4+) can show job alerts, which a plain Safari tab never can. Shown only on an
+// iPhone/iPad that is not already running it from the Home Screen, and not inside our app.
+function addIphoneGuide() {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const installed = window.navigator.standalone === true
+    || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  if (!ios || installed || window.FRESHAF_NATIVE) return;
+  let dismissed = false;
+  try { dismissed = localStorage.getItem('freshaf_ios_guide_done') === '1'; } catch (e) {}
+  if (dismissed) return;
+  const shareIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-label="Share" style="vertical-align:-3px">'
+    + '<path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+  const html = `
+    <div class="card ios-guide" role="region" aria-label="Add FreshAF Pro to your Home Screen">
+      <h2 style="margin-top:0">Using an iPhone? Put FreshAF Pro on your Home Screen</h2>
+      <p class="muted small-text" style="margin-top:-4px">The App Store app is coming soon. Until then this works like an app, and it is how job alerts reach your iPhone.</p>
+      <ol class="ios-steps">
+        <li>Open <strong>freshaf.io/supplier</strong> in <strong>Safari</strong>.</li>
+        <li>Tap the Share button ${shareIcon} at the bottom of the screen.</li>
+        <li>Scroll down, tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+        <li>Open <strong>FreshAF Pro</strong> from your Home Screen, sign in, and tap <strong>Enable job alerts</strong>.</li>
+      </ol>
+      <p class="muted small-text">Job alerts need iOS 16.4 or newer (Settings &gt; General &gt; About &gt; iOS Version).</p>
+      <div class="mt"><button type="button" class="secondary small" data-ios-guide-done>Got it</button></div>
+    </div>`;
+  const spots = [
+    [el('view-auth').querySelector('.hero'), 'afterend'],
+    [el('view-status'), 'afterbegin'],
+    [el('view-dash'), 'afterbegin'],
+  ];
+  spots.forEach(([node, where]) => { if (node) node.insertAdjacentHTML(where, html); });
+  document.querySelectorAll('[data-ios-guide-done]').forEach((b) => {
+    b.onclick = () => {
+      try { localStorage.setItem('freshaf_ios_guide_done', '1'); } catch (e) {}
+      document.querySelectorAll('.ios-guide').forEach((n) => n.remove());
+    };
+  });
 }
 
 function setWho() {

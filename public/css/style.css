@@ -310,6 +310,10 @@ button.small { padding: 8px 14px; font-size: .8rem; border-radius: 9px; }
 .msg:empty { display: none !important; }
 /* A sign-up problem shown under the field it is about (pro application). */
 .reg-field-error { margin: 8px 0 4px; }
+/* iPhone: Add to Home Screen guide on the pro portal. */
+.ios-guide { border-color: rgba(23, 153, 194, .35); }
+.ios-steps { margin: 10px 0 6px; padding-left: 22px; line-height: 1.6; }
+.ios-steps li { margin: 4px 0; }
 input.field-invalid, select.field-invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(214, 66, 87, .15); }
 
 /* ---------- toasts ---------- */
