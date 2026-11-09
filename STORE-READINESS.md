@@ -2,7 +2,7 @@
 
 One page: what is ready, where it is, and exactly what Evert does, in order. Details behind
 each step: `APP-STORE-SUBMISSION.md` (sections A–F) and `APP-STORE-LISTING.md` (copy).
-The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/freshaf-test.apk redirects) stays until the app is on Google Play. APK v11 (9 Nov) is signed with the upload key; phones with the older APK uninstall it once first.
+The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/freshaf-test.apk redirects) stays until the app is on Google Play. APK v12 (9 Nov, adds the pro return-trip rate) is signed with the upload key and installs over v11; phones with the pre-v11 APK uninstall it once first.
 
 ## Ready (done by Claude)
 
