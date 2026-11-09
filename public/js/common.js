@@ -856,7 +856,19 @@ function closeAppMenu() {
   d.classList.remove('open');
   document.body.classList.remove('drawer-open');
   const btn = document.getElementById('btn-app-menu');
-  if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
+  if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.focus({ preventScroll: true }); }
+}
+
+// Bring the pro application form into view, clear of the sticky top bar. Called a moment
+// after any view switch: switchView() scrolls to the top, and a second scroll started in the
+// same instant was cancelled by it, so "Apply to become a pro" in the menu closed the menu
+// and left the page where it was (found 9 Nov 2026).
+function scrollToApply() {
+  const h = document.getElementById('h-apply');
+  if (!h) return;
+  const bar = document.querySelector('.topbar');
+  const y = h.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0) - 24;
+  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
 }
 
 function menuItem(act, iconName, label, extra = '') {
@@ -895,7 +907,7 @@ function openAppMenu() {
         ${menuItem('page:/terms', 'shield', 'Terms & Conditions')}
         ${menuItem('page:/privacy', 'lock', 'Privacy Policy')}
         ${menuItem('page:/contact', 'home', 'Contact & support')}
-        ${pro ? menuItem('page:/', 'car', 'Customer app') : menuItem('page:/supplier', 'briefcase', 'Become a pro')}
+        ${pro ? menuItem('page:/', 'car', 'Customer app') : menuItem('page:/supplier#apply', 'briefcase', 'Become a pro')}
         ${u ? '<div class="drawer-sep"></div>' + menuItem('logout', 'logout', 'Log out') : ''}
       </div>
     </nav>`;
@@ -928,14 +940,9 @@ function openAppMenu() {
       }
       if (act === 'signup') {
         if (pro) {
-          if (typeof show === 'function') show('view-auth');
-          const h = document.getElementById('h-apply');
-          // Clear of the sticky top bar, not underneath it.
-          if (h) {
-            const bar = document.querySelector('.topbar');
-            const y = h.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0) - 24;
-            window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-          }
+          const auth = document.getElementById('view-auth');
+          if (auth && auth.classList.contains('hidden') && typeof show === 'function') show('view-auth');
+          setTimeout(scrollToApply, 80);
         } else if (typeof show === 'function') show('view-register');
       }
     };

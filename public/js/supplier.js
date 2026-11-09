@@ -246,6 +246,16 @@ function addIphoneGuide() {
   });
 }
 
+function showCustomerNote(u) {
+  const h = el('h-apply');
+  if (!h || el('customer-note')) return;
+  h.insertAdjacentHTML('afterend', `<div class="msg ok" id="customer-note" style="display:block">
+    You are signed in to the customer app as <strong>${escapeHtml(u.email || u.name || '')}</strong>.
+    A pro account is separate: apply below with a different email address.
+    <a href="#" id="customer-note-back">Back to the customer app</a></div>`);
+  el('customer-note-back').onclick = (e) => { e.preventDefault(); goPage('/'); };
+}
+
 function setWho() {
   el('who').textContent = me ? `${me.name} · ${me.supplier?.business_name || ''}` : '';
   el('btn-logout').classList.toggle('hidden', !me);
@@ -262,14 +272,21 @@ async function boot() {
   try {
     decorate();
     const { user } = await api('/api/auth/me');
-    if (user && user.role !== 'supplier') { goPage('/'); return; }
-    me = user;
+    if (user && user.role === 'admin') { goPage('/'); return; }
+    // A signed-in CUSTOMER who taps "Become a pro" used to be sent straight back to the
+    // customer app, so the menu seemed to do nothing (found 9 Nov 2026). Show the pro page
+    // instead, with a note: a pro account is separate and needs its own email address.
+    const customer = user && user.role !== 'supplier' ? user : null;
+    me = customer ? null : user;
     setWho();
     if (!me) {
       show('view-auth');
       hideSplash();
+      if (customer) showCustomerNote(customer);
       // Arriving from "Pro sign in" (menu or the Customer | Pro switch): straight to the form.
       if (/signin/.test(location.hash)) setTimeout(() => el('btn-go-login').click(), 150);
+      // Arriving from "Become a pro": straight to the application form.
+      else if (/apply/.test(location.hash)) setTimeout(scrollToApply, 250);
       return;
     }
     await route();
