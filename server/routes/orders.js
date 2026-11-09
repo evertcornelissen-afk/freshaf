@@ -19,6 +19,8 @@ router.get('/pricing', (req, res) => {
       per_km_cents: Number(getSetting('callout_per_km_cents', '1000')),
       cap_cents: Number(getSetting('callout_cap_cents', '15000')),
     },
+    // Laundry returned to a different address: the most the return trip can add, all in.
+    return_leg: require('../quotes').returnLegPublic(),
   });
 });
 

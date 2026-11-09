@@ -348,10 +348,30 @@ async function renderDocs() {
 
 /* ---------- your prices (the pro sets what FreshAF pays them per job) ---------- */
 let priceCat = null;
+let returnTrip = null;
+
+// Laundry pros choose their own rate for returning laundry to a second address, up to the
+// maximum FreshAF publishes to customers. Blank = paid the maximum.
+function returnTripHtml(t) {
+  if (!t) return '';
+  const max = (t.max_cents / 100).toFixed(2);
+  return `
+    <h3 style="margin-top:18px">Laundry return trip</h3>
+    <p class="muted small-text">When a customer wants their laundry brought back to a different address.
+      The first ${t.free_km} km are free; after that you charge your own rate per km, up to R${max}.
+      The trip never pays more than R${Math.round(t.cap_cents / 100)}. Leave it blank to charge the maximum.</p>
+    <div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center;padding:10px 0">
+      <label for="return-rate" style="margin:0;flex:1">Your rate per km</label>
+      <span class="muted small-text">R</span>
+      <input id="return-rate" type="number" min="0" max="${max}" step="0.5" style="width:110px" inputmode="decimal"
+             value="${t.rate_cents != null ? (t.rate_cents / 100) : ''}" placeholder="${max}">
+    </div>`;
+}
 
 async function renderPrices() {
   const data = await api('/api/supplier/prices');
   priceCat = data.services;
+  returnTrip = data.return_trip || null;
   const svcKeys = Object.keys(priceCat);
   if (!svcKeys.length) { el('prices-box').innerHTML = '<p class="empty">No services on your account.</p>'; return; }
   el('prices-box').innerHTML = svcKeys.map((k) => {
@@ -374,7 +394,7 @@ async function renderPrices() {
       </div>`).join('')}
     <p class="muted small-text mt">${s.unitLabel} adjusts this automatically:
       ${s.units.map((u) => `${u.name} ×${u.mult}`).join(' · ')}</p>`;
-  }).join('');
+  }).join('') + returnTripHtml(returnTrip);
 }
 
 el('btn-save-prices').onclick = () => withBusy(el('btn-save-prices'), 'Saving…', async () => {
@@ -382,8 +402,18 @@ el('btn-save-prices').onclick = () => withBusy(el('btn-save-prices'), 'Saving…
     const prices = [...document.querySelectorAll('#prices-box input[data-pkg]')]
       .filter((i) => i.value !== '')
       .map((i) => ({ service: i.dataset.svc, package: i.dataset.pkg, price_cents: Math.round(Number(i.value) * 100) }));
-    if (!prices.length) throw new Error('Enter at least one price so customers can book you');
-    await api('/api/supplier/prices', { method: 'POST', body: { prices } });
+    const body = { prices };
+    const rateInput = el('return-rate');
+    if (rateInput) {
+      const v = rateInput.value.trim().replace(',', '.');
+      if (v !== '' && !(Number(v) >= 0)) throw new Error('Enter your return-trip rate as a number of rand per km');
+      if (v !== '' && returnTrip && Number(v) * 100 > returnTrip.max_cents) {
+        throw new Error(`The most you can charge for the return trip is R${(returnTrip.max_cents / 100).toFixed(2)} per km`);
+      }
+      body.return_per_km_cents = v === '' ? null : Math.round(Number(v) * 100);
+    }
+    if (!prices.length && !rateInput) throw new Error('Enter at least one price so customers can book you');
+    await api('/api/supplier/prices', { method: 'POST', body });
     const okBox = el('prices-ok');
     okBox.textContent = 'Prices saved — this is exactly what you get paid.';
     okBox.style.display = 'block';

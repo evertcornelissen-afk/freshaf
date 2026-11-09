@@ -270,6 +270,10 @@ CREATE INDEX IF NOT EXISTS idx_whatsapp_log_created ON whatsapp_log(created_at);
 `);
 addColumn('users', 'phone_verified_at TEXT');
 addColumn('suppliers', 'alert_whatsapp INTEGER NOT NULL DEFAULT 1');
+// Laundry returned to a different address: each pro sets their own rate per km, up to the
+// maximum FreshAF publishes (return_leg_per_km_cents). NULL means they never chose one, and
+// they are paid the maximum, which is how every pro was paid before rates were per pro.
+addColumn('suppliers', 'return_per_km_cents INTEGER');
 
 // Pro sign-up: the WhatsApp number is proved with a code BEFORE the account exists, so new
 // bookings reach the pro from day one with no separate step later. Keyed by the number.

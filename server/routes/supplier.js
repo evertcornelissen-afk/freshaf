@@ -62,8 +62,15 @@ function requireApproved(req, res, next) {
 /* ---------- pro-set pricing ---------- */
 const { SERVICES, SERVICE_KEYS, quote } = require('../pricing');
 
+// The pro's own return-trip rate (laundry), with the limits FreshAF sets around it.
+function returnTripFor(s) {
+  if (!(s?.services || '').split(',').includes('laundry')) return null;
+  const q = require('../quotes').settings();
+  return { rate_cents: s.return_per_km_cents ?? null, max_cents: q.returnPerKm, free_km: q.returnFreeKm, cap_cents: q.returnCap };
+}
+
 router.get('/prices', (req, res) => {
-  const s = db.prepare('SELECT services FROM suppliers WHERE user_id = ?').get(req.user.id);
+  const s = db.prepare('SELECT services, return_per_km_cents FROM suppliers WHERE user_id = ?').get(req.user.id);
   const mine = db.prepare('SELECT service, package, price_cents FROM supplier_prices WHERE user_id = ?').all(req.user.id);
   const set = {};
   for (const r of mine) set[`${r.service}:${r.package}`] = r.price_cents;
@@ -82,13 +89,30 @@ router.get('/prices', (req, res) => {
       })),
     };
   }
-  res.json({ services: out, fee_pct: Number(getSetting('platform_fee_pct', '20')) });
+  res.json({ services: out, return_trip: returnTripFor(s), fee_pct: Number(getSetting('platform_fee_pct', '20')) });
 });
 
 router.post('/prices', (req, res) => {
   const prices = req.body?.prices;
   if (!Array.isArray(prices)) return res.status(400).json({ error: 'Send a prices array' });
-  const allowed = (db.prepare('SELECT services FROM suppliers WHERE user_id = ?').get(req.user.id)?.services || 'carwash').split(',');
+  const me = db.prepare('SELECT services, return_per_km_cents FROM suppliers WHERE user_id = ?').get(req.user.id);
+  const allowed = (me?.services || 'carwash').split(',');
+  // Return-trip rate (laundry pros): a number up to FreshAF's maximum, or null to clear it.
+  // Validated before any price is written, so a bad rate never leaves a half-saved list.
+  let returnRate;
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'return_per_km_cents')) {
+    const trip = returnTripFor(me);
+    if (!trip) return res.status(400).json({ error: 'The return-trip rate is for laundry pros' });
+    const v = req.body.return_per_km_cents;
+    if (v === null || v === '') returnRate = null;
+    else {
+      returnRate = Math.round(Number(v));
+      if (!Number.isFinite(returnRate) || returnRate < 0) return res.status(400).json({ error: 'Enter a return-trip rate of R0 or more per km' });
+      if (returnRate > trip.max_cents) {
+        return res.status(400).json({ error: `The most you can charge for the return trip is R${(trip.max_cents / 100).toFixed(2)} per km` });
+      }
+    }
+  }
   for (const p of prices) {
     if (!SERVICE_KEYS.includes(p.service) || !allowed.includes(p.service)) {
       return res.status(400).json({ error: 'You do not offer that service' });
@@ -101,6 +125,9 @@ router.post('/prices', (req, res) => {
     db.prepare(`INSERT INTO supplier_prices (user_id, service, package, price_cents) VALUES (?, ?, ?, ?)
       ON CONFLICT(user_id, service, package) DO UPDATE SET price_cents = excluded.price_cents`)
       .run(req.user.id, p.service, p.package, cents);
+  }
+  if (returnRate !== undefined) {
+    db.prepare('UPDATE suppliers SET return_per_km_cents = ? WHERE user_id = ?').run(returnRate, req.user.id);
   }
   res.json({ ok: true });
 });
@@ -321,7 +348,7 @@ router.get('/quote-requests', requireApproved, (req, res) => {
         distance_km: +dispatch.haversineKm(r.return_lat, r.return_lng, me.lat, me.lng).toFixed(1),
       } : null,
       return_leg_fee_cents: r.return_address
-        ? quotes.returnLegFor(dispatch.haversineKm(r.return_lat, r.return_lng, me.lat, me.lng)) : 0,
+        ? quotes.returnLegFor(dispatch.haversineKm(r.return_lat, r.return_lng, me.lat, me.lng), me.return_per_km_cents) : 0,
       scheduled_for: r.scheduled_for || null,
       when_label: quotes.whenLabel(r.scheduled_for),
       distance_km: +distance.toFixed(1),
@@ -379,7 +406,7 @@ router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
   });
   quotes.notifyCustomer(request);
   res.json({ ok: true, total_cents: total,
-    you_earn_cents: cents + quotes.calloutFor(distance) + quotes.returnLegFor(returnKm) });
+    you_earn_cents: cents + quotes.calloutFor(distance) + quotes.returnLegFor(returnKm, me.return_per_km_cents) });
 });
 
 // Not interested — stop showing it to me.

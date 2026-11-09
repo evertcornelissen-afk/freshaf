@@ -21,19 +21,37 @@ function settings() {
     perKm: Number(getSetting('callout_per_km_cents', '1000')),
     cap: Number(getSetting('callout_cap_cents', '15000')),
     windowMin: Number(getSetting('quote_window_min', '30')),
-    // The second trip of a laundry job returned to a different address. Same shape as the
-    // call-out rule and defaulting to it, but set separately in the admin app, because
-    // the owner has not priced it yet (return_leg_price_set stays 0 until they do).
+    // The second trip of a laundry job returned to a different address. FreshAF sets the
+    // free distance, the cap and the MAXIMUM rate per km (published to customers before they
+    // book); each pro chooses their own rate up to that maximum. Set in the admin app
+    // (return_leg_price_set stays 0 until the owner saves it).
     returnFreeKm: Number(getSetting('return_leg_free_km', '5')),
     returnPerKm: Number(getSetting('return_leg_per_km_cents', '1000')),
     returnCap: Number(getSetting('return_leg_cap_cents', '15000')),
   };
 }
 
-function returnLegFor(distanceKm) {
+// What the pro is paid for the return trip. proRateCents is the pro's own rate per km; a pro
+// who never chose one (null) gets FreshAF's maximum, and no pro can exceed it, including one
+// whose rate was saved before the owner lowered the maximum.
+function returnLegFor(distanceKm, proRateCents = null) {
   if (distanceKm == null || !Number.isFinite(distanceKm)) return 0;
   const { returnFreeKm, returnPerKm, returnCap } = settings();
-  return Math.min(returnCap, Math.round(Math.max(0, distanceKm - returnFreeKm) * returnPerKm / 100) * 100);
+  const rate = proRateCents == null ? returnPerKm : Math.min(returnPerKm, Math.max(0, proRateCents));
+  return Math.min(returnCap, Math.round(Math.max(0, distanceKm - returnFreeKm) * rate / 100) * 100);
+}
+
+function proReturnRate(supplierId) {
+  return db.prepare('SELECT return_per_km_cents FROM suppliers WHERE user_id = ?').get(supplierId)?.return_per_km_cents ?? null;
+}
+
+// The return-trip rule as the CUSTOMER sees it before booking: the most they can be charged,
+// with FreshAF's margin included (the customer only ever sees all-in prices). Rounded UP to
+// the next 10c so the published figure is never below what a quote can actually contain.
+function returnLegPublic() {
+  const { returnFreeKm, returnPerKm, returnCap, feePct } = settings();
+  const allIn = (c) => Math.ceil(c * (100 + feePct) / 100 / 10) * 10;
+  return { free_km: returnFreeKm, max_per_km_cents: allIn(returnPerKm), cap_cents: allIn(returnCap) };
 }
 
 function calloutFor(distanceKm) {
@@ -140,7 +158,7 @@ function insertQuote({ requestId, supplierId, supplierPrice, distanceKm, returnD
   availability, note, source }) {
   const { feePct } = settings();
   const callout = calloutFor(distanceKm);
-  const returnLeg = returnLegFor(returnDistanceKm);
+  const returnLeg = returnLegFor(returnDistanceKm, proReturnRate(supplierId));
   const fee = platformFee(supplierPrice + callout + returnLeg, feePct);
   const total = supplierPrice + callout + returnLeg + fee;
   db.prepare(`
@@ -282,7 +300,7 @@ const staleTimer = setInterval(expireStale, 60 * 1000);
 staleTimer.unref?.();
 
 module.exports = {
-  returnLegFor, isDemoUser,
+  returnLegFor, proReturnRate, returnLegPublic, isDemoUser,
   openRequest, listQuotes, insertQuote, notifyCustomer, getRequest,
   eligiblePros, calloutFor, settings, expireStale, quotePublic, serviceLabel, whenLabel,
 };

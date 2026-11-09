@@ -459,7 +459,7 @@ router.get('/readiness', (req, res) => {
       { key: 'return_leg_price', label: 'Laundry return-trip price set',
         ok: getSetting('return_leg_price_set', '0') === '1',
         detail: getSetting('return_leg_price_set', '0') === '1'
-          ? `Return to a different address: first ${getSetting('return_leg_free_km', '5')} km free, then R${(Number(getSetting('return_leg_per_km_cents', '1000')) / 100).toFixed(2)}/km, capped at R${(Number(getSetting('return_leg_cap_cents', '15000')) / 100).toFixed(2)}.`
+          ? `Return to a different address: first ${getSetting('return_leg_free_km', '5')} km free, then each pro's own rate up to R${(Number(getSetting('return_leg_per_km_cents', '1000')) / 100).toFixed(2)}/km, capped at R${(Number(getSetting('return_leg_cap_cents', '15000')) / 100).toFixed(2)}.`
           : 'NOT SET BY YOU YET. Laundry returned to a different address is charging the call-out rule as a stand-in (first 5 km free, then R10/km, capped at R150). Set it under Settings.' },
       { key: 'native_push', label: 'App push notifications live (iOS + Android)',
         ok: require('../native-push').configured().ios && require('../native-push').configured().android,

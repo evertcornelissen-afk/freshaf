@@ -340,8 +340,19 @@ function setReturnPin(lat, lng) {
   el('return-pin-status').innerHTML = `${icon('pin')} Return pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   invalidateQuotes();
 }
+// The most a return trip can add, published before booking. Each pro sets their own rate up
+// to this, and the exact amount is inside the total of every quote.
+function returnPriceNote() {
+  const r = pricing?.return_leg;
+  if (!r) return;
+  const perKm = (r.max_per_km_cents / 100).toFixed(2).replace(/\.00$/, '');
+  el('return-price-note').textContent = `Return trip: the first ${r.free_km} km are free, then at most R${perKm} per km, `
+    + `never more than R${Math.round(r.cap_cents / 100)}. Each pro sets their own rate up to that, and it is already in the total you see before you pay.`;
+}
+
 function refreshReturnBlock() {
   const on = returnOn();
+  if (on) returnPriceNote();
   el('return-fields').classList.toggle('hidden', !on);
   if (on && !returnMap) {
     const start = sel.lat != null ? [sel.lat, sel.lng] : [-29.0, 24.5];
