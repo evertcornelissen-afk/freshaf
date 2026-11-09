@@ -199,18 +199,20 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.type('application/json').sendFile(path.join(PUBLIC_DIR, '.well-known', 'assetlinks.json'));
 });
-// Test build of the Android app for sideloading onto test phones before Play Store release.
-// Unlisted (linked from nowhere, not indexed). Kept outside public/ on purpose: Capacitor
-// copies public/ into the app, so an APK there would end up inside the next APK.
-// Remove this route and downloads/ once the app is on Play internal testing.
-app.get('/download/freshaf-test.apk', (req, res) => {
+// The Android app (APK) for installing directly, until it is on Google Play. Signed with the
+// FreshAF upload key since 9 Nov 2026 (versionCode 11). Not indexed. Kept outside public/ on
+// purpose: Capacitor copies public/ into the app, so an APK there would end up inside the
+// next APK. Remove this route and downloads/ once the app is on Google Play.
+app.get('/download/freshaf.apk', (req, res) => {
   res.set('X-Robots-Tag', 'noindex, nofollow');
   res.set('Cache-Control', 'no-store');
   res.type('application/vnd.android.package-archive');
-  res.download(path.join(__dirname, '..', 'downloads', 'freshaf-test.apk'), 'freshaf-test.apk', (err) => {
+  res.download(path.join(__dirname, '..', 'downloads', 'freshaf.apk'), 'FreshAF.apk', (err) => {
     if (err && !res.headersSent) res.status(404).send('Not found');
   });
 });
+// Old links (shared before 9 Nov 2026) keep working.
+app.get('/download/freshaf-test.apk', (req, res) => res.redirect(301, '/download/freshaf.apk'));
 
 app.use(express.static(PUBLIC_DIR));
 app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.html')));
