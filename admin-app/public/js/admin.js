@@ -181,14 +181,17 @@ async function enterDash() {
 /* ---------- launch readiness + backup ---------- */
 async function refreshReadiness() {
   const r = await api('/api/admin/readiness');
-  el('readiness-box').innerHTML = r.checks.map((c) => `
+  const row = (c) => `
     <div class="row spread" style="padding:9px 0;border-bottom:1px solid var(--border-soft);gap:12px">
       <div style="flex:1;min-width:180px">
         <strong style="font-size:.9rem">${escapeHtml(c.label)}</strong>
         <div class="muted small-text">${escapeHtml(c.detail)}</div>
       </div>
       <span class="pill ${c.ok ? 'ok' : 'warn'}">${c.ok ? 'ready' : 'not yet'}</span>
-    </div>`).join('');
+    </div>`;
+  const apps = r.apps || [];
+  el('readiness-box').innerHTML = r.checks.map(row).join('')
+    + (apps.length ? `<h3 style="margin:18px 0 4px">Apps &amp; push notifications</h3>${apps.map(row).join('')}` : '');
 }
 
 el('btn-restore').onclick = () => el('restore-file').click();

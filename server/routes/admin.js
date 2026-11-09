@@ -421,6 +421,41 @@ router.post('/restore', restoreUpload.single('file'), (req, res) => {
 
 /* ---------- launch readiness ----------
    One place that answers "is this thing actually ready to take real customers". */
+// The apps and push notifications, shown as their own group in the readiness panel. Push is
+// read live from the server's settings; the store steps come from server/app-release.json,
+// which Claude updates as each one moves.
+function appChecks() {
+  let rel = {};
+  try { rel = JSON.parse(fs.readFileSync(require('path').join(__dirname, '..', 'app-release.json'), 'utf8')); } catch { /* shown as not ready */ }
+  const nat = require('../native-push').configured();
+  const count = (sql) => { try { return db.prepare(sql).get().c; } catch { return 0; } };
+  const webSubs = count('SELECT COUNT(*) c FROM push_subscriptions');
+  const androidDevices = count("SELECT COUNT(*) c FROM device_tokens WHERE platform = 'android'");
+  const iosDevices = count("SELECT COUNT(*) c FROM device_tokens WHERE platform = 'ios'");
+  const apk = rel.android_apk || {};
+  const apkOnDisk = fs.existsSync(require('path').join(__dirname, '..', '..', 'downloads', 'freshaf.apk'));
+  return [
+    { key: 'web_push', label: 'Push notifications: website and home-screen app', ok: true,
+      detail: `Live. Pros get job alerts in the browser or the home-screen app once they tap "Enable job alerts" (iPhone: Safari > Share > Add to Home Screen first, iOS 16.4+). ${webSubs} device(s) signed up.` },
+    { key: 'android_push', label: 'Push notifications: Android app', ok: nat.android,
+      detail: nat.android
+        ? `Live. ${androidDevices} Android device(s) registered.`
+        : 'Off: the app is already connected to Firebase; only the server key is missing. Firebase console > Project settings > Service accounts > Generate new private key, then paste the whole file into Render as FCM_SERVICE_ACCOUNT.' },
+    { key: 'ios_push', label: 'Push notifications: iPhone app', ok: nat.ios,
+      detail: nat.ios
+        ? `Live. ${iosDevices} iPhone(s) registered.`
+        : 'Off until the Apple Developer account exists (waits on the D-U-N-S number). Then: Apple Developer > Keys > APNs key, set APNS_KEY, APNS_KEY_ID, APNS_TEAM_ID on Render.' },
+    { key: 'android_apk', label: 'Android app: direct download', ok: apkOnDisk,
+      detail: apkOnDisk
+        ? `Version ${apk.version || '?'} (${apk.date || 'date unknown'}) at freshaf.io${apk.url || '/download/freshaf.apk'}, until the app is on Google Play.`
+        : 'No APK on the server.' },
+    { key: 'store_pack', label: 'Store listing pack', ok: !!rel.store_pack?.ok, detail: rel.store_pack?.detail || 'Unknown.' },
+    { key: 'duns', label: 'D-U-N-S number (needed for both stores)', ok: !!rel.duns?.ok, detail: rel.duns?.detail || 'Unknown.' },
+    { key: 'google_play', label: 'Google Play', ok: !!rel.google_play?.ok, detail: rel.google_play?.detail || 'Unknown.' },
+    { key: 'app_store', label: 'Apple App Store', ok: !!rel.app_store?.ok, detail: rel.app_store?.detail || 'Unknown.' },
+  ];
+}
+
 router.get('/readiness', (req, res) => {
   const payments = require('../payments');
   const whatsapp = require('../whatsapp');
@@ -461,13 +496,6 @@ router.get('/readiness', (req, res) => {
         detail: getSetting('return_leg_price_set', '0') === '1'
           ? `Return to a different address: first ${getSetting('return_leg_free_km', '5')} km free, then each pro's own rate up to R${(Number(getSetting('return_leg_per_km_cents', '1000')) / 100).toFixed(2)}/km, capped at R${(Number(getSetting('return_leg_cap_cents', '15000')) / 100).toFixed(2)}.`
           : 'NOT SET BY YOU YET. Laundry returned to a different address is charging the call-out rule as a stand-in (first 5 km free, then R10/km, capped at R150). Set it under Settings.' },
-      { key: 'native_push', label: 'App push notifications live (iOS + Android)',
-        ok: require('../native-push').configured().ios && require('../native-push').configured().android,
-        detail: (() => {
-          const c = require('../native-push').configured();
-          return `iOS: ${c.ios ? 'live' : 'off. Set APNS_KEY, APNS_KEY_ID, APNS_TEAM_ID (Apple Developer > Keys)'}. `
-            + `Android: ${c.android ? 'live' : 'off. Set FCM_SERVICE_ACCOUNT (Firebase > Service accounts)'}.`;
-        })() },
       { key: 'whatsapp', label: 'WhatsApp job alerts live', ok: whatsapp.configured(),
         detail: whatsapp.configured() ? 'Alerts are being sent.' : 'Dry run — see WHATSAPP-SETUP.md.' },
       // Proven by an actual sign-in to the mail server at boot, not by the password
@@ -487,6 +515,7 @@ router.get('/readiness', (req, res) => {
             ? 'ADMIN_PASSWORD is set to the published default. Choose a different one.'
             : 'Set from the environment, and applied on every boot.' },
     ],
+    apps: appChecks(),
     approved_pros: approvedPros,
     online_pros: db.prepare("SELECT COUNT(*) c FROM real_suppliers WHERE status = 'approved' AND online = 1").get().c,
     uploads_present: onDisk(require('path').join(DATA_DIR, 'uploads')),

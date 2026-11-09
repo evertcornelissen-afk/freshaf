@@ -307,6 +307,19 @@ if (!getSetting('margin_20_applied')) {
   }
   setSetting('margin_20_applied', '1');
 }
+// Laundry return trip, decided by Evert on 9 Nov 2026: first 5 km free, then each pro's own
+// rate up to R10/km, at most R150 a trip (customers see R12/km and R180, all in). Applied
+// once here so the readiness check turns green; figures the owner had already saved in the
+// admin app are kept, and the marker stops this re-firing over a later change.
+if (!getSetting('return_leg_decided_9nov')) {
+  if (getSetting('return_leg_price_set', '0') !== '1') {
+    if (!getSetting('return_leg_free_km')) setSetting('return_leg_free_km', '5');
+    if (!getSetting('return_leg_per_km_cents')) setSetting('return_leg_per_km_cents', '1000');
+    if (!getSetting('return_leg_cap_cents')) setSetting('return_leg_cap_cents', '15000');
+    setSetting('return_leg_price_set', '1');
+  }
+  setSetting('return_leg_decided_9nov', '1');
+}
 // How much of FreshAF's money a pro may be holding from cash jobs before they are taken
 // off the platform until they settle. The Uber mechanic. R300 by default.
 if (!getSetting('cash_owed_cap_cents')) setSetting('cash_owed_cap_cents', '30000');

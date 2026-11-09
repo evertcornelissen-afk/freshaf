@@ -1,0 +1,9 @@
+{
+  "_comment": "App-store status shown in the admin readiness panel. Claude updates this file whenever a release step changes; push status is read live from the server's settings instead.",
+  "updated": "2026-11-09",
+  "android_apk": { "version": 12, "date": "2026-11-09", "url": "/download/freshaf.apk" },
+  "store_pack": { "ok": true, "detail": "Listing copy, icon, screenshots, feature graphic, privacy policy (freshaf.io/privacy) and the store reviewer accounts are ready." },
+  "duns": { "ok": false, "detail": "Requested 6 Nov via Apple's lookup tool. D&B case 11252150 (tracking 11193219). D&B should respond by Fri 13 Nov; if not, ask Apple Developer support to chase. Both store accounts wait on this number." },
+  "google_play": { "ok": false, "detail": "Waiting on the D-U-N-S number: then the Google Play organisation account ($25), upload the signed app bundle, and put Play's signing fingerprint in assetlinks.json." },
+  "app_store": { "ok": false, "detail": "Waiting on the D-U-N-S number: then the Apple Developer organisation account ($99), the iOS build via Codemagic, and the APNs push key." }
+}
