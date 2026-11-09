@@ -492,7 +492,10 @@ function showError(id, msg) {
     box.textContent = msg;
     box.classList.add('error');
     box.style.display = 'block';
-    setTimeout(() => { box.style.display = 'none'; }, 6000);
+    // Never show a message the person cannot see: bring it on screen if it is above or below.
+    const r = box.getBoundingClientRect();
+    if (r.bottom < 60 || r.top > window.innerHeight - 40) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => { box.style.display = 'none'; }, 8000);
   } else {
     toast(msg, 'error');
   }

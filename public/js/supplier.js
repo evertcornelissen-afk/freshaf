@@ -917,21 +917,89 @@ el('btn-reg-code').onclick = () => withBusy(el('btn-reg-code'), 'Sending…', as
   }
 }).then(() => { if (regPhone.sentTo) el('btn-reg-code').textContent = 'Resend'; });
 
+// Sign-up problems are shown NEXT TO the field that needs fixing, and the page scrolls there.
+// Found 9 Nov 2026: the only message box sat at the top of this long form, ~1,400px above the
+// Submit button on a phone, and hid itself after 6s, so a pro who missed one box saw nothing
+// happen and reported that the app "froze" when they submitted.
+const regFieldOf = (id) => ({
+  services: el('svc-carwash').closest('.row'),
+  area: el('area-chips'),
+  terms: el('reg-terms').closest('label'),
+  phone: el('reg-phone').closest('.row'),
+  code: el('reg-code-row').style.display === 'none' ? el('reg-phone').closest('.row') : el('reg-code'),
+}[id] || el(id));
+function clearRegErrors() {
+  document.querySelectorAll('.reg-field-error').forEach((n) => n.remove());
+  document.querySelectorAll('.field-invalid').forEach((n) => n.classList.remove('field-invalid'));
+  const box = el('reg-error'); box.textContent = ''; box.style.display = '';
+}
+function showRegError(msg, field) {
+  clearRegErrors();
+  const after = field && regFieldOf(field);
+  if (!after) {
+    // No single field to point at (e.g. the server is down): right above the Submit button,
+    // where the pro is looking, and it stays until they try again.
+    const box = el('reg-error');
+    box.textContent = msg;
+    box.style.display = 'block';
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const note = document.createElement('div');
+  note.className = 'msg error reg-field-error';
+  note.setAttribute('role', 'alert');
+  note.style.display = 'block';
+  note.textContent = msg;
+  after.insertAdjacentElement('afterend', note);
+  const input = /^(INPUT|SELECT|TEXTAREA)$/.test(after.tagName) ? after : null;
+  if (input) input.classList.add('field-invalid');
+  if (field === 'area') el('area-pick').open = true;
+  note.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (input && input.type !== 'checkbox') setTimeout(() => input.focus({ preventScroll: true }), 400);
+}
+// Typing in a field clears its note.
+el('view-auth').addEventListener('input', (e) => {
+  if (!e.target.classList?.contains('field-invalid')) return;
+  e.target.classList.remove('field-invalid');
+  const n = e.target.nextElementSibling;
+  if (n?.classList.contains('reg-field-error')) n.remove();
+});
+// Server answers matched to the field they are about.
+function serverErrorField(msg) {
+  if (/email/i.test(msg)) return 'reg-email';
+  if (/password/i.test(msg)) return 'reg-password';
+  if (/business name/i.test(msg)) return 'reg-business';
+  if (/ID number/i.test(msg)) return 'reg-idnum';
+  if (/service you offer/i.test(msg)) return 'services';
+  if (/WhatsApp code|6-digit code|Send code|Resend/i.test(msg)) return 'code';
+  if (/WhatsApp number/i.test(msg)) return 'phone';
+  if (/Terms/i.test(msg)) return 'terms';
+  if (/^Name, email/i.test(msg)) return 'reg-name';
+  return null;
+}
+const fail = (msg, field) => Object.assign(new Error(msg), { field });
+
 el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting application…', async () => {
+  clearRegErrors();
   try {
-    if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
-    if (!el('reg-phone').value.trim()) throw new Error('Your WhatsApp number is required: new bookings are sent there');
+    if (!el('svc-carwash').checked && !el('svc-laundry').checked) throw fail('Choose at least one service you offer', 'services');
+    if (!el('reg-name').value.trim()) throw fail('Enter your full name', 'reg-name');
+    if (!el('reg-business').value.trim()) throw fail('Enter your business or trading name. Your own name is fine if you work alone', 'reg-business');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(el('reg-email').value.trim())) throw fail('Enter a valid email address', 'reg-email');
+    if (!el('reg-phone').value.trim()) throw fail('Your WhatsApp number is required: new bookings are sent there', 'phone');
     if (regPhone.required) {
-      if (!regPhone.sentTo) throw new Error('Tap "Send code" to confirm your WhatsApp number');
-      if (el('reg-phone').value !== regPhone.sentTo) throw new Error('You changed your WhatsApp number. Tap "Send code" again');
+      if (!regPhone.sentTo) throw fail('Tap "Send code" to confirm your WhatsApp number', 'phone');
+      if (el('reg-phone').value !== regPhone.sentTo) throw fail('You changed your WhatsApp number. Tap "Send code" again', 'phone');
       if (!regPhone.canSkip && !/^\d{6}$/.test(el('reg-code').value.trim())) {
-        throw new Error('Enter the 6-digit code we sent to your WhatsApp');
+        throw fail('Enter the 6-digit code we sent to your WhatsApp', 'code');
       }
     }
-    const serviceArea = serviceAreaText();
-    if (!serviceArea) throw new Error('Tick at least one service area, or type it under Other areas');
     const idNum = el('reg-idnum').value.replace(/\s/g, '');
-    if (!/^\d{13}$/.test(idNum)) throw new Error('Your SA ID number is 13 digits');
+    if (!/^\d{13}$/.test(idNum)) throw fail('Your SA ID number is 13 digits', 'reg-idnum');
+    const serviceArea = serviceAreaText();
+    if (!serviceArea) throw fail('Tick at least one service area, or type it under Other areas', 'area');
+    if (el('reg-password').value.length < 8) throw fail('Choose a password of at least 8 characters', 'reg-password');
+    if (!el('reg-terms').checked) throw fail('Please accept the Terms & Conditions to continue', 'terms');
     const services = [];
     if (el('svc-carwash').checked) services.push('carwash');
     if (el('svc-laundry').checked) services.push('laundry');
@@ -949,8 +1017,9 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
       },
     });
     me = user; setWho(); route();
+    window.scrollTo(0, 0);
     toast('Application submitted for review', 'ok');
-  } catch (e) { showError('reg-error', e.message); }
+  } catch (e) { showRegError(e.message, e.field || serverErrorField(e.message)); }
 });
 
 el('btn-logout').onclick = signOut;
