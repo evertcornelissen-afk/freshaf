@@ -50,9 +50,42 @@ The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/f
 
 **D-U-N-S status:** requested via Apple's lookup tool (Evert, Fri 6 Nov); D&B acknowledged it to admin@freshaf.io on Sun 8 Nov 00:32 (donotreply@iresearch.dnb.com): **Tracking ID 11193219, Case 11252150, Request key 4NVGG9ZW9U**, submitted 7 Nov 22:31 UTC, type "Add business - Mini Inquiry" (new listing; the Duns field was still blank on 9 Nov). D&B promises contact within 5 business days, so by **Fri 13 Nov**. If nothing by then: Apple Developer support (developer.apple.com/contact > Membership and Account > Program Enrollment, phone callback) quoting the case number. The number is free: ignore paid "expedite" offers and anyone not from dnb.com / dnbsame.com.
 
-**When the D-U-N-S number arrives (D&B email):**
+**D-U-N-S 588248848 — in hand 17 Nov 2026, NOT yet confirmed.** Evert reported the number; there is
+no D&B email for it (nothing from dnb.com since 11 Nov, case 35007250), so where it came from is
+not on record. **Confirm it before typing it anywhere.** Last time D&B "resolved" our case by
+matching us to 654518140, which belongs to a different company, so a number that looks right is not
+proof. The check: sign in at developer.apple.com, open
+`developer.apple.com/enroll/duns-lookup/`, enter FRESHAF (PTY) LTD / South Africa /
+35 Sterappel Crescent, Essenhout Estate, Langeberg Heights, Cape Town 7570. It must come back as
+**588248848** against *that* name and address. Both stores cap how many times a D-U-N-S may be
+entered, and Apple ties the enrolment to whatever legal entity the number resolves to — a wrong one
+is not a typo, it is an enrolment in someone else's name.
+
+**Android: the account situation (found 17 Nov 2026).** Evert's Google account
+(evertcornelissen@gmail.com) already holds a developer account — **"Social_Ideas", a PERSONAL
+account, id 6471963390115743783, still unverified** ("Complete account verifications to create
+apps"; pending: contact phone number, access to an Android device). Google allows **one developer
+account per Google account**, so FreshAF cannot simply be added there as an organisation. Two routes:
+
+- **Recommended — a second Google account for the business** (admin@freshaf.io can become a Google
+  account; the mailbox already exists in Outlook) and a fresh **organisation** developer account
+  under it, $25. Straight to organisation type, no personal identity verification, no 72-hour wait,
+  Social_Ideas stays free for Evert's other apps, and Nikki can be given access without touching
+  his personal Gmail.
+- **Convert Social_Ideas to an organisation account.** Allowed, but only after that personal
+  account is *fully verified* (his own ID), then freshaf.io verified as the organisation website on
+  the About you tab, then Change account type with an organisation payments profile, then **72
+  hours** before submitting apps. **It cannot be reversed**, and every later app Evert publishes
+  from that account would be published by FreshAF (Pty) Ltd.
+
+**When the D-U-N-S number is confirmed:**
 5. **Google Play Console** (play.google.com/console): Organisation account as FreshAF (Pty) Ltd,
    **$25 once**, identity + organisation verification (D-U-N-S, registration 2026/683087/07).
+   Sign in with the **business** Google account, not evertcornelissen@gmail.com — that one is used
+   up by Social_Ideas (see above). Organisation verification asks for the registration number, the
+   registered address and the D-U-N-S, and Google shows the business details it matched: **if the
+   name or address shown is not FreshAF (Pty) Ltd at 35 Sterappel Crescent, stop and do not
+   confirm.** Attempts at entering the D-U-N-S are limited.
 6. **Play app setup:** Create app "FreshAF: Car Wash & Laundry" (app, free). Then:
    - Store listing: copy from `APP-STORE-LISTING.md` (Google Play section), icon 512, feature
      graphic, the 5 screenshots from `android-1080x1920`. Category Lifestyle. Country: South Africa.
@@ -64,7 +97,11 @@ The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/f
    - Tell Claude "uploaded": Claude puts Play's SHA-256 into `assetlinks.json` (links open the app).
    - Test on your phone from the internal track, then **Promote to Production** → review.
 7. **Apple Developer Program** (developer.apple.com/programs/enroll): Organisation, **$99/year**,
-   D-U-N-S, legal entity FreshAF (Pty) Ltd. Apple may phone to verify.
+   D-U-N-S, legal entity FreshAF (Pty) Ltd. Apple may phone to verify. Apple fills the legal
+   entity name and address **from the D-U-N-S record**, so read that screen before continuing: it
+   must say FRESHAF (PTY) LTD at 35 Sterappel Crescent, 7570. Evert signs as the person with legal
+   authority to bind the company (he is Managing Director). The enrolment reached this page once on
+   11 Nov and was deliberately left unsubmitted because the D-U-N-S was wrong.
 8. **App Store Connect:** New App → iOS, name "FreshAF: Car Wash & Laundry", bundle
    `io.freshaf.app`, SKU `freshaf-ios`. App Privacy (section D), age rating 4+, the 6.9″ and 6.7″
    screenshots, review notes + the reviewer accounts (Sign-in Information).

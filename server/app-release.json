@@ -1,6 +1,6 @@
 {
   "_comment": "App-store status shown in the admin readiness panel. Claude updates this file whenever a release step changes; push status is read live from the server's settings instead.",
-  "updated": "2026-11-15",
+  "updated": "2026-11-17",
   "android_apk": {
     "version": 12,
     "date": "2026-11-09",
@@ -12,14 +12,14 @@
   },
   "duns": {
     "ok": false,
-    "detail": "Not issued yet. New request filed 11 Nov 2026: D&B case 35007250 (7-14 business days, so 20 Nov to 1 Dec). D-U-N-S 654518140 is a DIFFERENT company (Randburg grocery store): never use it."
+    "detail": "Number in hand 17 Nov 2026: 588248848 \u2014 but NOT yet confirmed in writing. No D&B email since 11 Nov, so it has to be checked against Apple's D-U-N-S lookup (it must return FRESHAF (PTY) LTD, 35 Sterappel Crescent, 7570) before it is typed into Apple or Google: both stores limit how many times you may enter one. D-U-N-S 654518140 is a DIFFERENT company (Randburg grocery store): never use it."
   },
   "google_play": {
     "ok": false,
-    "detail": "Waiting on FreshAF's own D-U-N-S number: then the Google Play organisation account ($25), upload the signed app bundle, and put Play's signing fingerprint in assetlinks.json."
+    "detail": "Evert's Google account already holds an UNVERIFIED PERSONAL developer account ('Social_Ideas', id 6471963390115743783) and Google allows only one per Google account. FreshAF needs an ORGANISATION account, so the plan is a second Google account (admin@freshaf.io) + a new organisation account ($25). Converting Social_Ideas instead would mean passing personal identity verification first, verifying freshaf.io as the organisation website, a 72-hour wait, and no way back."
   },
   "app_store": {
     "ok": false,
-    "detail": "Waiting on FreshAF's own D-U-N-S number: then the Apple Developer organisation account ($99), the iOS build via Codemagic, and the APNs push key."
+    "detail": "Blocked on Evert signing in to developer.apple.com: the enrolment and even Apple's own D-U-N-S lookup need his Apple ID. Then: Organisation enrolment ($99/year) as FreshAF (Pty) Ltd, the iOS build via Codemagic, and the APNs push key."
   }
 }
