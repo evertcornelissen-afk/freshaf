@@ -172,6 +172,15 @@ function authRequired(...roles) {
     if (roles.length && !roles.includes(s.user.role)) {
       return res.status(403).json({ error: 'Not allowed for your account type' });
     }
+    // Admin access can be taken away. Checked here rather than per route, so a new admin
+    // route cannot forget it: the session token itself stays valid for 30 days, and a
+    // removed person holding one must not keep the dashboard.
+    if (s.user.role === 'admin') {
+      const live = require('./db').db.prepare('SELECT admin_revoked_at FROM users WHERE id = ?').get(s.user.id);
+      if (!live || live.admin_revoked_at) {
+        return res.status(403).json({ error: 'Your admin access has been removed' });
+      }
+    }
     req.user = s.user;
     renewIfStale(req, res, s);
     next();

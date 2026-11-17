@@ -29,7 +29,15 @@ app.disable('x-powered-by');
 
 // Everything the dashboard needs that is not an API call is served from here first,
 // then falls through to the live site for shared assets (css, images, icons).
-app.use(express.static(path.join(__dirname, 'public')));
+// No caching. This dashboard is updated in place on the operator's own machine, and a
+// browser holding a stale admin.js shows an older set of buttons than the one that was
+// shipped — which looks exactly like a feature that was never built. Correctness beats
+// a few kilobytes on localhost.
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-store, must-revalidate'),
+}));
 
 // What this dashboard is actually reading. The header shows it, because a dashboard
 // pointed at the wrong database looks exactly like one pointed at the right database.

@@ -84,6 +84,22 @@
     </div>
 
     <div class="card">
+      <h2 id="h-admins">Team access</h2>
+      <p class="muted small-text">Everyone who can open this dashboard. Each person gets their own
+        login &mdash; approvals, rejections and messages are recorded under the name that sent them.</p>
+      <div class="msg error" id="admins-error"></div>
+      <div class="msg ok hidden" id="admins-new"></div>
+      <div class="table-scroll mt" id="admins-box"></div>
+      <div class="row mt" style="flex-wrap:wrap;align-items:flex-end;gap:10px">
+        <div style="flex:1;min-width:150px"><label for="admin-name">Name</label>
+          <input id="admin-name" autocomplete="off" placeholder="e.g. Nikki"></div>
+        <div style="flex:1;min-width:200px"><label for="admin-email">Their own email address</label>
+          <input id="admin-email" type="email" autocomplete="off" autocapitalize="none" placeholder="nikki@example.com"></div>
+        <button class="small" onclick="addAdmin()">Give access</button>
+      </div>
+    </div>
+
+    <div class="card" id="supplier-list-card">
       <div class="row spread">
         <h2 id="h-suppliers">Suppliers</h2>
         <select id="sup-filter" style="width:auto">
@@ -185,6 +201,8 @@
 </div>
 
 <script src="/js/common.js"></script>
+<script src="/js/safety.js"></script>
+<script src="/js/review.js"></script>
 <script src="/js/admin.js"></script>
 </body>
 </html>

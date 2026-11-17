@@ -4,6 +4,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { db, getSetting, setSetting, DEFAULT_ADMIN_PASSWORD } = require('../db');
 const { authRequired, rotateSession } = require('../auth');
+const { normEmail } = require('../email');
 const realtime = require('../realtime');
 const push = require('../push');
 const balance = require('../balance');
@@ -263,6 +264,10 @@ function setSupplierStatus(req, res, status) {
     : { title: 'Update on your FreshAF Pro account', body: reason || 'Open FreshAF Pro for details.', url: '/supplier', tag: 'account' }
   ).catch(() => {});
   if (u) mailer.proStatusChanged({ to: u.email, name: u.name, status, reason }).catch(() => {});
+  logMessage(s.user_id, {
+    kind: 'decision', subject: `Application ${status}`,
+    body: reason || `Marked ${status}.`, sentBy: req.user?.name, delivery: u ? 'sent' : 'skipped',
+  });
   res.json({ ok: true });
 }
 
@@ -329,8 +334,148 @@ router.post('/suppliers/:id/request-info', (req, res) => {
       .catch(() => {});
     mail = 'queued';
   }
+  logMessage(s.user_id, {
+    kind: 'request_info',
+    subject: 'Outstanding items requested',
+    body: labels.map((l) => `- ${l}`).join('\n') + (note ? `\n\nNote: ${note}` : ''),
+    sentBy: req.user?.name, delivery: mail === 'queued' ? 'sent' : 'skipped',
+  });
   console.log(`[FreshAF] Asked pro ${s.user_id} for: ${items.join(', ')}`);
   res.json({ ok: true, items, mail });
+});
+
+/* ---------- who else can get in ---------- */
+// A second admin is a second person who can approve pros and see ID numbers and bank
+// details. They get their OWN login, never a shared one: every message and decision is
+// already stamped with who sent it, and that is worthless if two people share an account.
+// Removing someone must also not mean changing your own password.
+
+// Readable aloud over the phone and still strong: no 0/O/1/l/I to mistype.
+const PW_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+function tempPassword(len = 16) {
+  const bytes = crypto.randomBytes(len);
+  let out = '';
+  for (let i = 0; i < len; i++) out += PW_ALPHABET[bytes[i] % PW_ALPHABET.length];
+  return `${out.slice(0, 4)}-${out.slice(4, 8)}-${out.slice(8, 12)}-${out.slice(12)}`;
+}
+
+router.get('/admins', (req, res) => {
+  const rows = db.prepare(`SELECT id, name, email, created_at, must_change_password, invited_by
+    FROM users WHERE role = 'admin' AND admin_revoked_at IS NULL ORDER BY id ASC`).all();
+  res.json({
+    admins: rows.map((r) => ({
+      id: r.id, name: r.name, email: r.email, created_at: r.created_at,
+      pending_first_sign_in: !!r.must_change_password,
+      invited_by: r.invited_by || null,
+      is_you: r.id === req.user.id,
+    })),
+  });
+});
+
+router.post('/admins', (req, res) => {
+  const name = String(req.body?.name || '').trim().slice(0, 80);
+  const email = normEmail(String(req.body?.email || ''));
+  if (!name) return res.status(400).json({ error: 'Give them a name' });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return res.status(400).json({ error: 'That is not a valid email address' });
+  }
+
+  const existing = db.prepare('SELECT id, role FROM users WHERE lower(email) = ?').get(email);
+  if (existing) {
+    return res.status(409).json({
+      error: existing.role === 'admin'
+        ? 'That address is already an admin'
+        : `That address already has a ${existing.role} account. Admins need their own address.`,
+    });
+  }
+
+  // Shown to the inviting admin ONCE and never stored in readable form. They pass it on;
+  // the new admin replaces it the moment they sign in.
+  const password = tempPassword();
+  const info = db.prepare(`INSERT INTO users (role, name, email, password_hash, must_change_password, invited_by)
+    VALUES ('admin', ?, ?, ?, 1, ?)`).run(name, email, bcrypt.hashSync(password, 10), req.user.name || null);
+
+  console.log(`[FreshAF] Admin access granted to ${email} by ${req.user.name || 'an admin'}`);
+  res.json({ ok: true, id: Number(info.lastInsertRowid), email, name, password });
+});
+
+// Reissue a temporary password — for "she never got it" or "she is locked out", without
+// touching anyone else's login.
+router.post('/admins/:id/reset-password', (req, res) => {
+  const a = db.prepare(`SELECT id, email FROM users WHERE id = ? AND role = 'admin'
+    AND admin_revoked_at IS NULL`).get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'That admin does not exist' });
+  const password = tempPassword();
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?')
+    .run(bcrypt.hashSync(password, 10), a.id);
+  rotateSession(a.id);
+  console.log(`[FreshAF] Temporary password reissued for ${a.email}`);
+  res.json({ ok: true, email: a.email, password });
+});
+
+router.post('/admins/:id/remove', (req, res) => {
+  const a = db.prepare(`SELECT id, name, email FROM users WHERE id = ? AND role = 'admin'
+    AND admin_revoked_at IS NULL`).get(req.params.id);
+  if (!a) return res.status(404).json({ error: 'That admin does not exist' });
+  if (a.id === req.user.id) return res.status(409).json({ error: 'You cannot remove your own access' });
+  const count = db.prepare(`SELECT COUNT(*) AS c FROM users WHERE role = 'admin'
+    AND admin_revoked_at IS NULL`).get().c;
+  if (count <= 1) return res.status(409).json({ error: 'That is the only admin left' });
+  // The account is kept, not deleted: their name is attached to decisions and messages in
+  // the history, and deleting the row would turn that history into "by someone".
+  db.prepare(`UPDATE users SET admin_revoked_at = datetime('now'), password_hash = ?,
+    must_change_password = 0 WHERE id = ?`)
+    .run(bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10), a.id);
+  rotateSession(a.id);
+  console.log(`[FreshAF] Admin access removed for ${a.email} by ${req.user.name || 'an admin'}`);
+  res.json({ ok: true, removed: a.email });
+});
+
+/* ---------- talking to an applicant ---------- */
+// Record anything sent to a pro, whichever route it went out by, so the detail page
+// shows one history instead of each feature keeping its own.
+function logMessage(userId, { kind, subject, body, sentBy, delivery }) {
+  db.prepare(`INSERT INTO supplier_messages (user_id, kind, subject, body, sent_by, delivery)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(userId, kind || 'message', subject || null, body || '', sentBy || null, delivery || 'unknown');
+}
+
+router.get('/suppliers/:id/messages', (req, res) => {
+  const rows = db.prepare(`SELECT id, kind, subject, body, sent_by, delivery, created_at
+    FROM supplier_messages WHERE user_id = ? ORDER BY id DESC LIMIT 50`).all(req.params.id);
+  res.json({ messages: rows, mail: mailer.status() });
+});
+
+// Send a free-text email to an applicant from the FreshAF address. The application is
+// not touched: this is a conversation, not a decision.
+router.post('/suppliers/:id/message', async (req, res) => {
+  const s = db.prepare('SELECT user_id FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(s.user_id);
+  if (!u?.email) return res.status(409).json({ error: 'This account has no email address' });
+
+  const subject = String(req.body?.subject || '').trim().slice(0, 150) || 'A message from FreshAF';
+  const body = String(req.body?.body || '').trim().slice(0, 5000);
+  if (!body) return res.status(400).json({ error: 'Write a message first' });
+
+  let delivery = 'sent';
+  try {
+    const out = await mailer.proMessage({ to: u.email, name: u.name, subject, body });
+    if (out?.status === 'dry_run') delivery = 'dry_run';
+  } catch (e) {
+    delivery = 'failed';
+    logMessage(s.user_id, { kind: 'message', subject, body, sentBy: req.user?.name, delivery });
+    return res.status(502).json({ error: `Could not send: ${e.message}`, delivery });
+  }
+  logMessage(s.user_id, { kind: 'message', subject, body, sentBy: req.user?.name, delivery });
+
+  // Also surface it in the pro's app, so it is not lost in a spam folder.
+  push.sendToUser(s.user_id, {
+    title: 'Message from FreshAF', body: subject, url: '/supplier', tag: 'account',
+  }).catch(() => {});
+
+  console.log(`[FreshAF] Message to pro ${s.user_id} (${delivery}): ${subject}`);
+  res.json({ ok: true, delivery, to: u.email, mail: mailer.status() });
 });
 
 // Re-run the automatic checks on demand — after a pro corrects a number, or when the

@@ -205,6 +205,32 @@ const ID_VALID = '9203045800084';
     check('  and a company not on the register is a hard flag',
       (await jsonOf(cipcOk)).vetting?.level, 'bad');
 
+    // ---- messaging an applicant --------------------------------------------
+    const emptyMsg = await adminPost(`/api/admin/suppliers/${id}/message`, { body: '   ' });
+    check('an empty message is refused', emptyMsg.status, 400);
+
+    const sent = await adminPost(`/api/admin/suppliers/${id}/message`, {
+      subject: 'Two documents still outstanding',
+      body: 'Hi Thabo,\n\nWe still need your bank letter.\n\nThanks',
+    });
+    check('a message is accepted', sent.status, 200);
+    const sentBody = await jsonOf(sent);
+    check('  and reports it was not really emailed in dry run', sentBody.delivery, 'dry_run');
+    check('  and says who it went to', sentBody.to, email);
+
+    const hist = await jsonOf(await adminGet(`/api/admin/suppliers/${id}/messages`));
+    const kinds = (hist.messages || []).map((m) => m.kind);
+    check('the message is in the history', kinds.includes('message'), true);
+    check('  and so is the earlier info request', kinds.includes('request_info'), true);
+    check('  newest first', hist.messages[0].kind, 'message');
+    check('  with the text that was sent',
+      /bank letter/.test(hist.messages[0].body), true);
+    check('  and a delivery state, so a silent failure is visible',
+      hist.messages[0].delivery, 'dry_run');
+
+    const missingPro = await adminPost('/api/admin/suppliers/99999/message', { body: 'hello' });
+    check('messaging a non-existent applicant 404s', missingPro.status, 404);
+
     // ---- approving clears any outstanding request --------------------------
     await adminPost(`/api/admin/suppliers/${id}/request-info`, { items: ['references'] });
     await adminPost(`/api/admin/suppliers/${id}/approve`);

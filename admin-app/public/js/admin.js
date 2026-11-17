@@ -173,7 +173,8 @@ async function boot() {
 }
 
 async function enterDash() {
-  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings(), refreshReviewers()]); // content first
+  if (me && me.must_change_password) await forcePasswordChange();
+  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings(), refreshReviewers(), refreshAdmins()]); // content first
   show('view-dash');
   setInterval(() => { refreshStats(); refreshOrders(); }, 15000);
 }
@@ -241,195 +242,14 @@ async function refreshStats() {
     <div class="stat"><div class="v">${rand(s.revenue_cents)}</div><div class="l">Commission earned</div></div>`;
 }
 
-const starInline = `<span class="star-inline"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span>`;
 
 // The automatic background checks: ID arithmetic, company number format, Google listing.
 // Every line says what it does and does not prove — a green tick here is not a clearance.
-function vettingHtml(s) {
-  const v = s.vetting;
-  if (!v) {
-    return `<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
-      <span class="muted">Background checks not run yet.</span>
-      <button class="secondary small" onclick="recheck(${s.user_id})">Run checks</button></div>`;
-  }
-  const dot = (state) => state === true ? '<span style="color:var(--ok,#1799c2)">✓</span>'
-    : state === false ? '<span style="color:var(--danger)">✗</span>'
-    : '<span class="muted">?</span>';
-
-  const id = v.id_number || {};
-  const co = v.company || {};
-  const g = v.google || {};
-
-  const stars = g.rating != null
-    ? `${starInline} <strong>${g.rating}</strong> <span class="muted">(${g.reviews} review${g.reviews === 1 ? '' : 's'})</span>`
-    : '<span class="muted">no rating</span>';
-
-  const cipcPill = {
-    verified: '<span class="pill ok">CIPC verified</span>',
-    not_found: '<span class="pill bad">NOT on CIPC register</span>',
-    not_a_company: '<span class="pill">sole trader</span>',
-    unchecked: '<span class="pill warn">CIPC not checked</span>',
-  }[v.cipc_status || 'unchecked'];
-
-  return `
-  <div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
-    <strong style="display:block;margin-bottom:4px">
-      Background checks
-      ${v.level === 'bad' ? '<span class="pill bad">problem</span>'
-        : v.level === 'warn' ? '<span class="pill warn">look closer</span>'
-        : '<span class="pill ok">nothing flagged</span>'}
-    </strong>
-    <div>${dot(id.ok)} <strong>ID number</strong> —
-      ${id.ok ? `valid checksum, born ${id.dob} (age ${id.age}), ${id.citizenship}` : (id.reason || 'not checked')}
-      ${id.ok ? '<br><span class="muted small-text">Format and checksum only &mdash; does not prove the ID belongs to them.</span>' : ''}
-    </div>
-    <div>${dot(co.ok)} <strong>Company number</strong> —
-      ${co.ok ? `${co.formatted} (registered ${co.year})` : (co.reason || 'none given')}
-      ${cipcPill}
-      <a href="${co.search_url || 'https://bizprofile.cipc.co.za/'}" target="_blank" rel="noopener">check on CIPC</a>
-      <br><span class="muted small-text">Format only. CIPC has no free API, so confirm on their site and record it:</span>
-      <span style="white-space:nowrap">
-        <button class="secondary small" onclick="setCipc(${s.user_id},'verified')">Verified</button>
-        <button class="danger small" onclick="setCipc(${s.user_id},'not_found')">Not found</button>
-        <button class="ghost small" onclick="setCipc(${s.user_id},'not_a_company')">Sole trader</button>
-      </span>
-      ${v.cipc_note ? `<br><span class="muted small-text">Note: ${v.cipc_note}</span>` : ''}
-    </div>
-    <div>${dot(g.ok)} <strong>Google</strong> —
-      ${g.ok ? `${stars}${g.address ? `<br><span class="muted small-text">${g.address}</span>` : ''}
-        ${g.maps_url ? `<br><a href="${g.maps_url}" target="_blank" rel="noopener">open on Google Maps</a>` : ''}`
-        : (g.reason || 'not checked')}
-      ${g.note ? `<br><span class="muted small-text">${g.note}</span>` : ''}
-    </div>
-    ${(v.flags || []).length
-      ? `<div style="margin-top:5px;color:var(--warn)"><strong>Flagged:</strong> ${v.flags.join(' &middot; ')}</div>`
-      : ''}
-    <div class="muted small-text" style="margin-top:4px">
-      Checked ${v.checked_at ? String(v.checked_at).replace('T', ' ').slice(0, 16) : 'never'}
-      <button class="ghost small" onclick="recheck(${s.user_id})">Re-run</button>
-    </div>
-  </div>`;
-}
-
-window.recheck = async (userId) => {
-  try {
-    toast('Running checks...', 'info');
-    await api(`/api/admin/suppliers/${userId}/recheck`, { method: 'POST' });
-    toast('Checks updated', 'ok');
-    await refreshSuppliers();
-  } catch (e) { toast(e.message, 'error'); }
-};
-
-window.setCipc = async (userId, status) => {
-  try {
-    let note = '';
-    if (status === 'not_found') {
-      note = await modal({
-        title: 'Company not found on CIPC?',
-        body: 'This is a serious flag: the business claims a registration number that is not on the register. It is recorded against the application and shown on every review from now on.',
-        input: 'What did you search for, and what came back?', confirmText: 'Record it', danger: true,
-      });
-      if (note === null) return;
-    }
-    await api(`/api/admin/suppliers/${userId}/cipc`, { method: 'POST', body: { status, note } });
-    toast('CIPC result recorded', 'ok');
-    await refreshSuppliers();
-  } catch (e) { toast(e.message, 'error'); }
-};
-
-// The approval checklist, straight from the server. Red = required and not in yet, so
-// the application cannot be approved; "asked" = we have already requested it.
-function checklistHtml(s) {
-  const list = s.checklist || [];
-  if (!list.length) return '';
-  const missing = list.filter((c) => c.required && !c.have);
-  const rows = list.filter((c) => c.required || c.have || c.asked).map((c) => {
-    const mark = c.have ? '<span style="color:var(--ok,#1799c2)">✓</span>'
-      : c.required ? '<span style="color:var(--danger)">✗</span>'
-      : '<span class="muted">·</span>';
-    const tag = !c.have && c.asked ? ' <em class="muted">(asked)</em>' : '';
-    return `<span style="display:inline-block;margin-right:11px;white-space:nowrap">${mark} ${c.label}${tag}</span>`;
-  }).join('');
-  const asked = (s.info_needed || []).length;
-  return `
-    <div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
-      <strong style="display:block;margin-bottom:3px">
-        ${missing.length
-          ? `<span style="color:var(--danger)">Cannot approve — ${missing.length} required item${missing.length === 1 ? '' : 's'} outstanding</span>`
-          : '<span style="color:var(--ok,#1799c2)">All required items in</span>'}
-      </strong>
-      ${rows}
-      ${asked ? `<div class="muted small-text" style="margin-top:5px">Requested ${s.info_requested_at ? `on ${String(s.info_requested_at).slice(0, 10)}` : ''}${s.info_note ? ` — note: ${s.info_note}` : ''}</div>` : ''}
-    </div>`;
-}
-
-// Tick what is outstanding, add a note, and the pro gets an email, a push and a live
+// application that is not yet approved, so the decision starts from the evidence.
 // tick list in their app. The application stays pending.
-window.requestInfo = async (userId) => {
-  const { suppliers } = await api('/api/admin/suppliers');
-  const s = suppliers.find((x) => x.user_id === userId);
-  if (!s) return toast('Supplier not found', 'error');
 
-  const picked = await new Promise((resolve) => {
-    const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.innerHTML = `
-      <div class="modal" style="max-width:520px">
-        <h3>What do you still need from ${s.business_name}?</h3>
-        <p class="muted small-text">They stay pending — this is not a rejection. Required items that have
-          not arrived are ticked for you.</p>
-        <div style="max-height:46vh;overflow:auto;margin:12px 0">
-          ${(s.checklist || []).map((c) => `
-            <label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-weight:400;cursor:pointer">
-              <input type="checkbox" value="${c.key}" style="margin-top:3px;width:auto"
-                ${c.required && !c.have ? 'checked' : ''}>
-              <span>
-                <strong>${c.label}</strong>
-                ${c.have ? ' <span style="color:var(--ok,#1799c2)">already in</span>' : ''}
-                ${c.required ? ' <em class="muted">required</em>' : ''}
-                <br><span class="muted small-text">${c.ask}</span>
-              </span>
-            </label>`).join('')}
-        </div>
-        <label for="__ri-note">Note to add to the email (optional)</label>
-        <input id="__ri-note" autocomplete="off" placeholder="e.g. the ID photo you sent is too blurry to read">
-        <div class="row mt" style="justify-content:flex-end">
-          <button class="ghost" data-act="cancel">Cancel</button>
-          <button data-act="ok">Send request</button>
-        </div>
-      </div>`;
-    document.body.appendChild(backdrop);
-    const close = (v) => { backdrop.remove(); resolve(v); };
-    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
-    backdrop.querySelector('[data-act=cancel]').onclick = () => close(null);
-    backdrop.querySelector('[data-act=ok]').onclick = () => close({
-      items: [...backdrop.querySelectorAll('input[type=checkbox]:checked')].map((c) => c.value),
-      note: backdrop.querySelector('#__ri-note').value.trim(),
-    });
-  });
-  if (!picked) return;
-  if (!picked.items.length) return toast('Tick at least one thing you need', 'error');
-  try {
-    const r = await api(`/api/admin/suppliers/${userId}/request-info`, { method: 'POST', body: picked });
-    toast(r.mail === 'queued'
-      ? `Asked for ${r.items.length} item${r.items.length === 1 ? '' : 's'} — email and notification sent`
-      : `Request saved — no email configured, so tell them yourself`, 'ok');
-    await refreshSuppliers();
-  } catch (e) { toast(e.message, 'error'); }
-};
-
-window.clearInfoRequest = async (userId) => {
-  try {
-    const ok = await modal({
-      title: 'Clear the outstanding request?',
-      body: 'Use this when what you asked for arrived another way — a phone call, a reference, a document emailed to you. The pro stops seeing the request in their app.',
-      confirmText: 'Clear request',
-    });
-    if (!ok) return;
-    await api(`/api/admin/suppliers/${userId}/clear-info-request`, { method: 'POST' });
-    toast('Request cleared', 'ok');
-    await refreshSuppliers();
-  } catch (e) { toast(e.message, 'error'); }
+window.afterSupplierChange = async () => {
+  await Promise.all([refreshSuppliers(), refreshStats()]);
 };
 
 async function refreshSuppliers() {
@@ -439,7 +259,7 @@ async function refreshSuppliers() {
   el('suppliers-box').innerHTML = `<table><thead><tr>
       <th>Business</th><th>Contact</th><th>Details</th><th>Status</th><th>Actions</th>
     </tr></thead><tbody>` + suppliers.map((s) => `<tr>
-      <td><strong>${s.business_name}</strong>${s.is_demo ? ' <span class="pill warn">DEMO</span>' : ''}<br>
+      <td><a href="/applicant.html?id=${s.user_id}" target="_blank" rel="noopener" style="font-weight:700">${s.business_name}</a>${s.is_demo ? ' <span class="pill warn">DEMO</span>' : ''}<br>
         <span class="muted small-text">${s.service_area || ''}</span><br>
         ${(s.services || []).map((x) => `<span class="pill ${x === 'laundry' ? 'ok' : 'warn'}" style="margin-top:4px">${serviceName(x)}</span>`).join(' ')}</td>
       <td>${s.name}<br><span class="muted small-text">${s.email}<br>${s.phone || ''}</span></td>
@@ -454,6 +274,7 @@ async function refreshSuppliers() {
         ${(s.documents || []).length
           ? '<br>' + s.documents.map((d) => `<a href="/api/admin/docs/${d.id}" target="_blank">${d.kind.replace(/_/g, ' ')}</a>`).join(' · ')
           : '<br><span style="color:var(--warn)">No documents uploaded</span>'}
+        ${s.status !== 'approved' && !s.is_demo ? safetyHtml(s) : ''}
         ${checklistHtml(s)}
         ${vettingHtml(s)}</td>
       <td><span class="pill ${s.status === 'approved' ? 'ok' : s.status === 'pending' ? 'warn' : 'bad'}">${s.status}</span>
@@ -463,7 +284,8 @@ async function refreshSuppliers() {
         ${s.rating ? `<br><span class="muted small-text">${starInline} ${s.rating} (${s.rating_count})</span>` : ''}</td>
       <td>
         <div class="row" style="flex-wrap:nowrap">
-        ${s.status !== 'approved' ? `<button class="small" onclick="setStatus(${s.user_id},'approve')">Approve</button>` : ''}
+        <a class="btn small" href="/applicant.html?id=${s.user_id}" target="_blank" rel="noopener">Open</a>
+        ${s.status !== 'approved' ? `<button class="secondary small" onclick="setStatus(${s.user_id},'approve')">Approve</button>` : ''}
         ${s.status !== 'rejected' ? `<button class="secondary small" onclick="requestInfo(${s.user_id})">Request info</button>` : ''}
         ${(s.info_needed || []).length ? `<button class="secondary small" onclick="clearInfoRequest(${s.user_id})">Clear request</button>` : ''}
         ${s.status === 'pending' ? `<button class="danger small" onclick="setStatus(${s.user_id},'reject')">Reject</button>` : ''}
@@ -534,29 +356,141 @@ window.settleCash = async (id, owed) => {
   } catch (e) { showError('sup-error', e.message); }
 };
 
-window.setStatus = async (id, action) => {
+
+/* ---------- who else can get in ---------- */
+// Shown once, never again: the temporary password is not stored in readable form, so if
+// this card is dismissed before it is passed on, a new one has to be issued.
+function showNewAdminCredentials(r) {
+  const signInUrl = location.origin;
+  const block = [
+    `FreshAF admin dashboard`,
+    `Sign in: ${signInUrl}`,
+    `Email: ${r.email}`,
+    `Temporary password: ${r.password}`,
+    ``,
+    `You will be asked to choose your own password the first time you sign in.`,
+    `Do not forward this message.`,
+  ].join('\n');
+  const box = el('admins-new');
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <strong>${escapeHtml(r.name)} can now sign in.</strong>
+    <p class="small-text" style="margin:6px 0">This password is shown <strong>once</strong>. Send it to them
+      now — if you lose it, issue a new one with “New password” below. They must change it on first sign-in.</p>
+    <div style="font-family:ui-monospace,monospace;background:var(--panel-2,#f4f6f8);padding:10px 12px;border-radius:8px;white-space:pre-wrap">${escapeHtml(block)}</div>
+    <div class="row mt">
+      <button class="secondary small" id="btn-copy-admin">Copy these details</button>
+      <button class="ghost small" onclick="document.getElementById('admins-new').classList.add('hidden')">Done, hide it</button>
+    </div>`;
+  el('btn-copy-admin').onclick = async () => {
+    try { await navigator.clipboard.writeText(block); toast('Copied — paste it to them now', 'ok'); }
+    catch { toast('Could not copy — select the text above', 'error'); }
+  };
+}
+
+async function refreshAdmins() {
+  let admins;
+  try { ({ admins } = await api('/api/admin/admins')); }
+  catch { el('admins-box').innerHTML = '<p class="muted">Team access needs the server update deployed.</p>'; return; }
+  el('admins-box').innerHTML = `<table><thead><tr>
+      <th>Name</th><th>Sign-in email</th><th>Status</th><th>Actions</th>
+    </tr></thead><tbody>` + admins.map((a) => `<tr>
+      <td><strong>${escapeHtml(a.name)}</strong>${a.is_you ? ' <span class="pill ok">you</span>' : ''}
+        ${a.invited_by ? `<br><span class="muted small-text">added by ${escapeHtml(a.invited_by)}</span>` : ''}</td>
+      <td>${escapeHtml(a.email)}</td>
+      <td>${a.pending_first_sign_in
+        ? '<span class="pill warn">has not signed in yet</span>'
+        : '<span class="pill ok">active</span>'}</td>
+      <td><div class="row" style="flex-wrap:nowrap">
+        ${a.is_you ? '' : `<button class="secondary small" onclick="resetAdminPassword(${a.id})">New password</button>`}
+        ${a.is_you ? '' : `<button class="danger small" onclick="removeAdmin(${a.id}, '${escapeHtml(a.name)}')">Remove</button>`}
+      </div></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+window.addAdmin = async () => {
+  const name = el('admin-name').value.trim();
+  const email = el('admin-email').value.trim();
+  if (!name || !email) return toast('Name and email are both needed', 'error');
   try {
-    let reason = null;
-    if (action === 'reject' || action === 'suspend') {
-      reason = await modal({
-        title: action === 'reject' ? 'Reject this application?' : 'Suspend this supplier?',
-        body: 'The supplier will see the reason you give on their portal.',
-        input: 'Reason', confirmText: action === 'reject' ? 'Reject' : 'Suspend', danger: true,
-      });
-      if (reason === null) return;
-    } else {
-      const ok = await modal({
-        title: 'Approve this supplier?',
-        body: 'They will immediately be able to go online and receive job offers.',
-        confirmText: 'Approve',
-      });
-      if (!ok) return;
-    }
-    await api(`/api/admin/suppliers/${id}/${action}`, { method: 'POST', body: { reason } });
-    toast(`Supplier ${action}${action === 'approve' ? 'd' : 'ed'}`, action === 'approve' ? 'ok' : 'info');
-    await Promise.all([refreshSuppliers(), refreshStats()]);
-  } catch (e) { showError('sup-error', e.message); }
+    const ok = await modal({
+      title: `Give ${name} full admin access?`,
+      body: 'They will be able to approve and reject pros, read ID numbers and bank details, and message applicants. Everything they do is recorded under their own name.',
+      confirmText: 'Create their login',
+    });
+    if (!ok) return;
+    const r = await api('/api/admin/admins', { method: 'POST', body: { name, email } });
+    el('admin-name').value = '';
+    el('admin-email').value = '';
+    showNewAdminCredentials(r);
+    await refreshAdmins();
+  } catch (e) { showError('admins-error', e.message); }
 };
+
+window.resetAdminPassword = async (id) => {
+  try {
+    const ok = await modal({
+      title: 'Issue a new temporary password?',
+      body: 'Their current password stops working immediately and they are signed out everywhere. They will have to set a new one when they next sign in.',
+      confirmText: 'Issue it', danger: true,
+    });
+    if (!ok) return;
+    const r = await api(`/api/admin/admins/${id}/reset-password`, { method: 'POST' });
+    showNewAdminCredentials({ name: r.email, email: r.email, password: r.password });
+    await refreshAdmins();
+  } catch (e) { showError('admins-error', e.message); }
+};
+
+window.removeAdmin = async (id, name) => {
+  try {
+    const ok = await modal({
+      title: `Remove ${name}'s access?`,
+      body: 'They are signed out immediately and cannot sign in again. Their name stays on the decisions and messages they already sent, so the history still makes sense.',
+      confirmText: 'Remove access', danger: true,
+    });
+    if (!ok) return;
+    await api(`/api/admin/admins/${id}/remove`, { method: 'POST' });
+    toast('Access removed', 'ok');
+    await refreshAdmins();
+  } catch (e) { showError('admins-error', e.message); }
+};
+
+// An invited admin arrives holding a password that was sent over WhatsApp. Nothing else
+// in the dashboard opens until they have replaced it.
+async function forcePasswordChange() {
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-backdrop';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <h3>Choose your own password</h3>
+      <p>You signed in with a temporary password that was sent to you. Replace it before going any
+        further — this account can see applicants' ID numbers and bank details.</p>
+      <div class="msg error" id="pw-error"></div>
+      <label for="pw-current">The temporary password you were sent</label>
+      <input id="pw-current" type="password" autocomplete="current-password">
+      <label for="pw-next">Your new password (at least 12 characters)</label>
+      <input id="pw-next" type="password" autocomplete="new-password">
+      <label for="pw-again">Type it again</label>
+      <input id="pw-again" type="password" autocomplete="new-password">
+      <div class="row mt" style="justify-content:flex-end">
+        <button data-act="save">Save and continue</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.querySelector('[data-act=save]').onclick = async () => {
+    const current = wrap.querySelector('#pw-current').value;
+    const next = wrap.querySelector('#pw-next').value;
+    const again = wrap.querySelector('#pw-again').value;
+    const err = (m) => { const b = wrap.querySelector('#pw-error'); b.textContent = m; b.classList.add('error'); b.style.display = 'block'; };
+    if (next !== again) return err('Those two do not match');
+    if (next.length < 12) return err('Use at least 12 characters');
+    try {
+      await api('/api/auth/admin-password', { method: 'POST', body: { current, next } });
+      wrap.remove();
+      toast('Password changed — this is yours now', 'ok');
+    } catch (e) { err(e.message); }
+  };
+}
 
 /* ---------- customer sign-ups ---------- */
 let allCustomers = [];

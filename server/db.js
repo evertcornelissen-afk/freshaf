@@ -196,6 +196,15 @@ function addColumn(table, definition) {
   try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`); } catch { /* already exists */ }
 }
 addColumn('users', 'points_cents INTEGER NOT NULL DEFAULT 0');
+// An admin invited by another admin signs in with a temporary password and must replace
+// it before the dashboard will do anything else.
+addColumn('users', 'must_change_password INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'invited_by TEXT');
+// Admin access that has been taken away. A separate column rather than a different role:
+// users.role has a CHECK constraint allowing only customer/supplier/admin, and rebuilding
+// the users table on a live database to add a fourth value is not worth the risk. The row
+// is kept so their name still explains the decisions and messages they already sent.
+addColumn('users', 'admin_revoked_at TEXT');
 addColumn('users', 'terms_accepted_at TEXT');
 addColumn('users', 'home_address TEXT');
 addColumn('users', 'home_lat REAL');
@@ -272,6 +281,22 @@ CREATE TABLE IF NOT EXISTS supplier_vetting (
   cipc_note TEXT,
   cipc_checked_at TEXT
 );
+`);
+
+// Every message sent to a pro from the dashboard, so the next reviewer can see what has
+// already been said instead of repeating it or contradicting it.
+db.exec(`
+CREATE TABLE IF NOT EXISTS supplier_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL DEFAULT 'message',
+  subject TEXT,
+  body TEXT NOT NULL,
+  sent_by TEXT,
+  delivery TEXT NOT NULL DEFAULT 'unknown',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_supplier_messages_user ON supplier_messages(user_id, id DESC);
 `);
 
 addColumn('suppliers', 'info_needed TEXT');       // JSON array of checklist keys
@@ -455,7 +480,15 @@ if (!getSetting('callout_cap_cents')) setSetting('callout_cap_cents', '15000');
 const ADMIN_EMAIL = require('./email').normEmail(process.env.ADMIN_EMAIL || 'admin@freshaf.co.za');
 const DEFAULT_ADMIN_PASSWORD = 'FreshAF!Admin2026';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
-const adminExists = db.prepare("SELECT id, email, password_hash FROM users WHERE role = 'admin' LIMIT 1").get();
+// WHICH admin this applies to matters as soon as there is more than one. This used to be
+// `WHERE role = 'admin' LIMIT 1` with no ORDER BY, so on any boot after a second admin was
+// added SQLite could hand back the NEW person's account -- and the block below would then
+// reset their password to ADMIN_PASSWORD and rename their sign-in to ADMIN_EMAIL, silently
+// taking over the account and locking them out. The owner account is the one matching
+// ADMIN_EMAIL, or failing that the oldest one.
+const adminExists = db.prepare(`SELECT id, email, password_hash FROM users
+  WHERE role = 'admin' AND admin_revoked_at IS NULL
+  ORDER BY (lower(email) = ?) DESC, id ASC LIMIT 1`).get(ADMIN_EMAIL);
 if (!adminExists) {
   db.prepare('INSERT INTO users (role, name, email, password_hash) VALUES (?, ?, ?, ?)')
     .run('admin', 'FreshAF Admin', ADMIN_EMAIL, bcrypt.hashSync(ADMIN_PASSWORD, 10));

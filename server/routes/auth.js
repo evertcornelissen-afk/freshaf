@@ -70,6 +70,9 @@ function supplierProfile(userId) {
 
 function mePayload(user) {
   const out = { id: user.id, role: user.role, name: user.name, email: user.email, phone: user.phone };
+  // An invited admin is still carrying the temporary password they were sent over
+  // WhatsApp. The dashboard makes them replace it before it shows anything.
+  if (user.role === 'admin') out.must_change_password = !!user.must_change_password;
   if (user.role === 'customer') {
     out.points_cents = user.points_cents || 0;
     out.home_address = user.home_address || null;
@@ -316,6 +319,34 @@ router.get('/me', (req, res) => {
   if (!user) return res.json({ user: null });
   const fresh = renewIfStale(req, res, s); // the app's token, renewed on launch
   res.json({ user: mePayload(user), ...(fresh ? { token: fresh } : {}) });
+});
+
+// An admin replacing their own password. Deliberately separate from the customer/pro
+// /profile route, which admins are not allowed to use: this one proves the current
+// password first, so a borrowed unlocked laptop cannot be used to lock the owner out,
+// and it clears the must-change flag an invite sets.
+router.post('/admin-password', authRequired('admin'), (req, res) => {
+  const current = String(req.body?.current || '');
+  const next = String(req.body?.next || '');
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user || !bcrypt.compareSync(current, user.password_hash)) {
+    return res.status(401).json({ error: 'That is not your current password' });
+  }
+  if (next.length < 12) {
+    return res.status(400).json({ error: 'Use at least 12 characters — this account can see ID numbers and bank details' });
+  }
+  if (bcrypt.compareSync(next, user.password_hash)) {
+    return res.status(400).json({ error: 'That is the password you already have' });
+  }
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
+    .run(bcrypt.hashSync(next, 10), user.id);
+  // Everything signed in elsewhere with the old password stops working, which is the
+  // point when the old one was sent over WhatsApp.
+  rotateSession(user.id);
+  setAuthCookie(res, db.prepare('SELECT * FROM users WHERE id = ?').get(user.id));
+  if (user.email) mailer.passwordChanged({ to: user.email, name: user.name }).catch(() => {});
+  console.log(`[FreshAF] Admin ${user.email} changed their own password`);
+  res.json({ ok: true });
 });
 
 // Step one: send a reset link. The answer is identical whether or not the address has an

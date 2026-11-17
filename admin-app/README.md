@@ -38,6 +38,40 @@ reach it, even on shared Wi-Fi.
 If the two keys do not match exactly, every admin call returns 404 and the dashboard
 looks empty. That is the expected failure, not a bug.
 
+## Giving someone else access
+
+Each person gets their **own login**. Never share one: every approval, rejection and
+message is recorded under the name that sent it, and that record is worthless if two
+people use the same account. You can also remove one person without changing your own
+password.
+
+In the dashboard, open **Team access**, enter their name and their own email address, and
+press **Give access**. A temporary password is shown **once** — copy it straight away and
+send it to them. They are forced to replace it the first time they sign in, and the
+temporary one stops working the moment they do. Lost it? Press **New password** to issue
+another; the old one dies immediately.
+
+**Remove** signs them out everywhere at once, even if their browser still holds a valid
+session, and blocks them signing in again. Their name stays on the decisions and messages
+they already sent, so the history still reads properly. You cannot remove yourself, and
+you cannot remove the last admin.
+
+### Getting the dashboard onto their machine
+
+Until it is hosted (see below), it runs on each person's own computer:
+
+1. They install **Node.js** (LTS) from <https://nodejs.org>.
+2. Copy the whole `admin-app` folder to their machine.
+3. In that folder, `copy .env.example .env`, then set `FRESHAF_URL=https://freshaf.io`
+   and paste the **same `ADMIN_API_KEY`** that is on Render.
+4. Double-click `start-admin.bat`.
+
+Send them the `ADMIN_API_KEY` by a different route than their password — the whole point
+of the key is that a stolen password alone is not enough, which stops being true if both
+travel in the same WhatsApp message.
+
+This route is a laptop only. For phones, the dashboard has to be hosted.
+
 ## Moving it to a server later
 
 This is an ordinary Node app and keeps no local state — it is a proxy with a key. To

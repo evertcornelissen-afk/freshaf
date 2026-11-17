@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application — FreshAF Admin</title>
+<link rel="icon" href="/img/logo-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'light';</script>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .target-tag { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .target-tag.target-live  { background: #d1e7dd; color: #0f5132; border-color: #0f5132; }
+  .target-tag.target-other { background: #ffe3d9; color: #7a2e12; border-color: #c6401f; font-weight: 700; }
+  [data-theme="dark"] .target-tag.target-live  { background: #0f2e22; color: #8fe3bd; border-color: #2f7d5d; }
+  [data-theme="dark"] .target-tag.target-other { background: #3a1409; color: #ff9c7d; border-color: #c6401f; }
+  /* One application, read top to bottom. Comfortable measure, not a dashboard column. */
+  .wrap { max-width: 880px; }
+  .appl-field { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border-soft, #eee); }
+  .appl-field > .k { flex: 0 0 180px; }
+  .appl-field > .v { flex: 1; min-width: 0; }
+  @media (max-width: 620px) {
+    .appl-field { display: block; padding: 9px 0; }
+    .appl-field > .k { margin-bottom: 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <a class="stack brand-home" href="/" aria-label="FreshAF admin dashboard">
+      <img class="logo-img logo-light-v" src="/img/logo.svg" alt="FreshAF"><img class="logo-img logo-dark-v" src="/img/logo-dark.svg" alt="FreshAF">
+      <span class="tag">Application</span>
+    </a>
+    <span class="tag target-tag" id="admin-target" title="The site this page is reading from">checking...</span>
+  </div>
+  <div class="row">
+    <label class="theme-toggle" title="Light / dark mode"><input type="checkbox" id="theme-switch"><span class="track"><span class="thumb"></span></span></label>
+    <span class="who" id="who"></span>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="msg error" id="sup-error" role="alert" aria-live="assertive"></div>
+  <div id="applicant-box"><p class="empty">Loading application…</p></div>
+</div>
+
+<script src="/js/common.js"></script>
+<script src="/js/safety.js"></script>
+<script src="/js/review.js"></script>
+<script src="/js/applicant.js"></script>
+</body>
+</html>

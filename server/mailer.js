@@ -146,6 +146,24 @@ function adminProInfoComplete({ to, name, business, items }) {
   });
 }
 
+// A free-text message typed by an admin in the dashboard, wrapped in the FreshAF shell so
+// it arrives looking like every other FreshAF email rather than a bare note.
+// The body is plain text from a trusted operator; it is escaped and newlines become
+// paragraphs, so nothing an admin types can break the layout or inject markup.
+function proMessage({ to, name, subject, body }) {
+  const paragraphs = String(body || '')
+    .split(/\n\s*\n/)
+    .map((p) => esc(p.trim()).replace(/\n/g, '<br>'))
+    .filter(Boolean);
+  return send({
+    to,
+    subject: subject || 'A message from FreshAF',
+    heading: `Hello ${esc((name || '').split(' ')[0] || 'there')},`,
+    paragraphs: paragraphs.length ? paragraphs : ['(no message)'],
+    cta: { label: 'Open FreshAF Pro', url: `${BASE}/supplier` },
+  });
+}
+
 function proStatusChanged({ to, name, status, reason }) {
   if (status === 'approved') {
     return send({
@@ -410,5 +428,5 @@ function passwordChanged({ to, name }) {
 
 // layout is exported so an email can be rendered and looked at before it is sent.
 module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
-  proInfoRequested, adminProInfoComplete,
+  proInfoRequested, adminProInfoComplete, proMessage,
   passwordReset, passwordChanged, bookingConfirmed, proJobBooked, proJobCancelled, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };
