@@ -27,30 +27,25 @@ const BIND = process.env.ADMIN_BIND || '127.0.0.1';
 
 const PUBLIC = BIND !== '127.0.0.1' && BIND !== 'localhost';
 
-// THE FRONT DOOR.
+// WHY THERE IS NO SECOND PASSWORD.
 //
-// This process holds ADMIN_API_KEY and attaches it to every admin call. On a laptop
-// bound to 127.0.0.1 that is safe: nothing else can reach it. Published on the internet
-// it is the opposite — anyone who finds the address gets the key attached to their
-// requests for free, which turns "admin password AND key" into "admin password", and
-// deletes the second factor exactly when it starts to matter.
+// This process holds ADMIN_API_KEY. The first published version put a shared Basic-auth
+// password in front of everything, because a proxy that blindly attaches the key to any
+// request hands it to whoever finds the address.
 //
-// So a publicly bound instance must carry its own gate: one shared password in front of
-// everything, separate from each person's FreshAF login. Two different secrets again,
-// one of which never travels with the other.
+// That worked, but it meant two passwords to explain and to send by two routes, and it
+// was confusing enough to be got wrong - which is itself a security problem.
 //
-// This refuses to start rather than coming up unprotected. A dashboard holding ID
-// numbers and bank details must not be one missing environment variable away from open.
-const GATE_USER = process.env.ADMIN_GATE_USER || 'freshaf';
-const GATE_PASSWORD = process.env.ADMIN_GATE_PASSWORD || '';
-if (PUBLIC && !GATE_PASSWORD) {
-  console.error('[FreshAF Admin] REFUSING TO START.');
-  console.error(`  ADMIN_BIND is "${BIND}", so this would be reachable from the internet,`);
-  console.error('  but ADMIN_GATE_PASSWORD is not set — there would be nothing in front of');
-  console.error('  the admin key this process holds. Set ADMIN_GATE_PASSWORD, or bind to');
-  console.error('  127.0.0.1 to run it locally.');
-  process.exit(1);
-}
+// The better fix is narrower: attach the key ONLY to /api/admin/* calls, and only after
+// checking with freshaf.io that the caller is already signed in as an admin. A stranger
+// who finds this address gets the sign-in page and nothing else; the key never helps
+// anyone who does not already hold an admin password. One password, same property.
+//
+// What this does NOT restore: on the laptop-only version the key was a true second
+// factor, because a stolen password alone could not reach a dashboard that held it.
+// Published, it cannot be - that is the trade-off of publishing, decided 17 Nov 2026.
+// The live site rate-limits admin sign-ins by IP and by address, which is what stands
+// between a guessed password and the data now.
 
 const app = express();
 app.disable('x-powered-by');
@@ -68,45 +63,9 @@ if (PUBLIC) {
     next();
   });
 
-  // Render's health checker is not a browser and cannot send the front-door password.
-  // Gated, it would get 401 on every probe and fail every deploy. So this one path sits
-  // in front of the gate — and says nothing except that the process is up.
+  // Render's health checker needs one path that is always answerable, and it reveals
+  // nothing but that the process is up.
   app.get('/healthz', (req, res) => res.type('text/plain').send('ok'));
-
-  const gateFails = new Map(); // ip -> { n, until }
-  const WINDOW_MS = 15 * 60_000;
-  const MAX_TRIES = 10;
-
-  app.use((req, res, next) => {
-    const ip = req.ip || 'unknown';
-    const rec = gateFails.get(ip);
-    if (rec && rec.until > Date.now() && rec.n >= MAX_TRIES) {
-      res.setHeader('Retry-After', String(Math.ceil((rec.until - Date.now()) / 1000)));
-      return res.status(429).type('text/plain').send('Too many attempts. Try again later.');
-    }
-
-    const header = String(req.headers.authorization || '');
-    const [scheme, encoded] = header.split(' ');
-    let ok = false;
-    if (/^Basic$/i.test(scheme || '') && encoded) {
-      const [u, ...rest] = Buffer.from(encoded, 'base64').toString('utf8').split(':');
-      const pw = rest.join(':');
-      // Constant time on the password, so the gate cannot be guessed character by
-      // character from how long the answer takes.
-      const a = Buffer.from(pw);
-      const b = Buffer.from(GATE_PASSWORD);
-      ok = u === GATE_USER && a.length === b.length && crypto.timingSafeEqual(a, b);
-    }
-    if (ok) {
-      gateFails.delete(ip);
-      return next();
-    }
-    const n = (rec && rec.until > Date.now() ? rec.n : 0) + 1;
-    gateFails.set(ip, { n, until: Date.now() + WINDOW_MS });
-    if (n >= MAX_TRIES) console.warn(`[FreshAF Admin] ${MAX_TRIES} failed front-door attempts from ${ip}`);
-    res.setHeader('WWW-Authenticate', 'Basic realm="FreshAF Admin", charset="UTF-8"');
-    return res.status(401).type('text/plain').send('FreshAF Admin');
-  });
 }
 
 // Everything the dashboard needs that is not an API call is served from here first,
@@ -128,6 +87,36 @@ app.get('/_admin/target', (req, res) => {
   res.json({ target: TARGET, live, host: TARGET.replace(/^https?:\/\//, '') });
 });
 
+// Is this request from someone freshaf.io already knows as an admin? Asked upstream
+// WITHOUT the key, so this cannot be used to answer itself. Cached briefly per session
+// so a dashboard that fires a dozen calls on load does not make a dozen extra round
+// trips - short enough that removing someone takes effect within seconds.
+const adminCache = new Map(); // session token -> { ok, until }
+const ADMIN_CACHE_MS = 15_000;
+
+async function callerIsAdmin(req) {
+  const cookie = req.headers.cookie || '';
+  const auth = req.headers.authorization || '';
+  if (!cookie && !auth) return false;
+  const cacheKey = crypto.createHash('sha256').update(cookie + '|' + auth).digest('hex');
+  const hit = adminCache.get(cacheKey);
+  if (hit && hit.until > Date.now()) return hit.ok;
+  let ok = false;
+  try {
+    const r = await fetch(`${TARGET}/api/auth/me`, {
+      headers: { ...(cookie ? { cookie } : {}), ...(auth ? { authorization: auth } : {}) },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) {
+      const body = await r.json().catch(() => ({}));
+      ok = body?.user?.role === 'admin';
+    }
+  } catch { ok = false; }
+  if (adminCache.size > 500) adminCache.clear();
+  adminCache.set(cacheKey, { ok, until: Date.now() + ADMIN_CACHE_MS });
+  return ok;
+}
+
 // One hop: browser -> this process -> freshaf.io. Bodies are streamed through as raw
 // bytes so uploads (the database restore) and JSON both work without special cases.
 app.use(async (req, res) => {
@@ -138,7 +127,15 @@ app.use(async (req, res) => {
     if (['host', 'connection', 'content-length', 'accept-encoding'].includes(k)) continue;
     headers[k] = v;
   }
-  if (ADMIN_API_KEY) headers['x-admin-key'] = ADMIN_API_KEY;
+  // The key goes ONLY on admin calls, and only for a caller freshaf.io already
+  // recognises as a signed-in admin. Everything else (sign-in, /api/auth/me, static
+  // assets) is forwarded untouched, exactly as a browser would send it.
+  if (ADMIN_API_KEY && req.path.startsWith('/api/admin/')) {
+    if (!(await callerIsAdmin(req))) {
+      return res.status(403).json({ error: 'Sign in as an admin first.' });
+    }
+    headers['x-admin-key'] = ADMIN_API_KEY;
+  }
 
   const hasBody = !['GET', 'HEAD'].includes(req.method);
   try {
@@ -180,7 +177,8 @@ app.listen(PORT, BIND, () => {
   console.log(`  Talking to: ${TARGET}`);
   console.log(`  Admin key : ${ADMIN_API_KEY ? 'set' : 'NOT SET — the live site must also have it unset, or every call returns 404'}`);
   console.log(PUBLIC
-    ? `  Listening on ${BIND}:${PORT} — PUBLIC, behind the shared front-door password.`
+    ? `  Listening on ${BIND}:${PORT} — public. The admin key is attached only to calls`
+      + ` from someone ${TARGET} already knows as a signed-in admin.`
     : `  Listening on ${BIND} only, so nothing on your network can reach it.`);
   console.log('');
 });

@@ -422,7 +422,9 @@ async function refreshAdmins() {
 window.addAdmin = async () => {
   const name = el('admin-name').value.trim();
   const email = el('admin-email').value.trim();
+  const password = el('admin-pw').value;
   if (!name || !email) return toast('Name and email are both needed', 'error');
+  if (password && password.length < 12) return toast('That password is too short — use at least 12 characters', 'error');
   try {
     const ok = await modal({
       title: `Give ${name} full admin access?`,
@@ -430,9 +432,10 @@ window.addAdmin = async () => {
       confirmText: 'Create their login',
     });
     if (!ok) return;
-    const r = await api('/api/admin/admins', { method: 'POST', body: { name, email } });
+    const r = await api('/api/admin/admins', { method: 'POST', body: { name, email, password } });
     el('admin-name').value = '';
     el('admin-email').value = '';
+    el('admin-pw').value = '';
     showNewAdminCredentials(r);
     await refreshAdmins();
   } catch (e) { showError('admins-error', e.message); }

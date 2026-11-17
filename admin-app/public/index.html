@@ -93,7 +93,9 @@
     <div class="card">
       <h2 id="h-admins">Team access</h2>
       <p class="muted small-text">Everyone who can open this dashboard. Each person gets their own
-        login &mdash; approvals, rejections and messages are recorded under the name that sent them.</p>
+        login &mdash; approvals, rejections and messages are recorded under the name that sent them.
+        Type a password and tell them what it is; leave it blank and one is generated that they must
+        replace on first sign-in.</p>
       <div class="msg error" id="admins-error"></div>
       <div class="msg ok hidden" id="admins-new"></div>
       <div class="table-scroll mt" id="admins-box"></div>
@@ -102,6 +104,8 @@
           <input id="admin-name" autocomplete="off" placeholder="e.g. Nikki"></div>
         <div style="flex:1;min-width:200px"><label for="admin-email">Their own email address</label>
           <input id="admin-email" type="email" autocomplete="off" autocapitalize="none" placeholder="nikki@example.com"></div>
+        <div style="flex:1;min-width:190px"><label for="admin-pw">Password you choose for them</label>
+          <input id="admin-pw" type="text" autocomplete="off" placeholder="at least 12 characters"></div>
         <button class="small" onclick="addAdmin()">Give access</button>
       </div>
     </div>

@@ -389,14 +389,22 @@ router.post('/admins', (req, res) => {
     });
   }
 
-  // Shown to the inviting admin ONCE and never stored in readable form. They pass it on;
-  // the new admin replaces it the moment they sign in.
-  const password = tempPassword();
+  // Either the inviting admin chooses the password and tells them directly - simplest,
+  // and what most people expect - or we generate one and force a change on first sign-in.
+  // A chosen password is NOT forced to change: whoever typed it already knows it, and
+  // making them change something they just agreed on is friction with no benefit.
+  const chosen = String(req.body?.password || '');
+  if (chosen && chosen.length < 12) {
+    return res.status(400).json({ error: 'Use at least 12 characters — this account can see ID numbers and bank details' });
+  }
+  const password = chosen || tempPassword();
+  const mustChange = chosen ? 0 : 1;
   const info = db.prepare(`INSERT INTO users (role, name, email, password_hash, must_change_password, invited_by)
-    VALUES ('admin', ?, ?, ?, 1, ?)`).run(name, email, bcrypt.hashSync(password, 10), req.user.name || null);
+    VALUES ('admin', ?, ?, ?, ?, ?)`)
+    .run(name, email, bcrypt.hashSync(password, 10), mustChange, req.user.name || null);
 
   console.log(`[FreshAF] Admin access granted to ${email} by ${req.user.name || 'an admin'}`);
-  res.json({ ok: true, id: Number(info.lastInsertRowid), email, name, password });
+  res.json({ ok: true, id: Number(info.lastInsertRowid), email, name, password, chosen: !!chosen });
 });
 
 // Reissue a temporary password — for "she never got it" or "she is locked out", without
@@ -405,12 +413,16 @@ router.post('/admins/:id/reset-password', (req, res) => {
   const a = db.prepare(`SELECT id, email FROM users WHERE id = ? AND role = 'admin'
     AND admin_revoked_at IS NULL`).get(req.params.id);
   if (!a) return res.status(404).json({ error: 'That admin does not exist' });
-  const password = tempPassword();
-  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?')
-    .run(bcrypt.hashSync(password, 10), a.id);
+  const chosen = String(req.body?.password || '');
+  if (chosen && chosen.length < 12) {
+    return res.status(400).json({ error: 'Use at least 12 characters' });
+  }
+  const password = chosen || tempPassword();
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?')
+    .run(bcrypt.hashSync(password, 10), chosen ? 0 : 1, a.id);
   rotateSession(a.id);
   console.log(`[FreshAF] Temporary password reissued for ${a.email}`);
-  res.json({ ok: true, email: a.email, password });
+  res.json({ ok: true, email: a.email, password, chosen: !!chosen });
 });
 
 router.post('/admins/:id/remove', (req, res) => {

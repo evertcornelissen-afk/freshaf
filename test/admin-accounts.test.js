@@ -112,6 +112,19 @@ async function signIn(email, password) {
     check('  and records who added her', list.find((a) => a.email === 'nikki@example.com')?.invited_by, 'FreshAF Admin');
     check('no password is ever listed', list.some((a) => 'password' in a || 'password_hash' in a), false);
 
+    // ---- an admin who sets the password themselves --------------------------
+    const shortChosen = await post('/api/admin/admins', { name: 'Shorty', email: 'short@example.com', password: 'abc' });
+    check('a chosen password under 12 characters is refused', shortChosen.status, 400);
+
+    const chosenMade = await post('/api/admin/admins', {
+      name: 'Chosen', email: 'chosen@example.com', password: 'EvertPicksThis1!',
+    });
+    check('an admin can be created with a chosen password', chosenMade.status, 200);
+    check('  and the response says it was chosen', (await jsonOf(chosenMade)).chosen, true);
+    const chosenLogin = await signIn('chosen@example.com', 'EvertPicksThis1!');
+    check('  they sign in with it straight away', chosenLogin.status, 200);
+    check('  and are NOT forced to change it', chosenLogin.body.user?.must_change_password, false);
+
     // ---- she signs in and must replace the password -------------------------
     const nikki = await signIn('nikki@example.com', invite.password);
     check('she can sign in with the temporary password', nikki.status, 200);
@@ -161,7 +174,9 @@ async function signIn(email, password) {
     }))).admins;
     check('  her sign-in address was not renamed to the owner address',
       after.filter((a) => a.email === OWNER_EMAIL).length, 1);
-    check('  both admins survive the restart', after.length, 2);
+    check('  every admin survives the restart',
+      after.map((a) => a.email).sort(),
+      ['chosen@example.com', 'nikki@example.com', OWNER_EMAIL].sort());
 
     // ---- removing access -----------------------------------------------------
     const owner2 = await signIn(OWNER_EMAIL, OWNER_PASSWORD);
@@ -171,8 +186,15 @@ async function signIn(email, password) {
     });
     check('access can be removed', removed.status, 200);
     check('  she can no longer sign in', (await signIn('nikki@example.com', 'NikkiOwnPassw0rd!')).status, 401);
-    check('  the owner remains', (await jsonOf(await call('/api/admin/admins', { cookies: owner2.jar, extra: KEY }))).admins.length, 1);
+    const left = (await jsonOf(await call('/api/admin/admins', { cookies: owner2.jar, extra: KEY }))).admins;
+    check('  she is gone from the list', left.some((a) => a.email === 'nikki@example.com'), false);
+    check('  everyone else remains', left.map((a) => a.email).sort(), ['chosen@example.com', OWNER_EMAIL].sort());
+
+    // Down to one, so the last-admin guard is actually being tested.
+    const chosenRow = left.find((a) => a.email === 'chosen@example.com');
+    await call(`/api/admin/admins/${chosenRow.id}/remove`, { method: 'POST', cookies: owner2.jar, extra: KEY, body: {} });
     const lastOne = (await jsonOf(await call('/api/admin/admins', { cookies: owner2.jar, extra: KEY }))).admins[0];
+    check('  only the owner is left', lastOne.email, OWNER_EMAIL);
     check('the last admin cannot be removed either', (await call(`/api/admin/admins/${lastOne.id}/remove`, {
       method: 'POST', cookies: owner2.jar, extra: KEY, body: {},
     })).status, 409);
