@@ -162,7 +162,7 @@ and the page offers no restart — its only links out are "update your D&B profi
 The only clean route is Apple Developer Support: developer.apple.com/contact →
 **Membership and Account → D-U-N-S Number → Email**. A message is drafted there giving 588248848,
 FRESHAF (PTY) LTD, registration 2026/683087/07, the registered office and freshaf.io, and asking
-them to reset the organisation details. Evert presses Send.
+them to reset the organisation details. **SENT 17 Nov 2026 by Evert - Apple case ID 30000018493246.** Replies go to admin@freshaf.io; watch GoDaddy's spam folder too, since that is where D&B's mail landed.
 
 Side effect worth noting: D&B's 24–48 hour eligibility window will have passed long before Apple
 replies, so that wait costs nothing now.

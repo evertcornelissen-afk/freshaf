@@ -20,6 +20,6 @@
   },
   "app_store": {
     "ok": false,
-    "detail": "D-U-N-S in hand. Waiting out D&B's 24-48 hour eligibility window (opens 18-19 Nov), then Evert signs in at developer.apple.com and Claude fills the organisation enrolment ($99/year) as FRESHAF (PTY) LTD. After that: iOS build via Codemagic and the APNs push key."
+    "detail": "BLOCKED: the in-progress Apple enrolment is pinned to D-U-N-S 654518140 (another company, Randburg) and every entity field on that step is read-only. Apple support case 30000018493246 opened 17 Nov 2026 asking them to reset it to 588248848. Nothing to do until they reply to admin@freshaf.io. Never press Continue on that enrolment step meanwhile."
   }
 }
