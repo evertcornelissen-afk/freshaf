@@ -35,7 +35,7 @@ state of its own.
 | Build command | `npm install --omit=dev` |
 | Start command | `node server.js` |
 | Plan | Starter (the free plan sleeps, and a dashboard that takes 50 seconds to wake is a dashboard nobody opens) |
-| Health check path | `/_admin/target` |
+| Health check path | `/healthz` (the one path in front of the gate; Render cannot send the front-door password) |
 
 ### Environment variables
 

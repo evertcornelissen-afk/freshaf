@@ -68,6 +68,11 @@ if (PUBLIC) {
     next();
   });
 
+  // Render's health checker is not a browser and cannot send the front-door password.
+  // Gated, it would get 401 on every probe and fail every deploy. So this one path sits
+  // in front of the gate — and says nothing except that the process is up.
+  app.get('/healthz', (req, res) => res.type('text/plain').send('ok'));
+
   const gateFails = new Map(); // ip -> { n, until }
   const WINDOW_MS = 15 * 60_000;
   const MAX_TRIES = 10;
