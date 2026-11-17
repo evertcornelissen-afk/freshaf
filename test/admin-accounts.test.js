@@ -193,6 +193,32 @@ async function signIn(email, password) {
     // Down to one, so the last-admin guard is actually being tested.
     const chosenRow = left.find((a) => a.email === 'chosen@example.com');
     await call(`/api/admin/admins/${chosenRow.id}/remove`, { method: 'POST', cookies: owner2.jar, extra: KEY, body: {} });
+    // ---- removed, then added back ------------------------------------------
+    // The guard only looked at role, and a removed admin keeps role = 'admin'. That
+    // refused the address forever after a removal: no way to undo, and no way to
+    // re-create the account someone had just deleted by mistake.
+    const back = await post('/api/admin/admins', {
+      name: 'Nikki', email: 'nikki@example.com', password: 'SheIsBackAgain1!',
+    });
+    check('a removed admin can be added back', back.status, 200);
+    check('  and it says it reinstated them', (await jsonOf(back)).reinstated, true);
+    const backIn = await signIn('nikki@example.com', 'SheIsBackAgain1!');
+    check('  they can sign in again', backIn.status, 200);
+    const stillOne = (await jsonOf(await call('/api/admin/admins', { cookies: owner2.jar, extra: KEY }))).admins;
+    check('  and they appear once, not twice',
+      stillOne.filter((a) => a.email === 'nikki@example.com').length, 1);
+    // Remove her again so the last-admin guard below is still meaningful.
+    const nikkiAgain = stillOne.find((a) => a.email === 'nikki@example.com');
+    await call(`/api/admin/admins/${nikkiAgain.id}/remove`, { method: 'POST', cookies: owner2.jar, extra: KEY, body: {} });
+
+    // ---- a chosen password on reset ----------------------------------------
+    const ownerRow = (await jsonOf(await call('/api/admin/admins', { cookies: owner2.jar, extra: KEY }))).admins
+      .find((a) => a.email === OWNER_EMAIL);
+    check('an active admin cannot be added again', (await post('/api/admin/admins',
+      { name: 'Dup', email: OWNER_EMAIL })).status, 409);
+    check('  and the refusal says to use the password button instead',
+      /New password/.test((await jsonOf(await post('/api/admin/admins', { name: 'Dup', email: OWNER_EMAIL }))).error), true);
+
     const lastOne = (await jsonOf(await call('/api/admin/admins', { cookies: owner2.jar, extra: KEY }))).admins[0];
     check('  only the owner is left', lastOne.email, OWNER_EMAIL);
     check('the last admin cannot be removed either', (await call(`/api/admin/admins/${lastOne.id}/remove`, {

@@ -413,7 +413,7 @@ async function refreshAdmins() {
         ? '<span class="pill warn">has not signed in yet</span>'
         : '<span class="pill ok">active</span>'}</td>
       <td><div class="row" style="flex-wrap:nowrap">
-        ${a.is_you ? '' : `<button class="secondary small" onclick="resetAdminPassword(${a.id})">New password</button>`}
+        ${a.is_you ? '' : `<button class="secondary small" onclick="resetAdminPassword(${a.id})">Set password</button>`}
         ${a.is_you ? '' : `<button class="danger small" onclick="removeAdmin(${a.id}, '${escapeHtml(a.name)}')">Remove</button>`}
       </div></td>
     </tr>`).join('') + '</tbody></table>';
@@ -443,14 +443,18 @@ window.addAdmin = async () => {
 
 window.resetAdminPassword = async (id) => {
   try {
-    const ok = await modal({
-      title: 'Issue a new temporary password?',
-      body: 'Their current password stops working immediately and they are signed out everywhere. They will have to set a new one when they next sign in.',
-      confirmText: 'Issue it', danger: true,
+    const password = await modal({
+      title: 'Set a new password for them',
+      body: 'Their current password stops working immediately and they are signed out everywhere. '
+        + 'Type the password you want them to use and tell them what it is &mdash; or leave it blank '
+        + 'and one is generated that they must replace on first sign-in.',
+      input: 'New password (at least 12 characters, or blank to generate one)',
+      confirmText: 'Set it', danger: true,
     });
-    if (!ok) return;
-    const r = await api(`/api/admin/admins/${id}/reset-password`, { method: 'POST' });
-    showNewAdminCredentials({ name: r.email, email: r.email, password: r.password });
+    if (password === null) return;
+    if (password && password.length < 12) return toast('That password is too short — use at least 12 characters', 'error');
+    const r = await api(`/api/admin/admins/${id}/reset-password`, { method: 'POST', body: { password } });
+    showNewAdminCredentials({ name: r.email, email: r.email, password: r.password, chosen: r.chosen });
     await refreshAdmins();
   } catch (e) { showError('admins-error', e.message); }
 };

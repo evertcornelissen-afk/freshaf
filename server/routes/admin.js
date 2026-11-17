@@ -380,11 +380,28 @@ router.post('/admins', (req, res) => {
     return res.status(400).json({ error: 'That is not a valid email address' });
   }
 
-  const existing = db.prepare('SELECT id, role FROM users WHERE lower(email) = ?').get(email);
+  // Removing someone leaves their row in place with role = 'admin' and a revoked stamp,
+  // so their name still explains the decisions they made. That meant this guard, which
+  // only looked at the role, refused the address FOREVER after a removal — the account
+  // could not be removed and re-created, which is the obvious thing to try when something
+  // looks stuck. A revoked admin is reinstated instead of refused.
+  const existing = db.prepare('SELECT id, role, admin_revoked_at FROM users WHERE lower(email) = ?').get(email);
+  if (existing && existing.role === 'admin' && existing.admin_revoked_at) {
+    const chosen = String(req.body?.password || '');
+    if (chosen && chosen.length < 12) {
+      return res.status(400).json({ error: 'Use at least 12 characters — this account can see ID numbers and bank details' });
+    }
+    const password = chosen || tempPassword();
+    db.prepare(`UPDATE users SET name = ?, password_hash = ?, must_change_password = ?,
+      admin_revoked_at = NULL, invited_by = ? WHERE id = ?`)
+      .run(name, bcrypt.hashSync(password, 10), chosen ? 0 : 1, req.user.name || null, existing.id);
+    console.log(`[FreshAF] Admin access restored for ${email} by ${req.user.name || 'an admin'}`);
+    return res.json({ ok: true, id: existing.id, email, name, password, chosen: !!chosen, reinstated: true });
+  }
   if (existing) {
     return res.status(409).json({
       error: existing.role === 'admin'
-        ? 'That address is already an admin'
+        ? 'That address is already an admin — use "New password" next to their name instead of adding them again'
         : `That address already has a ${existing.role} account. Admins need their own address.`,
     });
   }
