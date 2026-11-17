@@ -9,6 +9,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script>document.documentElement.dataset.theme = localStorage.getItem('freshaf_theme') || 'light';</script>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1799c2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FreshAF Admin">
+<link rel="apple-touch-icon" href="/img/icon-180.png">
+<meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .target-tag { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
@@ -52,5 +59,12 @@
 <script src="/js/safety.js"></script>
 <script src="/js/review.js"></script>
 <script src="/js/applicant.js"></script>
+<script>
+  // Registered only over HTTPS (the hosted dashboard). On localhost it is unnecessary,
+  // and a worker there would outlive the session and serve a stale dashboard later.
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  }
+</script>
 </body>
 </html>

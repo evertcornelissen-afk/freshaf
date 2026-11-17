@@ -361,7 +361,17 @@ window.settleCash = async (id, owed) => {
 // Shown once, never again: the temporary password is not stored in readable form, so if
 // this card is dismissed before it is passed on, a new one has to be issued.
 function showNewAdminCredentials(r) {
-  const signInUrl = location.origin;
+  // NOT location.origin. On the operator's own laptop that is http://localhost:5858 —
+  // their machine and nobody else's. Pasting it to a new admin sends them to a dead
+  // address on their own computer, which is exactly what happened the first time.
+  const local = /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(location.origin);
+  const signInUrl = local ? '<< fill in the dashboard address - see the note below >>' : location.origin;
+  const localWarning = local ? `
+    <p class="small-text" style="margin:9px 0 0;color:var(--warn)"><strong>This dashboard is not published yet.</strong>
+      It is running at <code>${escapeHtml(location.origin)}</code>, which is this computer and nobody
+      else can reach it. Until it is hosted, they either run their own copy on their laptop
+      (see <code>admin-app/README.md</code>) or they cannot sign in at all. Fill the real address in
+      before you send this.</p>` : '';
   const block = [
     `FreshAF admin dashboard`,
     `Sign in: ${signInUrl}`,
@@ -378,6 +388,7 @@ function showNewAdminCredentials(r) {
     <p class="small-text" style="margin:6px 0">This password is shown <strong>once</strong>. Send it to them
       now — if you lose it, issue a new one with “New password” below. They must change it on first sign-in.</p>
     <div style="font-family:ui-monospace,monospace;background:var(--panel-2,#f4f6f8);padding:10px 12px;border-radius:8px;white-space:pre-wrap">${escapeHtml(block)}</div>
+    ${localWarning}
     <div class="row mt">
       <button class="secondary small" id="btn-copy-admin">Copy these details</button>
       <button class="ghost small" onclick="document.getElementById('admins-new').classList.add('hidden')">Done, hide it</button>
