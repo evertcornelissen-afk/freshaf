@@ -859,6 +859,16 @@ function appUser() {
 }
 function isProPage() { return /supplier/.test(location.pathname); }
 
+// Which of the three apps this page belongs to. The drawer used to know only "pro or
+// not", so the admin dashboard fell through to the CUSTOMER branch and offered an admin
+// "Sign up", "Become a pro" and "Contact & support" — and because the admin app proxies
+// everything it does not serve itself, tapping those walked the operator out of the
+// dashboard and into the live customer site. An admin page says so explicitly.
+function appKind() {
+  if (window.FRESHAF_APP === 'admin') return 'admin';
+  return isProPage() ? 'pro' : 'customer';
+}
+
 function closeAppMenu() {
   const d = document.getElementById('app-drawer');
   if (!d) return;
@@ -895,11 +905,31 @@ function openAppMenu() {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && d.classList.contains('open')) closeAppMenu(); });
   }
   const u = appUser();
-  const pro = isProPage();
+  const kind = appKind();
+  const admin = kind === 'admin';
+  const pro = kind === 'pro';
   const dark = document.documentElement.dataset.theme === 'dark';
   const who = u
     ? `<strong>${escapeHtml(u.name || '')}</strong><span>${escapeHtml(pro && u.supplier?.business_name ? u.supplier.business_name : (u.email || ''))}</span>`
-    : `<strong>FreshAF${pro ? ' Pro' : ''}</strong><span>Not signed in</span>`;
+    : `<strong>FreshAF${admin ? ' Admin' : pro ? ' Pro' : ''}</strong><span>Not signed in</span>`;
+
+  // The admin dashboard is a staff tool. It gets the two things that belong in a menu
+  // here and nothing from the customer or pro apps.
+  if (admin) {
+    d.innerHTML = `
+      <nav class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="drawer-head">${who}<button type="button" class="drawer-close" data-close aria-label="Close menu">${icon('x')}</button></div>
+        <div class="drawer-list">
+          ${/applicant/.test(location.pathname) ? menuItem('page:/', 'briefcase', 'All applications') : ''}
+          <label class="drawer-item drawer-switch">${icon('moon')}<span>Night mode</span>
+            <input type="checkbox" id="drawer-dark" ${dark ? 'checked' : ''} aria-label="Night mode"><i class="drawer-toggle"></i></label>
+          ${u ? '<div class="drawer-sep"></div>' + menuItem('logout', 'logout', 'Sign out') : ''}
+        </div>
+      </nav>`;
+    wireAppMenu(d, pro);
+    openDrawer(d);
+    return;
+  }
   d.innerHTML = `
     <nav class="drawer-panel" role="dialog" aria-modal="true" aria-label="Menu">
       <div class="drawer-head">${who}<button type="button" class="drawer-close" data-close aria-label="Close menu">${icon('x')}</button></div>
@@ -920,6 +950,11 @@ function openAppMenu() {
         ${u ? '<div class="drawer-sep"></div>' + menuItem('logout', 'logout', 'Log out') : ''}
       </div>
     </nav>`;
+  wireAppMenu(d, pro);
+  openDrawer(d);
+}
+
+function wireAppMenu(d, pro) {
   d.querySelector('[data-close]').onclick = closeAppMenu;
   d.querySelector('#drawer-dark').onchange = (e) => {
     const t = e.target.checked ? 'dark' : 'light';
@@ -956,7 +991,11 @@ function openAppMenu() {
       }
     };
   });
-  // Next frame, so the slide-in transition runs.
+}
+
+// Shared by every drawer variant, so a new one cannot ship without the slide-in,
+// the aria state or focus moving into the panel.
+function openDrawer(d) {
   requestAnimationFrame(() => {
     d.classList.add('open');
     document.body.classList.add('drawer-open');

@@ -9,6 +9,9 @@
 
 const APPLICANT_ID = Number(new URLSearchParams(location.search).get('id'));
 
+// The shared menu reads this to show who is signed in and offer Sign out.
+let me = null;
+
 // Which site this page is reading. Same reason as the dashboard: a page showing real
 // numbers from the wrong database looks perfectly healthy.
 (async function showTarget() {
@@ -237,6 +240,7 @@ window.copyMessage = async () => {
   try {
     const { user } = await api('/api/auth/me');
     if (!user || user.role !== 'admin') throw new Error('not an admin');
+    me = user;
     const who = el('who');
     if (who) who.textContent = user.name || '';
     await load();
