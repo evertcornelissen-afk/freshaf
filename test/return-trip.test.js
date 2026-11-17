@@ -3,6 +3,7 @@
 // before they book. Runs against the local database like the other tests; it creates its
 // own throwaway accounts and puts the return-trip settings back as it found them.
 const path = require('path');
+const { stopServer } = require('./stop-server');
 const { spawn } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 process.chdir(ROOT);
@@ -112,7 +113,7 @@ const reqId = db.prepare(`INSERT INTO quote_requests (customer_id, service, pack
   } catch (e) {
     console.log('ERROR', e); checks.push(false);
   } finally {
-    server.kill();
+    await stopServer(server);
     for (const [k, v] of SAVED) { if (v == null) db.prepare('DELETE FROM settings WHERE key = ?').run(k); else setSetting(k, v); }
     const bad = checks.filter((c) => !c).length;
     console.log(`\n${checks.length - bad}/${checks.length} passed`);

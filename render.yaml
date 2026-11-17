@@ -40,6 +40,14 @@ services:
       # fee falls back to straight-line distance.
       - key: GOOGLE_MAPS_API_KEY
         sync: false
+      # The map picture (Maps JavaScript API). Public by design; restricted by website
+      # and API in Google Cloud. Without it the map is OpenStreetMap.
+      - key: GOOGLE_MAPS_BROWSER_KEY
+        sync: false
+      # Backup-only token for /api/backup (the nightly off-site backup on the owner's PC).
+      # Same value as BACKUP_TOKEN in that PC's .env. Unset: the route does not exist.
+      - key: BACKUP_TOKEN
+        sync: false
       # Encrypts supplier ID numbers and bank details at rest. Without it they
       # are plain text in the database and in every backup.
       - key: DATA_KEY

@@ -109,3 +109,19 @@ npm run backup -- --local
 which writes a verified snapshot to `Desktop\FreshAF\backups\`.
 
 **That file is the business.** Whatever you host on later, it moves with you.
+
+## Data safety (added 15 Nov 2026)
+
+Three layers, each covering what the others cannot:
+
+| Layer | Where | Protects against | Restore |
+|---|---|---|---|
+| **Server snapshots** | `data/snapshots/` on the Render disk: one at every start-up (so before every deploy touches anything) + every 6 h; 20 boot + 28 scheduled kept, each verified | a bad release, a mistaken delete | copy one to `data/restore.db`, restart (Render Shell) |
+| **Render disk snapshots** | Render dashboard → service → Disks → Snapshots (daily, Render-managed) | the disk itself failing or being wiped | Restore button in Render |
+| **Off-site nightly backup** | this PC, `BACKUP_DIR` (Desktop\FreshAF\backups), 02:30 via `scripts\install-nightly-backup.ps1`; 30 kept + the fullest one never pruned | losing Render or the account | admin app → Restore, or `data/restore.db` |
+
+`/api/health` shows `last_snapshot` (time only). The nightly job writes `LAST-BACKUP.txt`, and
+`BACKUP-FAILED.txt` whenever it fails or the live data **shrinks** by more than 2 rows / 5%.
+Restore drill done locally 15 Nov 2026: snapshot → restore.db → boot → every count matched.
+
+**Before every release:** run `npm run backup` and see OK first.

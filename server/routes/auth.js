@@ -80,6 +80,10 @@ function mePayload(user) {
     const s = supplierProfile(user.id);
     out.supplier = s && {
       business_name: s.business_name, status: s.status, status_reason: s.status_reason,
+      // Outstanding items an admin has asked for. Separate from status_reason so being
+      // asked for a document never reads as a refusal.
+      info_needed: (() => { try { return JSON.parse(s.info_needed || '[]'); } catch { return []; } })(),
+      info_note: s.info_note || null,
       online: !!s.online, lat: s.lat, lng: s.lng, service_area: s.service_area,
       services: (s.services || 'carwash').split(','),
       rating: s.rating_count ? +(s.rating_sum / s.rating_count).toFixed(1) : null,
@@ -139,7 +143,7 @@ router.post('/phone-code', signupCodeLimit, async (req, res) => {
 
 router.post('/register', registerLimit, (req, res) => {
   const { role, name, email, phone, password, home_address, home_lat, home_lng, accept_terms,
-    business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
+    business_name, id_number, reg_number, vat_number, vehicle_reg, service_area, equipment_notes, services,
     bank_name, bank_account, bank_branch, vehicles, equipment, phone_code } = req.body || {};
 
   // Structured onboarding data: multiple vehicles + itemised equipment.
@@ -237,10 +241,11 @@ router.post('/register', registerLimit, (req, res) => {
       ...cleanEquipment.items.map((i) => i.qty ? `${i.label} ×${i.qty}` : i.label),
       cleanEquipment.other,
     ].filter(Boolean).join(', ') || equipment_notes?.trim() || null;
-    db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, vehicle_reg, service_area, equipment_notes, services,
+    db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, reg_number, vat_number, vehicle_reg, service_area, equipment_notes, services,
                 bank_name, bank_account, bank_branch, vehicles_json, equipment_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(userId, business_name.trim(), secrets.encryptField(id_number.trim()), vehicleSummary,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(userId, business_name.trim(), secrets.encryptField(id_number.trim()),
+        reg_number?.trim() || null, vat_number?.trim() || null, vehicleSummary,
         service_area?.trim() || null, equipmentSummary, supplierServices.join(','),
         bank_name?.trim() || null, secrets.encryptField(bank_account?.trim() || null),
         secrets.encryptField(bank_branch?.trim() || null),
@@ -249,6 +254,10 @@ router.post('/register', registerLimit, (req, res) => {
       db.prepare("UPDATE users SET phone_verified_at = datetime('now') WHERE id = ?").run(userId);
       db.prepare('DELETE FROM signup_phone_codes WHERE phone = ?').run(phoneProved);
     }
+    // Run the automatic checks straight away, so the application is never sitting in the
+    // queue un-vetted. Deliberately not awaited: a slow Google call must not hold up
+    // someone's sign-up, and the result is stored for the dashboard either way.
+    require('../vetting').runFor(userId).catch((e) => console.warn('[FreshAF] vetting failed:', e.message));
     mailer.proApplicationReceived({ to: cleanEmail, name: name.trim() }).catch(() => {});
     mailer.adminNewPro({ name: name.trim(), business: business_name.trim(), email: cleanEmail,
       phone: phone?.trim(), services: supplierServices }).catch(() => {});

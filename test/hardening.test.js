@@ -7,6 +7,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
+const { stopServer } = require('./stop-server');
 const ROOT = path.join(__dirname, '..');
 const PORT = 5759;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -161,6 +162,6 @@ const BASE = `http://127.0.0.1:${PORT}`;
       process.exitCode = 1;
     }
   } finally {
-    server.kill();
+    await stopServer(server);
   }
 })();

@@ -610,7 +610,7 @@ router.get('/orders/:id/handover-photo', authRequired('customer'), (req, res) =>
   const o = db.prepare('SELECT handover_photo FROM orders WHERE id = ? AND customer_id = ?').get(req.params.id, req.user.id);
   if (!o?.handover_photo) return res.status(404).json({ error: 'No handover photo' });
   res.set('Cache-Control', 'private, max-age=3600');
-  res.sendFile(require('path').join(__dirname, '..', '..', 'data', 'uploads', o.handover_photo));
+  res.sendFile(require('path').join(require('../db').DATA_DIR, 'uploads', o.handover_photo));
 });
 
 router.get('/orders/:id', authRequired('customer'), (req, res) => {

@@ -148,4 +148,37 @@ async function drivingDistance(from, to) {
   }
 }
 
-module.exports = { hasGoogle, autocomplete, placeDetails, drivingDistance };
+/* ---------- business lookup (pro vetting) ---------- */
+// Find a pro's Google Business listing by name, to show the reviewer its rating, review
+// count and whether Google thinks it is still trading.
+//
+// Cost note: rating and userRatingCount sit in a higher Text Search billing tier than a
+// plain name lookup. This runs ONCE per application and the answer is stored, so it is a
+// handful of calls a month, not one per page view.
+async function findBusiness(name, area) {
+  if (!KEY || !String(name || '').trim()) return null;
+  const query = [String(name).trim(), String(area || '').trim(), 'South Africa']
+    .filter(Boolean).join(' ');
+  const data = await googleJson(`${PLACES}/places:searchText`, {
+    method: 'POST',
+    fieldMask: [
+      'places.id', 'places.displayName', 'places.formattedAddress',
+      'places.rating', 'places.userRatingCount', 'places.businessStatus',
+      'places.googleMapsUri',
+    ].join(','),
+    body: { textQuery: query, regionCode: REGION, languageCode: 'en', maxResultCount: 1 },
+  });
+  const p = (data.places || [])[0];
+  if (!p) return null;
+  return {
+    placeId: p.id || null,
+    name: p.displayName?.text || null,
+    address: p.formattedAddress || null,
+    rating: typeof p.rating === 'number' ? p.rating : null,
+    reviews: typeof p.userRatingCount === 'number' ? p.userRatingCount : 0,
+    status: p.businessStatus || null,
+    mapsUrl: p.googleMapsUri || null,
+  };
+}
+
+module.exports = { hasGoogle, autocomplete, placeDetails, drivingDistance, findBusiness };

@@ -113,6 +113,39 @@ function proApplicationReceived({ to, name }) {
   });
 }
 
+// "We have your application, we just need X." Deliberately NOT a rejection: the
+// application stays pending and the pro keeps the same login.
+function proInfoRequested({ to, name, items, note }) {
+  const list = (items || []).map(
+    (i) => `<li style="margin-bottom:9px"><b>${esc(i.label)}</b><br><span style="color:#5b6472">${esc(i.ask)}</span></li>`
+  ).join('');
+  return send({
+    to, subject: 'FreshAF Pro: a few things still outstanding',
+    heading: `Almost there, ${esc(name)}.`,
+    paragraphs: [
+      'We have your FreshAF Pro application and it is still open — nothing has been turned down. Before we can approve you we need the following:',
+      `<ul style="padding-left:20px;margin:0 0 4px">${list}</ul>`,
+      ...(note ? [`<b>Note from the team:</b> ${esc(note)}`] : []),
+      'Open FreshAF Pro and upload them on the <b>Your documents</b> card — the tick list there matches this email. Anything we cannot collect as a file, just reply to this email.',
+      'As soon as everything is in, your application goes straight back into review.',
+    ],
+    cta: { label: 'Upload the outstanding items', url: `${BASE}/supplier` },
+  });
+}
+
+// The other side of that conversation: the pro has sent in everything we asked for.
+function adminProInfoComplete({ to, name, business, items }) {
+  return send({
+    to, subject: `Pro ready for review again: ${esc(business || name)}`,
+    heading: `${esc(business || name)} has sent in what we asked for.`,
+    paragraphs: [
+      `Supplied: ${esc((items || []).join(', '))}.`,
+      'The application is back in the pending queue for a decision.',
+    ],
+    cta: { label: 'Open the approvals queue', url: `${BASE}/admin` },
+  });
+}
+
 function proStatusChanged({ to, name, status, reason }) {
   if (status === 'approved') {
     return send({
@@ -377,4 +410,5 @@ function passwordChanged({ to, name }) {
 
 // layout is exported so an email can be rendered and looked at before it is sent.
 module.exports = { layout, configured, status, send, proApplicationReceived, proStatusChanged, adminNewPro,
+  proInfoRequested, adminProInfoComplete,
   passwordReset, passwordChanged, bookingConfirmed, proJobBooked, proJobCancelled, receipt, orderCancelled, noProAvailable, refundSent, adminAlert, adminDigest };

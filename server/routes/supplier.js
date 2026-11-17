@@ -3,17 +3,19 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const crypto = require('crypto');
-const { db, getSetting } = require('../db');
+const { db, getSetting, DATA_DIR } = require('../db');
 const { authRequired } = require('../auth');
 const dispatch = require('../dispatch');
 const realtime = require('../realtime');
 const balance = require('../balance');
+const mailer = require('../mailer');
+const onboarding = require('../onboarding');
 
 const router = express.Router();
 router.use(authRequired('supplier'));
 
 // ---------- onboarding documents (allowed while pending — that's when they're needed) ----------
-const UPLOAD_DIR = path.join(__dirname, '..', '..', 'data', 'uploads');
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.pdf'];
@@ -33,7 +35,7 @@ const upload = multer({
 
 router.post('/documents', upload.single('file'), (req, res) => {
   const kind = req.body.kind;
-  if (!['id_copy', 'proof_address', 'work_photo'].includes(kind)) {
+  if (!onboarding.DOC_KINDS.includes(kind)) {
     return res.status(400).json({ error: 'Invalid document type' });
   }
   if (!req.file) return res.status(400).json({ error: 'Attach a JPG, PNG or PDF up to 5 MB' });
@@ -45,12 +47,39 @@ router.post('/documents', upload.single('file'), (req, res) => {
   }
   db.prepare('INSERT INTO supplier_docs (user_id, kind, original_name, stored_name) VALUES (?, ?, ?, ?)')
     .run(req.user.id, kind, req.file.originalname, req.file.filename);
-  res.json({ ok: true });
+
+  // If this was the last thing an admin asked for, close the request and put the
+  // application back in the queue — nobody should have to notice by hand.
+  const settled = onboarding.settleRequest(req.user.id);
+  if (settled?.done) {
+    const u = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
+    const s = db.prepare('SELECT business_name FROM suppliers WHERE user_id = ?').get(req.user.id);
+    const to = process.env.ADMIN_NOTIFY_EMAIL;
+    if (to) {
+      mailer.adminProInfoComplete({
+        to, name: u?.name, business: s?.business_name,
+        items: onboarding.labelsFor(settled.supplied),
+      }).catch(() => {});
+    }
+    console.log(`[FreshAF] Pro ${req.user.id} supplied everything requested: ${settled.supplied.join(', ')}`);
+  }
+  res.json({ ok: true, request_settled: !!settled?.done });
 });
 
+// The pro's own view of the checklist: what they have sent, what is still outstanding,
+// and anything an admin has specifically asked for.
 router.get('/documents', (req, res) => {
+  const s = db.prepare('SELECT * FROM suppliers WHERE user_id = ?').get(req.user.id);
   const docs = db.prepare('SELECT kind, original_name, uploaded_at FROM supplier_docs WHERE user_id = ?').all(req.user.id);
-  res.json({ documents: docs });
+  let asked = [];
+  try { asked = JSON.parse(s?.info_needed || '[]'); } catch { asked = []; }
+  res.json({
+    documents: docs,
+    checklist: onboarding.checklist(s, docs),
+    info_needed: asked.filter(onboarding.isValidKey),
+    info_note: s?.info_note || null,
+    info_requested_at: s?.info_requested_at || null,
+  });
 });
 
 function requireApproved(req, res, next) {

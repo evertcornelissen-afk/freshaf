@@ -52,21 +52,23 @@ function securityHeaders(publicDir) {
 
   const policy = [
     "default-src 'self'",
-    // Leaflet is the only third-party script. Named explicitly rather than allowing
-    // https:, so a future injected <script src> to anywhere else is still refused.
-    `script-src 'self' https://unpkg.com ${scriptHashes.join(' ')}`,
+    // Leaflet (unpkg) and Google Maps are the only third-party scripts. Named explicitly
+    // rather than allowing https:, so an injected <script src> to anywhere else is refused.
+    `script-src 'self' https://unpkg.com https://maps.googleapis.com https://maps.gstatic.com ${scriptHashes.join(' ')}`,
     // Styles keep 'unsafe-inline': Leaflet and the map markers set element styles
     // directly, and hashing cannot cover a style attribute. An injected stylesheet is a
     // far smaller prize than injected script, so this is a deliberate, bounded trade.
     "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     // data: for the inline SVG icons, blob: for photo previews before upload,
-    // tile.openstreetmap.org for the map itself.
-    "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org",
-    // Everything the browser calls is same-origin: the geocoder, Google Places and
-    // Stitch are all reached from the server, never from the page.
-    "connect-src 'self'",
-    "worker-src 'self'",
+    // tile.openstreetmap.org and Google's map servers for the map itself.
+    "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org"
+      + ' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com https://*.google.com',
+    // The page calls only us, plus Google's map script fetching its own map data. The
+    // geocoder, Google Places, Routes and Stitch are reached from the server.
+    "connect-src 'self' https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com",
+    // Google's map draws in a blob: worker.
+    "worker-src 'self' blob:",
     "manifest-src 'self'",
     "media-src 'self'",
     "object-src 'none'",

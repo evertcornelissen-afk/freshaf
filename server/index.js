@@ -77,7 +77,10 @@ app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 3) return res.json({ results: [] });
   const key = q.toLowerCase();
-  if (geoCache.has(key)) return res.json({ results: geoCache.get(key) });
+  if (geoCache.has(key)) {
+    const hit = geoCache.get(key);
+    return res.json({ results: hit, source: hit.some((r) => r.place_id) ? 'google' : 'osm' });
+  }
 
   if (maps.hasGoogle()) {
     try {
@@ -85,7 +88,7 @@ app.get('/api/geocode', async (req, res) => {
       if (results.length) {
         if (geoCache.size > 500) geoCache.clear();
         geoCache.set(key, results);
-        return res.json({ results });
+        return res.json({ results, source: 'google' });
       }
     } catch (e) {
       // Fall through to Photon rather than leaving the customer with a dead field.
@@ -139,7 +142,7 @@ app.get('/api/geocode', async (req, res) => {
     }
     if (geoCache.size > 500) geoCache.clear();
     geoCache.set(key, unique);
-    res.json({ results: unique });
+    res.json({ results: unique, source: 'osm' });
   } catch {
     res.json({ results: [] }); // autocomplete is best-effort; typing still works
   }
@@ -227,10 +230,17 @@ app.get('/supplier', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'supplier.
 // Stadia Maps or MapTiler, key included in the URL - such keys are public by design and
 // restricted on the provider's side). Unset: OpenStreetMap, as before.
 app.get('/api/map-config', (req, res) => {
-  res.set('Cache-Control', 'public, max-age=3600');
+  // Short on purpose: switching the map engine (or pulling a misbehaving key) should
+  // reach visitors within minutes, not an hour.
+  res.set('Cache-Control', 'public, max-age=300');
   res.json({
     tiles: process.env.MAP_TILES_URL || null,
     attribution: process.env.MAP_TILES_ATTRIBUTION || null,
+    // A SEPARATE key from GOOGLE_MAPS_API_KEY. Browser keys are public by design (every
+    // visitor's browser receives it), so this one is restricted in Google Cloud to the
+    // Maps JavaScript API only, to freshaf.io and the app's own origin, and capped by a
+    // daily quota. The server key (Places, Routes) is never sent to a browser.
+    google_key: process.env.GOOGLE_MAPS_BROWSER_KEY || null,
   });
 });
 
@@ -238,6 +248,37 @@ app.get('/api/map-config', (req, res) => {
 // since when. No counts, no names, nothing an attacker can use — but it is the one
 // question ("are customer accounts being wiped?") that has to be answerable without
 // logging in, and the admin UI is no longer on this site to answer it.
+// Off-site backup download, for the nightly job on the owner's PC (scripts/backup.js).
+//
+// It used to sign in as the admin. When the admin password changed, every nightly backup
+// failed silently for two weeks (found 15 Nov 2026). This route takes its own long random
+// token instead (BACKUP_TOKEN, set on Render and in the PC's .env, never typed by a
+// person), so a password change can never stop backups again. It does one thing, a
+// read-only consistent copy of the database; without the token set it does not exist.
+app.get('/api/backup', (req, res) => {
+  const expected = process.env.BACKUP_TOKEN || '';
+  const given = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (expected.length < 32 || a.length !== b.length || !require('crypto').timingSafeEqual(a, b)) {
+    return res.status(404).send('Not found'); // do not confirm this route exists
+  }
+  const { db: database, checkpoint, DATA_DIR } = require('./db');
+  checkpoint();
+  const file = path.join(DATA_DIR, `backup-download-${Date.now()}.db`);
+  const cleanup = () => { try { require('fs').unlinkSync(file); } catch {} };
+  try {
+    database.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+  } catch (e) {
+    cleanup();
+    console.error('[FreshAF] Backup download failed:', e.message);
+    return res.status(500).send('Backup failed');
+  }
+  console.log(`[FreshAF] Off-site backup downloaded (${req.ip}).`);
+  res.set('Cache-Control', 'no-store');
+  res.download(file, `freshaf-backup-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.db`, cleanup);
+});
+
 app.get('/api/health', (req, res) => {
   const { persistence, DATA_DIR } = require('./db');
   // data_dir and the file list are here to answer one question that cannot be answered
@@ -261,6 +302,9 @@ app.get('/api/health', (req, res) => {
     // exactly the public address, customers get a 404 AFTER paying — money gone,
     // no order. Worth being able to read from outside before switching card on.
     return_url: require('./stitch').returnUrl(process.env.BASE_URL || ''),
+    // When the server last copied its own database (start-up, then every 6 hours).
+    // Time only: no counts, nothing about who is in it.
+    last_snapshot: (() => { const s = require('./db').lastSnapshotInfo(); return s ? { kind: s.kind, at: s.at } : null; })(),
   });
 });
 app.get('/pay/:orderId', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'pay.html')));

@@ -301,31 +301,52 @@ async function boot() {
   }
 }
 
-/* ---------- onboarding documents ---------- */
-const DOC_KINDS = [
-  ['id_copy', 'SA ID copy (required)'],
-  ['proof_address', 'Proof of address'],
-  ['work_photo', 'Photo of your setup / equipment'],
-];
-
+/* ---------- onboarding checklist ---------- */
+// The list itself comes from the server (server/onboarding.js), so what the pro sees
+// here is exactly what the admin dashboard and the email say.
 async function renderDocs() {
   el('docs-card').classList.remove('hidden');
-  const { documents } = await api('/api/supplier/documents');
-  el('docs-rows').innerHTML = DOC_KINDS.map(([kind, label]) => {
-    const doc = documents.find((d) => d.kind === kind);
+  const data = await api('/api/supplier/documents');
+  const checklist = data.checklist || [];
+  const asked = checklist.filter((c) => c.asked && !c.have);
+
+  // When the team has asked for specific things, lead with those.
+  const banner = el('docs-asked');
+  if (asked.length) {
+    banner.classList.remove('hidden');
+    banner.innerHTML = `
+      <strong style="display:block;margin-bottom:6px">${icon('alert')} We are waiting on ${asked.length === 1 ? 'one thing' : `${asked.length} things`} from you</strong>
+      <ul style="margin:0;padding-left:19px;line-height:1.55">
+        ${asked.map((c) => `<li><strong>${c.label}</strong> — <span class="muted">${c.ask}</span></li>`).join('')}
+      </ul>
+      ${data.info_note ? `<p style="margin:10px 0 0"><strong>Note from the team:</strong> ${escapeHtml(data.info_note)}</p>` : ''}
+      <p class="muted small-text" style="margin:10px 0 0">Your application is still open — this is not a rejection.
+        Anything that is not a file, reply to our email instead.</p>`;
+  } else {
+    banner.classList.add('hidden');
+    banner.innerHTML = '';
+  }
+
+  const docItems = checklist.filter((c) => c.kind === 'doc');
+  el('docs-rows').innerHTML = docItems.map((c) => {
+    const doc = (data.documents || []).find((d) => d.kind === c.key);
+    const flag = c.asked && !c.have
+      ? '<span class="pill warn" style="margin-left:7px;font-size:.68rem;padding:2px 9px">Requested</span>'
+      : (c.required ? '<span class="muted small-text" style="margin-left:7px">Required</span>' : '');
     return `
     <div class="row spread" style="padding:11px 0;border-bottom:1px solid var(--border-soft)">
-      <div>
-        <strong style="font-size:.9rem">${label}</strong>
-        <div class="muted small-text">${doc ? `${icon('check')} ${doc.original_name}` : 'Not uploaded yet'}</div>
+      <div style="min-width:0">
+        <strong style="font-size:.9rem">${c.label}</strong>${flag}
+        <div class="muted small-text">${doc ? `${icon('check')} ${escapeHtml(doc.original_name)}` : c.ask}</div>
       </div>
       <div>
-        <input type="file" id="file-${kind}" accept=".jpg,.jpeg,.png,.pdf" class="hidden">
-        <button class="secondary small" data-action="openFilePicker" data-arg="file-${kind}">${doc ? 'Replace' : 'Upload'}</button>
+        <input type="file" id="file-${c.key}" accept=".jpg,.jpeg,.png,.pdf" class="hidden">
+        <button class="secondary small" data-action="openFilePicker" data-arg="file-${c.key}">${doc ? 'Replace' : 'Upload'}</button>
       </div>
     </div>`;
   }).join('');
-  DOC_KINDS.forEach(([kind]) => {
+
+  docItems.forEach(({ key: kind }) => {
     el(`file-${kind}`).onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -339,7 +360,9 @@ async function renderDocs() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Upload failed');
-        toast('Document uploaded', 'ok');
+        toast(data.request_settled
+          ? 'That was the last outstanding item — your application is back in review'
+          : 'Document uploaded', 'ok');
         renderDocs();
       } catch (err) { showError('docs-error', err.message); }
     };
@@ -477,7 +500,14 @@ async function route() {
   if (s.status === 'pending') renderDocs().catch(() => {});
   else el('docs-card').classList.add('hidden');
   const heading = el('status-heading'); const detail = el('status-detail'); const ic = el('status-icon');
-  if (s.status === 'pending') {
+  if (s.status === 'pending' && (s.info_needed || []).length) {
+    // Pending, but we are waiting on them — say so here rather than leaving them to
+    // believe the delay is on our side.
+    ic.innerHTML = icon('alert', 'xl');
+    ic.style.color = 'var(--warn)';
+    heading.textContent = 'We need a few things from you';
+    detail.textContent = 'Your application is still open. Send in the items listed below and it goes straight back into review.';
+  } else if (s.status === 'pending') {
     ic.innerHTML = icon('clock', 'xl');
     ic.style.color = 'var(--warn)';
     heading.textContent = 'Application under review';
@@ -1102,6 +1132,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
         role: 'supplier', name: el('reg-name').value, email: el('reg-email').value.trim().toLowerCase(),
         phone: el('reg-phone').value, password: el('reg-password').value,
         business_name: el('reg-business').value, id_number: idNum,
+        reg_number: el('reg-regno').value.trim(), vat_number: el('reg-vat').value.trim(),
         service_area: serviceArea,
         vehicles: collectVehicles(), equipment: collectEquipment(),
         services, accept_terms: true,

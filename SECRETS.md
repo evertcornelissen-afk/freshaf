@@ -47,7 +47,8 @@ is a working copy that can be regenerated or re-pasted.**
 | Stitch **webhook signing secret** | Password manager | Render | **Cannot be re-fetched.** Delete the endpoint and make a new one |
 | `JWT_SECRET` | Password manager | `.env`, Render | Generate a new one; everyone gets logged out, nothing else breaks |
 | Live admin password | Password manager | nowhere | Reset through the database |
-| Google Maps API key | Password manager | Render | Regenerate in Google Cloud |
+| Google Maps API key (server: Places + Routes) | Password manager | Render | Regenerate in Google Cloud |
+| Google Maps browser key (map picture, public by design, website-restricted) | Password manager | Render `GOOGLE_MAPS_BROWSER_KEY` | Regenerate in Google Cloud |
 | SMTP password | Password manager | Render | Reset in the mail provider |
 | **`DATA_KEY`** | Password manager | Render, `.env` | **Nothing can recover the data.** See below |
 

@@ -258,6 +258,51 @@ Then place one real low-value order and pay it. Check that:
 
 ---
 
+## Stitch's review test — what they will see (checked 12 Nov 2026)
+
+`npm run stitch:e2e` rehearses the reviewer against the **real Stitch test API**: demo customer
+signs in → instant quote from the demo pro (offline, nobody awake) → Card → real Stitch test
+link (amount checked in cents) → signed `payment.paid` → order paid and booked → the same
+webhook again is harmless → return page loads → can book again. **16/16 passed.** Live site the
+same day: `/api/health` return URL is exactly `https://freshaf.io/payment-complete`, data
+survives restarts, forged webhooks get 400, `/terms` `/privacy` `/contact` all 200.
+
+**The one thing that will fail them:** a visitor who is *not* signed in as a demo account sees
+"Pay cash on completion" and no Card button (test keys never open card to the public). Stitch
+must be given the **demo customer login** with the steps below, or they will report that
+Stitch is not on the checkout.
+
+> To test a card payment: sign in at https://freshaf.io with the demo customer account below.
+> Choose Car Wash, use the address 1 Main Road, Durbanville (any address works for this
+> account), and request a quote. The demo pro answers straight away. Accept it, choose Card,
+> and you are taken to the Stitch test checkout. After paying with a Stitch test card you
+> return to FreshAF and the booking shows as paid within about a minute (our webhook marks it
+> paid; the browser redirect alone never does). The demo account can book as often as needed
+> and never involves a real person.
+
+Demo login: admin app → **Store reviewer accounts** (shows whether the demo pro is approved and
+online). Pressing **Create** again resets both passwords — if Apple/Google already have them,
+give Stitch the same ones instead.
+
+## When Stitch approves — switching to live keys
+
+Live keys are a **separate Stitch client**: assume the test client's return URL and webhook
+do **not** carry over, and its webhook secret is different.
+
+1. Put the live client id + secret in local `.env` **and** set `BASE_URL=https://freshaf.io`
+   and remove `STITCH_WEBHOOK_SECRET` from `.env` for this one run.
+2. `npm run stitch:connect` — registers `https://freshaf.io/payment-complete` (exact, no
+   trailing slash) and the webhook, and prints the **new** `whsec_` secret once. Run it
+   yourself; never paste the output into chat.
+3. Render → Environment: replace `STITCH_CLIENT_ID`, `STITCH_CLIENT_SECRET`,
+   `STITCH_WEBHOOK_SECRET` (use `scripts/copy-render-env.ps1`). Keep `PAYMENTS_LIVE=true`.
+   One deploy, outside busy hours (each deploy = ~1 min of 502).
+4. Check: `curl -s https://freshaf.io/api/pricing` shows `"payments_live":true` signed out.
+5. `npm run stitch:test` makes a live **R1.00** link. Pay it with your own card: R1 should
+   reach FNB and the Stitch webhooks page should show a 200 from freshaf.io.
+6. From then on demo accounts use FreshAF's internal test page, never Stitch — a reviewer's
+   card is never charged with live keys.
+
 ## Ask them these before going live
 
 From `STITCH-CONTRACT-REVIEW.md` — the acquiring terms leave all three open:

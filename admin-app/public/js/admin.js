@@ -243,6 +243,195 @@ async function refreshStats() {
 
 const starInline = `<span class="star-inline"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span>`;
 
+// The automatic background checks: ID arithmetic, company number format, Google listing.
+// Every line says what it does and does not prove — a green tick here is not a clearance.
+function vettingHtml(s) {
+  const v = s.vetting;
+  if (!v) {
+    return `<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
+      <span class="muted">Background checks not run yet.</span>
+      <button class="secondary small" onclick="recheck(${s.user_id})">Run checks</button></div>`;
+  }
+  const dot = (state) => state === true ? '<span style="color:var(--ok,#1799c2)">✓</span>'
+    : state === false ? '<span style="color:var(--danger)">✗</span>'
+    : '<span class="muted">?</span>';
+
+  const id = v.id_number || {};
+  const co = v.company || {};
+  const g = v.google || {};
+
+  const stars = g.rating != null
+    ? `${starInline} <strong>${g.rating}</strong> <span class="muted">(${g.reviews} review${g.reviews === 1 ? '' : 's'})</span>`
+    : '<span class="muted">no rating</span>';
+
+  const cipcPill = {
+    verified: '<span class="pill ok">CIPC verified</span>',
+    not_found: '<span class="pill bad">NOT on CIPC register</span>',
+    not_a_company: '<span class="pill">sole trader</span>',
+    unchecked: '<span class="pill warn">CIPC not checked</span>',
+  }[v.cipc_status || 'unchecked'];
+
+  return `
+  <div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
+    <strong style="display:block;margin-bottom:4px">
+      Background checks
+      ${v.level === 'bad' ? '<span class="pill bad">problem</span>'
+        : v.level === 'warn' ? '<span class="pill warn">look closer</span>'
+        : '<span class="pill ok">nothing flagged</span>'}
+    </strong>
+    <div>${dot(id.ok)} <strong>ID number</strong> —
+      ${id.ok ? `valid checksum, born ${id.dob} (age ${id.age}), ${id.citizenship}` : (id.reason || 'not checked')}
+      ${id.ok ? '<br><span class="muted small-text">Format and checksum only &mdash; does not prove the ID belongs to them.</span>' : ''}
+    </div>
+    <div>${dot(co.ok)} <strong>Company number</strong> —
+      ${co.ok ? `${co.formatted} (registered ${co.year})` : (co.reason || 'none given')}
+      ${cipcPill}
+      <a href="${co.search_url || 'https://bizprofile.cipc.co.za/'}" target="_blank" rel="noopener">check on CIPC</a>
+      <br><span class="muted small-text">Format only. CIPC has no free API, so confirm on their site and record it:</span>
+      <span style="white-space:nowrap">
+        <button class="secondary small" onclick="setCipc(${s.user_id},'verified')">Verified</button>
+        <button class="danger small" onclick="setCipc(${s.user_id},'not_found')">Not found</button>
+        <button class="ghost small" onclick="setCipc(${s.user_id},'not_a_company')">Sole trader</button>
+      </span>
+      ${v.cipc_note ? `<br><span class="muted small-text">Note: ${v.cipc_note}</span>` : ''}
+    </div>
+    <div>${dot(g.ok)} <strong>Google</strong> —
+      ${g.ok ? `${stars}${g.address ? `<br><span class="muted small-text">${g.address}</span>` : ''}
+        ${g.maps_url ? `<br><a href="${g.maps_url}" target="_blank" rel="noopener">open on Google Maps</a>` : ''}`
+        : (g.reason || 'not checked')}
+      ${g.note ? `<br><span class="muted small-text">${g.note}</span>` : ''}
+    </div>
+    ${(v.flags || []).length
+      ? `<div style="margin-top:5px;color:var(--warn)"><strong>Flagged:</strong> ${v.flags.join(' &middot; ')}</div>`
+      : ''}
+    <div class="muted small-text" style="margin-top:4px">
+      Checked ${v.checked_at ? String(v.checked_at).replace('T', ' ').slice(0, 16) : 'never'}
+      <button class="ghost small" onclick="recheck(${s.user_id})">Re-run</button>
+    </div>
+  </div>`;
+}
+
+window.recheck = async (userId) => {
+  try {
+    toast('Running checks...', 'info');
+    await api(`/api/admin/suppliers/${userId}/recheck`, { method: 'POST' });
+    toast('Checks updated', 'ok');
+    await refreshSuppliers();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.setCipc = async (userId, status) => {
+  try {
+    let note = '';
+    if (status === 'not_found') {
+      note = await modal({
+        title: 'Company not found on CIPC?',
+        body: 'This is a serious flag: the business claims a registration number that is not on the register. It is recorded against the application and shown on every review from now on.',
+        input: 'What did you search for, and what came back?', confirmText: 'Record it', danger: true,
+      });
+      if (note === null) return;
+    }
+    await api(`/api/admin/suppliers/${userId}/cipc`, { method: 'POST', body: { status, note } });
+    toast('CIPC result recorded', 'ok');
+    await refreshSuppliers();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+// The approval checklist, straight from the server. Red = required and not in yet, so
+// the application cannot be approved; "asked" = we have already requested it.
+function checklistHtml(s) {
+  const list = s.checklist || [];
+  if (!list.length) return '';
+  const missing = list.filter((c) => c.required && !c.have);
+  const rows = list.filter((c) => c.required || c.have || c.asked).map((c) => {
+    const mark = c.have ? '<span style="color:var(--ok,#1799c2)">✓</span>'
+      : c.required ? '<span style="color:var(--danger)">✗</span>'
+      : '<span class="muted">·</span>';
+    const tag = !c.have && c.asked ? ' <em class="muted">(asked)</em>' : '';
+    return `<span style="display:inline-block;margin-right:11px;white-space:nowrap">${mark} ${c.label}${tag}</span>`;
+  }).join('');
+  const asked = (s.info_needed || []).length;
+  return `
+    <div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
+      <strong style="display:block;margin-bottom:3px">
+        ${missing.length
+          ? `<span style="color:var(--danger)">Cannot approve — ${missing.length} required item${missing.length === 1 ? '' : 's'} outstanding</span>`
+          : '<span style="color:var(--ok,#1799c2)">All required items in</span>'}
+      </strong>
+      ${rows}
+      ${asked ? `<div class="muted small-text" style="margin-top:5px">Requested ${s.info_requested_at ? `on ${String(s.info_requested_at).slice(0, 10)}` : ''}${s.info_note ? ` — note: ${s.info_note}` : ''}</div>` : ''}
+    </div>`;
+}
+
+// Tick what is outstanding, add a note, and the pro gets an email, a push and a live
+// tick list in their app. The application stays pending.
+window.requestInfo = async (userId) => {
+  const { suppliers } = await api('/api/admin/suppliers');
+  const s = suppliers.find((x) => x.user_id === userId);
+  if (!s) return toast('Supplier not found', 'error');
+
+  const picked = await new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:520px">
+        <h3>What do you still need from ${s.business_name}?</h3>
+        <p class="muted small-text">They stay pending — this is not a rejection. Required items that have
+          not arrived are ticked for you.</p>
+        <div style="max-height:46vh;overflow:auto;margin:12px 0">
+          ${(s.checklist || []).map((c) => `
+            <label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-weight:400;cursor:pointer">
+              <input type="checkbox" value="${c.key}" style="margin-top:3px;width:auto"
+                ${c.required && !c.have ? 'checked' : ''}>
+              <span>
+                <strong>${c.label}</strong>
+                ${c.have ? ' <span style="color:var(--ok,#1799c2)">already in</span>' : ''}
+                ${c.required ? ' <em class="muted">required</em>' : ''}
+                <br><span class="muted small-text">${c.ask}</span>
+              </span>
+            </label>`).join('')}
+        </div>
+        <label for="__ri-note">Note to add to the email (optional)</label>
+        <input id="__ri-note" autocomplete="off" placeholder="e.g. the ID photo you sent is too blurry to read">
+        <div class="row mt" style="justify-content:flex-end">
+          <button class="ghost" data-act="cancel">Cancel</button>
+          <button data-act="ok">Send request</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    const close = (v) => { backdrop.remove(); resolve(v); };
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+    backdrop.querySelector('[data-act=cancel]').onclick = () => close(null);
+    backdrop.querySelector('[data-act=ok]').onclick = () => close({
+      items: [...backdrop.querySelectorAll('input[type=checkbox]:checked')].map((c) => c.value),
+      note: backdrop.querySelector('#__ri-note').value.trim(),
+    });
+  });
+  if (!picked) return;
+  if (!picked.items.length) return toast('Tick at least one thing you need', 'error');
+  try {
+    const r = await api(`/api/admin/suppliers/${userId}/request-info`, { method: 'POST', body: picked });
+    toast(r.mail === 'queued'
+      ? `Asked for ${r.items.length} item${r.items.length === 1 ? '' : 's'} — email and notification sent`
+      : `Request saved — no email configured, so tell them yourself`, 'ok');
+    await refreshSuppliers();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+window.clearInfoRequest = async (userId) => {
+  try {
+    const ok = await modal({
+      title: 'Clear the outstanding request?',
+      body: 'Use this when what you asked for arrived another way — a phone call, a reference, a document emailed to you. The pro stops seeing the request in their app.',
+      confirmText: 'Clear request',
+    });
+    if (!ok) return;
+    await api(`/api/admin/suppliers/${userId}/clear-info-request`, { method: 'POST' });
+    toast('Request cleared', 'ok');
+    await refreshSuppliers();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
 async function refreshSuppliers() {
   const status = el('sup-filter').value;
   const { suppliers } = await api(`/api/admin/suppliers${status ? `?status=${status}` : ''}`);
@@ -264,7 +453,9 @@ async function refreshSuppliers() {
         ${s.bank_name ? `<br>Bank: ${s.bank_name} · ${s.bank_account || ''} · ${s.bank_branch || ''}` : '<br>Bank: not provided'}
         ${(s.documents || []).length
           ? '<br>' + s.documents.map((d) => `<a href="/api/admin/docs/${d.id}" target="_blank">${d.kind.replace(/_/g, ' ')}</a>`).join(' · ')
-          : '<br><span style="color:var(--warn)">No documents uploaded</span>'}</td>
+          : '<br><span style="color:var(--warn)">No documents uploaded</span>'}
+        ${checklistHtml(s)}
+        ${vettingHtml(s)}</td>
       <td><span class="pill ${s.status === 'approved' ? 'ok' : s.status === 'pending' ? 'warn' : 'bad'}">${s.status}</span>
         ${s.cash_blocked ? '<br><span class="pill bad" style="margin-top:5px">cash limit</span>' : ''}
         ${s.online ? '<br><span class="pill ok live" style="margin-top:5px">online</span>' : ''}
@@ -273,6 +464,8 @@ async function refreshSuppliers() {
       <td>
         <div class="row" style="flex-wrap:nowrap">
         ${s.status !== 'approved' ? `<button class="small" onclick="setStatus(${s.user_id},'approve')">Approve</button>` : ''}
+        ${s.status !== 'rejected' ? `<button class="secondary small" onclick="requestInfo(${s.user_id})">Request info</button>` : ''}
+        ${(s.info_needed || []).length ? `<button class="secondary small" onclick="clearInfoRequest(${s.user_id})">Clear request</button>` : ''}
         ${s.status === 'pending' ? `<button class="danger small" onclick="setStatus(${s.user_id},'reject')">Reject</button>` : ''}
         ${s.status === 'approved' ? `<button class="danger small" onclick="setStatus(${s.user_id},'suspend')">Suspend</button>` : ''}
         ${s.cash_owed_cents > 0 ? `<button class="small" onclick="settleCash(${s.user_id}, ${s.cash_owed_cents})">Settle cash</button>` : ''}

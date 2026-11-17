@@ -9,11 +9,12 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "test": "node test/stitch-signature.test.js && node test/stitch-webhook-route.test.js && node test/hardening.test.js && node test/return-trip.test.js",
+    "test": "node test/stitch-signature.test.js && node test/stitch-webhook-route.test.js && node test/hardening.test.js && node test/return-trip.test.js && node test/vetting.test.js && node test/request-info.test.js && node test/backup-token.test.js",
     "stitch:check": "node scripts/stitch-connect.js",
     "stitch:connect": "node scripts/stitch-connect.js --connect",
     "backup": "node scripts/backup.js",
-    "stitch:test": "node scripts/stitch-connect.js --connect --test-payment"
+    "stitch:test": "node scripts/stitch-connect.js --connect --test-payment",
+    "stitch:e2e": "node test/stitch-reviewer-e2e.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",

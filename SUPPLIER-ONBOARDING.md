@@ -43,13 +43,44 @@ leading zero.
 | 1 | Contact the business (brochure, cold call, WhatsApp) and send the **vetting questionnaire** | Evert | — |
 | 2 | Pro returns the questionnaire + documents to admin@freshaf.io or WhatsApp 078 299 1050 | Pro | — |
 | 3 | **Screening call** (10 min): confirm services, area, team size. Call both references. Check the name on the ID matches the bank letter. Check the police clearance is under 6 months old. | Evert | — |
-| 4 | Pro signs up at **freshaf.io/supplier**: details, services, vehicles, equipment, banking, then uploads ID, proof of address and bank letter in the app | Pro | Pro gets an **"application received"** email with next steps. **admin@freshaf.io gets a "new pro application" email.** |
-| 5 | Review in **freshaf.io/admin → Approvals** (documents and banking are visible there). Approve, or reject with a reason. | Evert | Pro gets an **email + push notification + in-app update** with the decision and the reason. |
+| 4 | Pro signs up at **freshaf.io/supplier**: details, services, vehicles, equipment, banking, then uploads **ID, bank confirmation letter, police clearance** (and optionally proof of address, a setup photo, company registration) in the app | Pro | Pro gets an **"application received"** email with next steps. **admin@freshaf.io gets a "new pro application" email.** |
+| 5 | Review in the **admin dashboard** (run `admin-app/start-admin.bat`). Each application shows a tick list of what is in and what is outstanding. Approve, **Request info** for anything still missing, or reject with a reason. | Evert | Approve/reject: pro gets an **email + push + in-app update**. **Request info** keeps them pending and sends the same tick list by email, push and in their app. |
 | 6 | Pro switches on: **Add to Home Screen**, allow notifications, verify their WhatsApp number, set prices (or quote per job), set their travel radius, **go online** | Pro | Pro can now receive offers |
 | 7 | First job: phone the customer afterwards; check the rating | Evert | Ratings collect automatically |
 
-**Decision rule (suggested):** do not approve without the ID, the bank letter in the same name, a police
+**Decision rule:** do not approve without the ID, the bank letter in the same name, a police
 clearance for every person who will do jobs, and one reference you reached on the phone.
+
+The dashboard enforces the first three for you: an application with any of them outstanding is
+marked **"Cannot approve — N required items outstanding"**. The reference call is yours to judge,
+so it is never ticked automatically — clear it by hand once you have made the call.
+
+**If something is missing, do not reject.** Use **Request info**: tick what you need, add a note
+("the ID photo is too blurry to read"), and the pro gets an email, a push notification and a tick
+list in their own app, worded identically. They stay pending and keep their login. The moment the
+last requested document is uploaded the request closes itself and admin@freshaf.io is emailed that
+the application is ready for a decision again. Reject is for a pro you do not want, not for
+paperwork you are still waiting on.
+
+## Automatic background checks
+
+Every application is checked the moment it arrives — nobody has to remember to do it.
+The results sit on the application in the dashboard, with a **Re-run** button.
+
+| Check | What it does | What it proves |
+|---|---|---|
+| **SA ID number** | Arithmetic: the 13th digit is a checksum over the first twelve. Also reads date of birth and citizenship, and flags under-18. | The number is **well formed**. It does **not** prove it belongs to the applicant — that needs paid Home Affairs verification. |
+| **Company registration number** | Format `YYYY/NNNNNN/NN` and a possible year. | The format only. It deliberately does **not** say what the two-digit suffix means: the published tables contradict each other and CIPC's own notice could not be reached to settle it. |
+| **Google Business listing** | Looks the business up by name and area: star rating, number of reviews, address, and whether Google shows it as closed. | A real trading presence. **No listing is not proof of anything** — plenty of honest one-person operations have none. Needs `GOOGLE_MAPS_API_KEY`. |
+
+**CIPC is not automatic.** There is no free official CIPC API. The dashboard gives you a
+one-click link to the register and three buttons to record what you found — **Verified**,
+**Not found**, **Sole trader** — so the answer is stored against the application instead of
+living in your head. "Not found" is a hard flag and shows on every review from then on.
+
+A verdict of **problem** means something failed outright (a bad ID checksum, a company not on
+the register). **Look closer** means a soft flag (a low rating, no reviews, an unusual age).
+**Nothing flagged** is not a clearance — it means the free automatic checks found nothing.
 
 ## How a pro is told about a job
 

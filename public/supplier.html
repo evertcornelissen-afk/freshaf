@@ -94,6 +94,10 @@
         <p class="muted small-text" id="reg-phone-hint" style="display:none;margin:6px 0 0"></p>
         <!-- Never autofilled: browsers otherwise drop the saved email or username in here. -->
         <label for="reg-idnum">SA ID number</label><input id="reg-idnum" name="sa-id-number" inputmode="numeric" maxlength="13" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="13 digits">
+        <label for="reg-regno">Company registration number <span class="muted">(leave blank if you trade as yourself)</span></label>
+        <input id="reg-regno" inputmode="numeric" autocomplete="off" placeholder="e.g. 2021/123456/07">
+        <label for="reg-vat">VAT number <span class="muted">(only if you are VAT registered)</span></label>
+        <input id="reg-vat" inputmode="numeric" autocomplete="off" placeholder="10 digits, starts with 4">
         <label>Service areas: tick every area you will cover</label>
         <details class="multi-pick" id="area-pick">
           <summary id="area-summary">Choose your service areas</summary>
@@ -137,7 +141,9 @@
     </div>
     <div class="card hidden" id="docs-card" style="max-width:520px;margin:0 auto">
       <h2 id="h-docs">Your documents</h2>
-      <p class="muted small-text">Uploading these speeds up your approval. JPG, PNG or PDF, max 5 MB each.</p>
+      <div class="msg warn hidden" id="docs-asked" role="status" aria-live="polite"></div>
+      <p class="muted small-text">We cannot approve an application without your ID, a bank confirmation letter
+        and a police clearance. JPG, PNG or PDF, max 5 MB each.</p>
       <div class="msg error" id="docs-error"></div>
       <div id="docs-rows"></div>
     </div>
@@ -224,6 +230,7 @@
     <a href="mailto:admin@freshaf.io">Support</a>
     <a href="/">Customer app</a>
     <a class="app-download" href="/download/freshaf.apk" download="FreshAF.apk">Download Android app (APK)</a>
+    <p class="app-download app-download-note">Installed FreshAF before 9 Nov 2026? Uninstall that version first, then install this one. Your account stays as it is.</p>
   </footer>
 </div>
 

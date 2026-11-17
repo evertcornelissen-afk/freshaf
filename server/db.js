@@ -3,7 +3,11 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// FRESHAF_DATA_DIR exists so a test can run against a throwaway database instead of the
+// real one. It is never set on Render or on the owner's PC, where the default applies.
+const DATA_DIR = process.env.FRESHAF_DATA_DIR
+  ? path.resolve(process.env.FRESHAF_DATA_DIR)
+  : path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // Restore-on-boot. Attaching a persistent disk mounts it EMPTY, so the cutover would
@@ -28,6 +32,48 @@ if (fs.existsSync(RESTORE_FILE)) {
 const db = new DatabaseSync(DB_FILE);
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
+
+// Automatic snapshots, on the server's own disk.
+//
+// One at every boot, taken HERE, before any migration below runs: every deploy is a boot,
+// so if a release ever damages data, the copy from the minute before it is sitting next
+// to the database. Then one every 6 hours. VACUUM INTO asks SQLite for a consistent copy
+// (including what is still in the WAL), and each copy is opened and counted before it is
+// kept. These guard against bad releases and mistakes, not against losing the disk itself:
+// that is what Render's daily disk snapshots and the off-site `npm run backup` are for.
+//
+// Restore one: copy it to data/restore.db and restart (see the restore-on-boot above).
+const SNAPSHOT_DIR = path.join(DATA_DIR, 'snapshots');
+const SNAPSHOT_KEEP = { boot: 20, auto: 28 }; // 28 x 6 h = a week; a few hundred KB each
+let lastSnapshot = null;
+function takeSnapshot(kind) {
+  try {
+    const hasData = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+    if (!hasData) return null; // a brand-new empty database has nothing to protect
+    if (!fs.existsSync(SNAPSHOT_DIR)) fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const file = path.join(SNAPSHOT_DIR, `${kind}-${stamp}.db`);
+    if (fs.existsSync(file)) return file;
+    db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+    const check = new DatabaseSync(file, { readOnly: true });
+    let users;
+    try { users = check.prepare('SELECT COUNT(*) AS c FROM users').get().c; } finally { check.close(); }
+    lastSnapshot = { kind, at: new Date().toISOString(), users };
+    // Retention: newest N of each kind. Only files this code wrote are ever removed.
+    const mine = fs.readdirSync(SNAPSHOT_DIR).filter((f) => f.startsWith(`${kind}-`) && f.endsWith('.db')).sort();
+    for (const old of mine.slice(0, Math.max(0, mine.length - SNAPSHOT_KEEP[kind]))) {
+      try { fs.unlinkSync(path.join(SNAPSHOT_DIR, old)); } catch { /* next time */ }
+    }
+    console.log(`[FreshAF] ${kind === 'boot' ? 'Start-up' : 'Scheduled'} snapshot saved (${users} accounts).`);
+    return file;
+  } catch (e) {
+    console.error(`[FreshAF] Snapshot (${kind}) FAILED:`, e.message);
+    return null;
+  }
+}
+takeSnapshot('boot');
+const snapshotTimer = setInterval(() => takeSnapshot('auto'), 6 * 60 * 60 * 1000);
+snapshotTimer.unref?.();
 
 // Proof, rather than inference, that customer accounts survive a restart.
 //
@@ -172,12 +218,65 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 CREATE TABLE IF NOT EXISTS supplier_docs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id),
-  kind TEXT NOT NULL CHECK (kind IN ('id_copy','proof_address','work_photo')),
+  kind TEXT NOT NULL CHECK (kind IN ('id_copy','proof_address','work_photo','bank_letter','police_clearance','company_reg')),
   original_name TEXT NOT NULL,
   stored_name TEXT NOT NULL,
   uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+
+// The first version of supplier_docs allowed only three kinds, while the welcome email
+// asked for a bank letter and a police clearance — so the two documents the approval
+// decision actually turns on could not be uploaded at all (found 16 Nov 2026). A CHECK
+// constraint cannot be altered in SQLite, so the table is rebuilt once, in place.
+{
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'supplier_docs'").get()?.sql || '';
+  if (!sql.includes('bank_letter')) {
+    db.exec(`
+      PRAGMA foreign_keys = off;
+      BEGIN;
+      CREATE TABLE supplier_docs_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        kind TEXT NOT NULL CHECK (kind IN ('id_copy','proof_address','work_photo','bank_letter','police_clearance','company_reg')),
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO supplier_docs_new (id, user_id, kind, original_name, stored_name, uploaded_at)
+        SELECT id, user_id, kind, original_name, stored_name, uploaded_at FROM supplier_docs;
+      DROP TABLE supplier_docs;
+      ALTER TABLE supplier_docs_new RENAME TO supplier_docs;
+      COMMIT;
+      PRAGMA foreign_keys = on;
+    `);
+    console.log('[FreshAF] supplier_docs rebuilt: bank letter, police clearance and company registration can now be uploaded');
+  }
+}
+
+// What an admin has asked a pending pro to still send in. Kept separate from
+// status_reason, which is the rejection/suspension reason — asking for a missing
+// document must not look like a refusal.
+// Registered company details, so the CIPC check has something to check. Optional:
+// plenty of pros trade as themselves, and that is allowed.
+addColumn('suppliers', 'reg_number TEXT');
+addColumn('suppliers', 'vat_number TEXT');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS supplier_vetting (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  result_json TEXT NOT NULL,
+  checked_at TEXT,
+  cipc_status TEXT NOT NULL DEFAULT 'unchecked'
+    CHECK (cipc_status IN ('unchecked','verified','not_found','not_a_company')),
+  cipc_note TEXT,
+  cipc_checked_at TEXT
+);
+`);
+
+addColumn('suppliers', 'info_needed TEXT');       // JSON array of checklist keys
+addColumn('suppliers', 'info_note TEXT');          // free text from the admin
+addColumn('suppliers', 'info_requested_at TEXT');
 addColumn('orders', 'callout_fee_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'points_used_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'points_earned_cents INTEGER NOT NULL DEFAULT 0');
@@ -509,4 +608,5 @@ try {
   console.error('[FreshAF] Could not encrypt existing supplier details:', e.message);
 }
 
-module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence, DEFAULT_ADMIN_PASSWORD };
+module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence, DEFAULT_ADMIN_PASSWORD,
+  SNAPSHOT_DIR, takeSnapshot, lastSnapshotInfo: () => lastSnapshot };

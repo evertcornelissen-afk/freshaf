@@ -240,12 +240,15 @@ function attachAutocomplete(input, onPick) {
     timer = setTimeout(async () => {
       lastQuery = q;
       try {
-        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q)
+        const { results, source } = await api('/api/geocode?q=' + encodeURIComponent(q)
           + '&session=' + encodeURIComponent(session));
         if (input.value.trim() !== lastQuery || !results.length) { hide(); return; }
+        // Labels come from an outside database, so they are text, never markup.
         list.innerHTML = results.map((r, i) =>
-          `<div class="ac-item" data-i="${i}">${icon('pin')} <span>${r.label}${
-            r.precision === 'street' ? '<em class="ac-hint">street</em>' : ''}</span></div>`).join('');
+          `<div class="ac-item" data-i="${i}">${icon('pin')} <span>${escapeHtml(r.label)}${
+            r.precision === 'street' ? '<em class="ac-hint">street</em>' : ''}</span></div>`).join('')
+          // Google's terms require its name on suggestions that come from Google Places.
+          + (source === 'google' ? '<div class="ac-credit" aria-hidden="true">Google Maps</div>' : '');
         list.classList.remove('hidden');
         list.querySelectorAll('.ac-item').forEach((n) => {
           n.addEventListener('mousedown', async (e) => {
@@ -628,8 +631,14 @@ function insideAnApp() {
   try { if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) return true; } catch (e) {}
   return false;
 }
+// An APK cannot be installed on an iPhone or iPad: offering it there only produces a file
+// that will not open. (iPadOS reports itself as a Mac, hence the touch check.)
+function isAppleMobile() {
+  const ua = navigator.userAgent || '';
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
 document.addEventListener('DOMContentLoaded', () => {
-  if (insideAnApp()) document.querySelectorAll('.app-download').forEach((a) => a.remove());
+  if (insideAnApp() || isAppleMobile()) document.querySelectorAll('.app-download').forEach((a) => a.remove());
 });
 
 /* ---------- pages, website and app ----------

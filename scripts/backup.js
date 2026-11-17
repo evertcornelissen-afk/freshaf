@@ -71,12 +71,39 @@ function verify(file) {
   }
 }
 
+const BACKUP_RE = /^freshaf-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}\.db$/;
+const rows = (c) => (Number(c?.users) || 0) + (Number(c?.orders) || 0);
+
+// The fullest backup on disk is never pruned. If the live data were ever wiped, every
+// nightly backup after that would be empty, and plain "keep the newest 30" would quietly
+// delete the last good copy a month later.
+function fullest(files) {
+  let best = null, bestRows = -1;
+  for (const f of files) {
+    try { const n = rows(verify(path.join(OUT_DIR, f))); if (n > bestRows) { best = f; bestRows = n; } } catch {}
+  }
+  return best;
+}
+
+// Status the owner can see without reading logs: LAST-BACKUP.txt always, and a loud
+// BACKUP-FAILED.txt that stays until a backup succeeds again.
+function status(ok, lines) {
+  const text = [`${ok ? 'OK' : 'FAILED'}  ${new Date().toString()}`, ...lines, ''].join('\r\n');
+  try {
+    fs.writeFileSync(path.join(OUT_DIR, 'LAST-BACKUP.txt'), text);
+    const failFile = path.join(OUT_DIR, 'BACKUP-FAILED.txt');
+    if (ok) { if (fs.existsSync(failFile)) fs.unlinkSync(failFile); } else fs.writeFileSync(failFile, text);
+  } catch { /* the console output still says it */ }
+}
+
 function prune() {
   const files = fs.readdirSync(OUT_DIR)
-    .filter((f) => /^freshaf-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}\.db$/.test(f))
+    .filter((f) => BACKUP_RE.test(f))
     .sort()
     .reverse();
+  const keepAlways = files.length > KEEP ? fullest(files) : null;
   for (const f of files.slice(KEEP)) {
+    if (f === keepAlways) { info(`kept ${f} (the fullest backup on disk)`); continue; }
     fs.unlinkSync(path.join(OUT_DIR, f));
     info(`pruned ${f}`);
   }
@@ -84,6 +111,21 @@ function prune() {
 }
 
 async function remote(dest) {
+  // Preferred: the backup-only token (server/index.js /api/backup). No password involved,
+  // so a changed admin password cannot break the nightly backup.
+  if (process.env.BACKUP_TOKEN) {
+    const r = await fetch(`${BASE_URL}/api/backup`, {
+      headers: { Authorization: `Bearer ${process.env.BACKUP_TOKEN}` },
+      signal: AbortSignal.timeout(180000),
+    });
+    if (r.ok) { fs.writeFileSync(dest, Buffer.from(await r.arrayBuffer())); return; }
+    if (r.status !== 404 || !EMAIL || !PASSWORD) {
+      throw new Error(r.status === 404
+        ? 'backup refused (404): BACKUP_TOKEN on Render is missing or does not match .env'
+        : `backup download failed (${r.status})`);
+    }
+    info('BACKUP_TOKEN not accepted yet; trying the admin sign-in instead.');
+  }
   if (!EMAIL || !PASSWORD) {
     throw new Error('Set BACKUP_EMAIL and BACKUP_PASSWORD in .env (an admin login on the live site)');
   }
@@ -133,6 +175,7 @@ function local(dest) {
   } catch (e) {
     cross(e.message);
     try { fs.unlinkSync(dest); } catch {}
+    status(false, [e.message]);
     process.exitCode = 1;
     return;
   }
@@ -142,13 +185,36 @@ function local(dest) {
   } catch (e) {
     cross(`The backup is not usable: ${e.message}`);
     try { fs.unlinkSync(dest); } catch {}
+    status(false, [`The backup is not usable: ${e.message}`]);
     process.exitCode = 1;
     return;
+  }
+  // Data should only ever grow. A drop in accounts or orders since the last backup means
+  // something deleted them, so say so loudly, and keep both files.
+  let warning = null;
+  const previous = fs.readdirSync(OUT_DIR).filter((f) => BACKUP_RE.test(f) && f !== path.basename(dest)).sort().pop();
+  if (previous) {
+    try {
+      const before = verify(path.join(OUT_DIR, previous));
+      // A customer deleting their own account is a normal small drop; losing more than
+      // 2 rows or 5% of a table at once is not.
+      const drop = (t) => Number(before[t]) - Number(counts[t]);
+      const small = ['users', 'orders', 'suppliers'].filter((t) => drop(t) > 0 && drop(t) <= Math.max(2, before[t] * 0.05));
+      if (small.length) info(`small drop since ${previous} (deleted accounts?): ${small.map((t) => `${t} -${drop(t)}`).join(', ')}`);
+      const lost = ['users', 'orders', 'suppliers'].filter((t) => drop(t) > Math.max(2, before[t] * 0.05));
+      if (lost.length) {
+        warning = `LIVE DATA SHRANK since ${previous}: ` + lost.map((t) => `${t} ${before[t]} -> ${counts[t]}`).join(', ')
+          + '. Nothing was deleted here; check the live site before the next release.';
+        cross(warning);
+      }
+    } catch { /* an unreadable older file does not block today's backup */ }
   }
   const mb = (fs.statSync(dest).size / 1024 / 1024).toFixed(2);
   tick(`${path.basename(dest)} — ${mb} MB`);
   info(Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(', '));
   const total = prune();
   info(`${Math.min(total, KEEP)} backup${total === 1 ? '' : 's'} in ${OUT_DIR}`);
+  status(!warning, [`${path.basename(dest)} (${mb} MB)`,
+    Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(', '), ...(warning ? [warning] : [])]);
   console.log('');
 })();

@@ -9,6 +9,8 @@ const push = require('../push');
 const balance = require('../balance');
 const secrets = require('../secrets');
 const mailer = require('../mailer');
+const onboarding = require('../onboarding');
+const vetting = require('../vetting');
 
 const router = express.Router();
 
@@ -192,7 +194,17 @@ router.post('/reviewer-accounts', (req, res) => {
   res.json({ ...creds, status: reviewerStatus() });
 });
 
+const docsCache = new Map();
+function docsFor(userId) {
+  if (!docsCache.has(userId)) {
+    docsCache.set(userId, db.prepare('SELECT id, kind, original_name, uploaded_at FROM supplier_docs WHERE user_id = ?').all(userId));
+  }
+  return docsCache.get(userId);
+}
+function safeList(json) { try { return JSON.parse(json || '[]'); } catch { return []; } }
+
 router.get('/suppliers', (req, res) => {
+  docsCache.clear(); // per request: one query per pro, not one per checklist lookup
   const status = req.query.status;
   const base = `
     SELECT s.*, u.name, u.email, u.phone, u.is_demo, u.created_at AS user_created_at
@@ -213,7 +225,18 @@ router.get('/suppliers', (req, res) => {
       equipment: JSON.parse(r.equipment_json || 'null'),
       bank_name: r.bank_name, bank_account: secrets.maskTail(r.bank_account),
       bank_branch: secrets.maskTail(r.bank_branch),
-      documents: db.prepare('SELECT id, kind, original_name FROM supplier_docs WHERE user_id = ?').all(r.user_id),
+      documents: docsFor(r.user_id),
+      // What is still outstanding on this application, and what we have already asked for.
+      checklist: onboarding.checklist(r, docsFor(r.user_id)),
+      missing: onboarding.missingRequired(r, docsFor(r.user_id)),
+      info_needed: safeList(r.info_needed), info_note: r.info_note,
+      info_requested_at: r.info_requested_at,
+      reg_number: r.reg_number, vat_number: r.vat_number,
+      // Automatic checks: ID number arithmetic, company number format, Google listing.
+      vetting: (() => {
+        const v = vetting.stored(r.user_id);
+        return v && { ...v, ...vetting.summarise(v) };
+      })(),
       status: r.status, status_reason: r.status_reason, online: !!r.online, is_demo: !!r.is_demo,
       ...balance.status(r.user_id),
       rating: r.rating_count ? +(r.rating_sum / r.rating_count).toFixed(1) : null,
@@ -227,7 +250,10 @@ function setSupplierStatus(req, res, status) {
   if (!s) return res.status(404).json({ error: 'Supplier not found' });
   const reason = req.body?.reason?.trim() || null;
   const online = status === 'approved' ? s.online : 0;
-  db.prepare('UPDATE suppliers SET status = ?, status_reason = ?, online = ? WHERE user_id = ?')
+  // A decision ends any outstanding request for information — otherwise an approved pro
+  // would still be told they owe us documents.
+  db.prepare(`UPDATE suppliers SET status = ?, status_reason = ?, online = ?,
+    info_needed = NULL, info_note = NULL WHERE user_id = ?`)
     .run(status, reason, online, s.user_id);
   realtime.send(s.user_id, 'account_update', { status, reason });
   // The pro is rarely looking at the app when this happens, so tell them on every channel.
@@ -244,7 +270,7 @@ function setSupplierStatus(req, res, status) {
 router.get('/docs/:docId', (req, res) => {
   const doc = db.prepare('SELECT * FROM supplier_docs WHERE id = ?').get(req.params.docId);
   if (!doc) return res.status(404).json({ error: 'Document not found' });
-  res.sendFile(path.join(__dirname, '..', '..', 'data', 'uploads', doc.stored_name));
+  res.sendFile(path.join(DATA_DIR, 'uploads', doc.stored_name));
 });
 
 // Record that a pro has paid in the cash they were holding. Clears the balance that
@@ -269,6 +295,79 @@ router.post('/users/:id/demo', (req, res) => {
   db.prepare('UPDATE users SET is_demo = ? WHERE id = ?').run(flag, u.id);
   console.log(`[FreshAF] Account ${u.id} (${u.role}) marked ${flag ? 'DEMO' : 'real'}`);
   res.json({ ok: true, is_demo: !!flag });
+});
+
+// Ask a pending pro for what is still outstanding, WITHOUT rejecting them. The
+// application stays pending, they keep their login, and the tick list in their app
+// matches the email word for word.
+router.post('/suppliers/:id/request-info', (req, res) => {
+  const s = db.prepare('SELECT * FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  if (s.status === 'rejected') {
+    return res.status(409).json({ error: 'This application was turned down. Move it back to pending first.' });
+  }
+  const items = (Array.isArray(req.body?.items) ? req.body.items : []).filter(onboarding.isValidKey);
+  if (!items.length) return res.status(400).json({ error: 'Tick at least one thing you need from them' });
+  const note = String(req.body?.note || '').trim().slice(0, 500) || null;
+
+  db.prepare(`UPDATE suppliers SET info_needed = ?, info_note = ?, info_requested_at = datetime('now')
+    WHERE user_id = ?`).run(JSON.stringify(items), note, s.user_id);
+
+  const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(s.user_id);
+  const labels = onboarding.labelsFor(items);
+  // Tell them on every channel — the app page updates live, and the email is the one
+  // they can act on later.
+  realtime.send(s.user_id, 'account_update', { status: s.status, info_needed: items, info_note: note });
+  push.sendToUser(s.user_id, {
+    title: 'FreshAF Pro needs a few things',
+    body: `Still outstanding: ${labels.join(', ')}`,
+    url: '/supplier', tag: 'account',
+  }).catch(() => {});
+  let mail = 'skipped';
+  if (u?.email) {
+    mailer.proInfoRequested({ to: u.email, name: u.name, items: onboarding.asksFor(items), note })
+      .catch(() => {});
+    mail = 'queued';
+  }
+  console.log(`[FreshAF] Asked pro ${s.user_id} for: ${items.join(', ')}`);
+  res.json({ ok: true, items, mail });
+});
+
+// Re-run the automatic checks on demand — after a pro corrects a number, or when the
+// Google key was added later.
+router.post('/suppliers/:id/recheck', async (req, res) => {
+  const s = db.prepare('SELECT user_id FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  try {
+    const result = await vetting.runFor(s.user_id);
+    const v = vetting.stored(s.user_id);
+    res.json({ ok: true, vetting: v && { ...v, ...vetting.summarise(v) }, ran: !!result });
+  } catch (e) {
+    res.status(502).json({ error: `Checks failed: ${e.message}` });
+  }
+});
+
+// Record the outcome of the CIPC check, which a human has to do: there is no free
+// official API, so the dashboard tracks the answer instead of pretending to fetch it.
+router.post('/suppliers/:id/cipc', (req, res) => {
+  const s = db.prepare('SELECT user_id FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  const status = String(req.body?.status || '');
+  if (!vetting.setCipcStatus(s.user_id, status, String(req.body?.note || '').trim().slice(0, 300))) {
+    return res.status(400).json({ error: `Status must be one of: ${vetting.CIPC_STATUSES.join(', ')}` });
+  }
+  const v = vetting.stored(s.user_id);
+  res.json({ ok: true, vetting: v && { ...v, ...vetting.summarise(v) } });
+});
+
+// Clear the request by hand — used when the outstanding item was a phone call or a
+// reference, which the system cannot see arriving.
+router.post('/suppliers/:id/clear-info-request', (req, res) => {
+  const s = db.prepare('SELECT user_id FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  db.prepare('UPDATE suppliers SET info_needed = NULL, info_note = NULL WHERE user_id = ?').run(s.user_id);
+  realtime.send(s.user_id, 'account_update', {});
+  res.json({ ok: true });
 });
 
 router.post('/suppliers/:id/approve', (req, res) => setSupplierStatus(req, res, 'approved'));
@@ -318,7 +417,7 @@ router.post('/orders/:id/refunded', (req, res) => {
 router.get('/orders/:id/handover-photo', (req, res) => {
   const o = db.prepare('SELECT handover_photo FROM orders WHERE id = ?').get(req.params.id);
   if (!o?.handover_photo) return res.status(404).json({ error: 'No handover photo' });
-  res.sendFile(path.join(__dirname, '..', '..', 'data', 'uploads', o.handover_photo));
+  res.sendFile(path.join(DATA_DIR, 'uploads', o.handover_photo));
 });
 
 router.get('/orders', (req, res) => {

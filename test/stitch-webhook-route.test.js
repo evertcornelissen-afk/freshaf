@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 const path = require('path');
 
+const { stopServer } = require('./stop-server');
 const ROOT = path.join(__dirname, '..');
 
 const SECRET = 'whsec_' + Buffer.from(crypto.randomBytes(24)).toString('base64');
@@ -120,7 +121,7 @@ function paymentStatus(orderId) {
       process.exitCode = 1;
     }
   } finally {
-    server.kill();
+    await stopServer(server);
     db.prepare('DELETE FROM orders WHERE customer_id = ?').run(custId);
     db.prepare('DELETE FROM users WHERE id = ?').run(custId);
     console.log('(test rows removed)');
