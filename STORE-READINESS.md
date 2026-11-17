@@ -50,16 +50,28 @@ The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/f
 
 **D-U-N-S status:** requested via Apple's lookup tool (Evert, Fri 6 Nov); D&B acknowledged it to admin@freshaf.io on Sun 8 Nov 00:32 (donotreply@iresearch.dnb.com): **Tracking ID 11193219, Case 11252150, Request key 4NVGG9ZW9U**, submitted 7 Nov 22:31 UTC, type "Add business - Mini Inquiry" (new listing; the Duns field was still blank on 9 Nov). D&B promises contact within 5 business days, so by **Fri 13 Nov**. If nothing by then: Apple Developer support (developer.apple.com/contact > Membership and Account > Program Enrollment, phone callback) quoting the case number. The number is free: ignore paid "expedite" offers and anyone not from dnb.com / dnbsame.com.
 
-**D-U-N-S 588248848 — in hand 17 Nov 2026, NOT yet confirmed.** Evert reported the number; there is
-no D&B email for it (nothing from dnb.com since 11 Nov, case 35007250), so where it came from is
-not on record. **Confirm it before typing it anywhere.** Last time D&B "resolved" our case by
-matching us to 654518140, which belongs to a different company, so a number that looks right is not
-proof. The check: sign in at developer.apple.com, open
-`developer.apple.com/enroll/duns-lookup/`, enter FRESHAF (PTY) LTD / South Africa /
-35 Sterappel Crescent, Essenhout Estate, Langeberg Heights, Cape Town 7570. It must come back as
-**588248848** against *that* name and address. Both stores cap how many times a D-U-N-S may be
-entered, and Apple ties the enrolment to whatever legal entity the number resolves to — a wrong one
-is not a typo, it is an enrolment in someone else's name.
+**✅ D-U-N-S ISSUED 17 Nov 2026, 16:07.** "Your D&B D-U-N-S Number has been created - Case 35007250"
+(D&B Notification, to admin@freshaf.io, landed in the GoDaddy spam folder):
+
+| | |
+|---|---|
+| **D-U-N-S Number** | **588248848** |
+| **Legal Business Name** | **FRESHAF (PTY) LTD** |
+
+D&B's own instruction: *enter the number and business name exactly as provided* — so **FRESHAF (PTY)
+LTD**, no space in FRESHAF, not "FreshAF (Pty) Ltd". The mail carries no address, so the registered
+office is not restated there; CIPC's is 35 Sterappel Crescent, Essenhout Estate, Langeberg Heights,
+Cape Town 7570. This is our own case (35007250), not the one D&B wrongly closed against 654518140,
+which belongs to a different company and must never be used.
+
+⏳ **"Your newly-created DUNS number will be eligible for Apple Registration after 24-48 hours."**
+Created 17 Nov 16:07, so Apple enrolment opens somewhere between **18 Nov evening and 19 Nov
+afternoon**. Attempting it earlier risks burning one of the limited D-U-N-S attempts for nothing.
+
+⚠️ **This mail went to spam and Outlook never showed it.** The Spam folder for admin@freshaf.io
+reads 0 items on this PC even after a forced send/receive, so anything GoDaddy quarantines —
+D&B, Stitch, Apple, a pro's reply — is invisible here. Re-subscribe that IMAP folder
+(Outlook → Folder → IMAP Folders → Query → Subscribe to Spam) or check webmail by hand.
 
 **Android: the account situation (found 17 Nov 2026).** Evert's Google account
 (evertcornelissen@gmail.com) already holds a developer account — **"Social_Ideas", a PERSONAL

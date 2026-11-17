@@ -11,8 +11,8 @@
     "detail": "Listing copy, icon, screenshots, feature graphic, privacy policy (freshaf.io/privacy) and the store reviewer accounts are ready."
   },
   "duns": {
-    "ok": false,
-    "detail": "Number in hand 17 Nov 2026: 588248848 \u2014 but NOT yet confirmed in writing. No D&B email since 11 Nov, so it has to be checked against Apple's D-U-N-S lookup (it must return FRESHAF (PTY) LTD, 35 Sterappel Crescent, 7570) before it is typed into Apple or Google: both stores limit how many times you may enter one. D-U-N-S 654518140 is a DIFFERENT company (Randburg grocery store): never use it."
+    "ok": true,
+    "detail": "ISSUED 17 Nov 2026, case 35007250: D-U-N-S 588248848, legal business name FRESHAF (PTY) LTD. Enter the number and that name EXACTLY as D&B wrote them. D&B says a new number is only eligible for Apple registration after 24-48 hours, so Apple enrolment opens 18-19 Nov. D-U-N-S 654518140 is a DIFFERENT company (Randburg grocery store): never use it."
   },
   "google_play": {
     "ok": false,
@@ -20,6 +20,6 @@
   },
   "app_store": {
     "ok": false,
-    "detail": "Blocked on Evert signing in to developer.apple.com: the enrolment and even Apple's own D-U-N-S lookup need his Apple ID. Then: Organisation enrolment ($99/year) as FreshAF (Pty) Ltd, the iOS build via Codemagic, and the APNs push key."
+    "detail": "D-U-N-S in hand. Waiting out D&B's 24-48 hour eligibility window (opens 18-19 Nov), then Evert signs in at developer.apple.com and Claude fills the organisation enrolment ($99/year) as FRESHAF (PTY) LTD. After that: iOS build via Codemagic and the APNs push key."
   }
 }
