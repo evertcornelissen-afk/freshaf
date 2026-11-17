@@ -139,3 +139,30 @@ Claude then checks the maps live.
 **Before real customers:** Claude removes the APK footer button and `/download/freshaf.apk`
 (Play replaces it), and moves map tiles to a paid provider (OpenStreetMap's free servers do not
 allow app traffic at volume — cost to approve then).
+
+## Apple enrolment is pinned to the WRONG D-U-N-S (found 17 Nov 2026, evening)
+
+Signed in as **admin@freshaf.io** (the Apple Account on the enrolment — correct for an organisation),
+the enrolment resumes at `/enroll/organization/details/edit/signing-authority` and shows:
+
+| Legal Entity Name | D-U-N-S | Address |
+|---|---|---|
+| FreshAF (PTY) LTD | **654518140** | 51 EQUITY DR, RANDBURG, 2194, ZA |
+
+That is the other company's number with our name on it. **All six of those inputs are
+`readOnly: true`** (checked in the DOM), so the number cannot be changed from the page; typing into
+it only changes what is on screen. `/enroll/` redirects back to this same step, `Back` does nothing,
+and the page offers no restart — its only links out are "update your D&B profile" and logout.
+
+**Do not press Continue on that page.** It would bind the enrolment to an address in Randburg.
+
+**Do not take Apple's "update your D&B profile" advice either** — that would edit D&B record
+654518140, which belongs to someone else.
+
+The only clean route is Apple Developer Support: developer.apple.com/contact →
+**Membership and Account → D-U-N-S Number → Email**. A message is drafted there giving 588248848,
+FRESHAF (PTY) LTD, registration 2026/683087/07, the registered office and freshaf.io, and asking
+them to reset the organisation details. Evert presses Send.
+
+Side effect worth noting: D&B's 24–48 hour eligibility window will have passed long before Apple
+replies, so that wait costs nothing now.
