@@ -233,3 +233,17 @@ No app can be created, no listing built and no bundle uploaded until these clear
 - **D&B has the postcode as 8001; CIPC says 7570.** Google will ask for an official document matching
   what it got from D&B. If the document check bounces, correct it on **our own** record 588248848 -
   never on 654518140, which belongs to another company.
+
+### Verification progress, 18 Nov 2026
+
+- ✅ **Trader status** declared (Trader).
+- ✅ **Organisation website verified.** freshaf.io added to Google Search Console as a Domain
+  property under admin@freshaf.io, verified by the TXT record
+  `google-site-verification=HyUUzeReit9Bj9MfG-oTjTOJkpL8q1CT34MjmpTjG6Y` added by hand at GoDaddy,
+  then **Send verification request** in Play → **Website verified**. The zone is snapshotted in
+  `DNS-freshaf.io.md`, which also carries the rule about never using provider auto-connect flows
+  on this domain.
+- ⏳ **Verify your identity** — Evert uploads an official ID document. Google: *do not edit or
+  manipulate documents, this will cause verification to fail*, which then affects app availability.
+  Takes a few days. **This is now the only thing standing between us and building the listing.**
+- ⏳ **Verify your phone numbers** — unlocks once identity is approved.
