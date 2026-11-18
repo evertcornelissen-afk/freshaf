@@ -32,3 +32,4 @@ android/app/google-services.json
 
 # Store reviewer sign-in details (scripts/make-reviewer-logins.ps1): never commit.
 REVIEWER-LOGINS.md
+play-upload/

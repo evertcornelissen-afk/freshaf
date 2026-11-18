@@ -282,3 +282,39 @@ drags these in:
 | App icon (512×512) | `public/img/icon-512.png` |
 | Feature graphic (1024×500) | `marketing/play-feature-graphic.png` |
 | Phone screenshots (1080×1920) | `marketing/store-screenshots/android-1080x1920/1-home.png` … `5-laundry.png` |
+
+### Store settings done, 18 Nov 2026
+
+| Field | Value |
+|---|---|
+| App or game | App |
+| Category | **Lifestyle** |
+| Public email | **admin@freshaf.io** |
+| Public phone | +27 78 299 1050 |
+| Website | https://freshaf.io |
+| External marketing | left on (Play may advertise the app off-Play) |
+
+Tags are still unset (optional, "Manage tags" on Store settings).
+
+**Inconsistency to settle:** the live site uses **support@freshaf.co.za** as the public support
+address (7 places in `public/`), but the Play listing now shows **admin@freshaf.io**, because that
+is the mailbox we know works and the one Google verified. `support@freshaf.io` does NOT exist.
+Pick one address and make the site, the listing and the developer profile agree.
+
+### Asset QA, 18 Nov 2026
+
+Every image was opened and looked at before staging (the rule from past work: never ship a
+generated asset unseen). All five screenshots are clean - no text overlap, nothing clipped,
+all legible, all 1080x1920. Icon 512x512 (13 KB), feature graphic 1024x500 (63 KB), largest
+screenshot 806 KB, so everything is far inside Play's limits.
+
+Two judgement calls left for Evert, neither blocking:
+
+- **`3-live-tracking.png` and `4-pro-dashboard.png` both show "12 Wellington Road, Durbanville".**
+  FreshAF is positioned nationally and the rule is never to pin it to one city or suburb. Two of
+  five store screenshots naming one Cape Town suburb works against that on a national listing.
+- **`4-pro-dashboard.png` is badged "SUPPLIER PORTAL"** while the store description calls that side
+  **FreshAF Pro**. Two names for one thing, visible together on the store page.
+
+Staged for upload in **`play-upload/`** (git-ignored), one folder per Play slot, with
+`READ-ME-FIRST.txt` saying which folder goes where and in what order.
