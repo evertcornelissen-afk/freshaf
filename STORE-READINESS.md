@@ -447,3 +447,57 @@ registration documents**, and did not account for PDF uploads needing "Files and
 Starting the questionnaire is itself an agreement: *"By completing this questionnaire you
 agree to IARC's Terms of Service."* Accepting terms on Evert's behalf needs his word, so it
 was left untouched.
+
+## Content rating: done, 19 Nov 2026
+
+Evert gave express permission to accept IARC's terms before the questionnaire was started.
+Contact email: **admin@freshaf.io**. Category: **All Other App Types**.
+
+Result — the cleanest set available:
+
+| Authority | Rating |
+|---|---|
+| ESRB (North America) | **Everyone** |
+| PEGI (Europe) | **PEGI 3** |
+| USK (Germany) | All ages |
+| ClassInd (Brazil) | All ages |
+| IARC Generic / Russia / South Korea | Rated for 3+ |
+
+No content descriptors at all. The only interactive element flagged is **Shares Location**.
+
+### The two answers that mattered
+
+**"Does the app natively allow users to interact or exchange content with other users
+through voice communication, text, or sharing images or audio?" → No.** This was answered
+Yes first and then corrected. FreshAF has no chat and no messaging: the customer's order
+notes are instructions attached to an order, and the handover photo is a proof-of-delivery
+artefact. The follow-up questions that appear after a Yes make IARC's intent plain — nudity,
+graphic violence, chat moderation, blocking, reporting, invited friends — all social-app
+concepts. Answering Yes would have forced "no moderation, no blocking, no reporting" and
+pushed the rating up for no honest reason. If a real chat feature is ever added, this answer
+has to change.
+
+**"Does the app share the user's current and precise physical location with other users?"
+→ Yes.** Live tracking is a headline feature; the pro's position is shown to the customer
+and the customer's pin goes to the pro. This is what produces the "Shares Location" tag,
+which is correct and expected.
+
+Other answers: no ratings-relevant content in the package; online content **yes** (service
+listings and pro profiles come from the server, exactly Google's Amazon example); no
+violence, sexual material, offensive language or drug references; not age-restricted goods;
+**no digital goods** (a physical service, which is also why Play billing does not apply);
+**no cash rewards or transferable assets** — consistent with the financial-features answer,
+since the points have no cash value and cannot be transferred.
+
+Note the app is rated 3+ while the target audience is set to 18 and over. That is normal and
+not a conflict: the rating describes content, the target audience describes who it is for.
+
+### Data safety step 4 is a 15-part grind
+
+Each declared data type needs its own sub-form: collected/shared, ephemeral, required or
+optional, and the purposes for each. **Approximate location is done**; the other 14 are not.
+The answers follow one rule: shared is declared for exactly what the privacy policy says the
+other side of the booking receives (name, address, phone, both location types, order notes
+and the handover photo), and collected-only for everything else. Phone number is marked as
+a user choice, because `/register` requires it for suppliers only and the customer sign-up
+form has no required attribute on it.
