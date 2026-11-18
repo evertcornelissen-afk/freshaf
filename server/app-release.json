@@ -16,7 +16,7 @@
   },
   "google_play": {
     "ok": false,
-    "detail": "Evert's Google account already holds an UNVERIFIED PERSONAL developer account ('Social_Ideas', id 6471963390115743783) and Google allows only one per Google account. FreshAF needs an ORGANISATION account, so the plan is a second Google account (admin@freshaf.io) + a new organisation account ($25). Converting Social_Ideas instead would mean passing personal identity verification first, verifying freshaf.io as the organisation website, a 72-hour wait, and no way back."
+    "detail": "ACCOUNT CREATED 18 Nov 2026: Google Play ORGANISATION developer account 'FreshAF', Account ID 5459039805433028598, owner admin@freshaf.io (a NEW Google account, 2-Step Verification on, phone 078 299 1050). $25 paid. D-U-N-S 588248848 confirmed by Google as FRESHAF (PTY) LTD, 35 Sterappel Cres - the correct company, not Randburg. Trader status declared. STILL BLOCKED FROM CREATING APPS until account verification completes: (1) Verify identity - Evert uploads an official ID document, never edited or Google fails it permanently; (2) Verify organisation website - freshaf.io must be a verified property in Google Search Console, TXT record google-site-verification=HyUUzeReit9Bj9MfG-oTjTOJkpL8q1CT34MjmpTjG6Y must be added at GoDaddy DNS (Evert must sign in to GoDaddy first; do NOT use GoDaddy Domain Connect, its template scope includes gmail-setup and can rewrite the MX records that carry admin@freshaf.io); (3) Verify phone numbers - unlocks after 1 and 2. Signed bundle app-release.aab versionCode 13 is built and waiting."
   },
   "app_store": {
     "ok": false,

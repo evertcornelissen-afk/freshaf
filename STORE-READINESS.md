@@ -166,3 +166,70 @@ them to reset the organisation details. **SENT 17 Nov 2026 by Evert - Apple case
 
 Side effect worth noting: D&B's 24–48 hour eligibility window will have passed long before Apple
 replies, so that wait costs nothing now.
+
+## Google Play organisation account CREATED (18 Nov 2026)
+
+The Android blocker is gone. A new Google account **admin@freshaf.io** was created (2-Step
+Verification on, phone 078 299 1050 verified), and under it a Google Play **organisation**
+developer account:
+
+| | |
+|---|---|
+| **Developer name (public)** | FreshAF |
+| **Account ID** | 5459039805433028598 |
+| **Account owner** | admin@freshaf.io (Evert Cornelissen) |
+| **Registration fee** | USD 25, paid 18 Nov 2026 |
+
+Google looked up D-U-N-S **588248848** and returned **FRESHAF (PTY) LTD, 35 STERAPPEL CRES
+ESSENHOUT EST LANGEBERG HEIG, CAPE TOWN - 8001, South Africa**. That is our company, confirmed
+before anything was accepted. Apple's enrolment is still welded to the wrong number; Android is not.
+
+Answers given during signup, for consistency if anything is ever re-asked:
+
+- Organisation type **a company or business**, size **1 - 10** (pros are contractors, not employees)
+- Organisation phone **+27782991050**, website **https://freshaf.io**
+- Public profile phone and email **+27782991050 / admin@freshaf.io**
+- Apps planned in 12 months **2 - 5**; earns money **yes, "Other"** (commission on real-world
+  services, merchant of record, no digital goods or IAP); special app categories **none of the above**
+- Google contact: Evert Cornelissen, admin@freshaf.io, English (United Kingdom), +27782991050.
+  `support@freshaf.io` does NOT exist as a mailbox - admin@freshaf.io is the only one, and Google
+  accepted it and auto-verified it because it is the account's own address.
+- Other Google accounts: declared **yes**, evertcornelissen@gmail.com (the personal, unverified
+  "Social_Ideas" account), verified by code. Never hide this - Google treats undeclared second
+  accounts as policy circumvention.
+- Trader status: **Trader**.
+
+### Still blocked: "Complete account verifications to create apps"
+
+No app can be created, no listing built and no bundle uploaded until these clear:
+
+1. **Verify your identity** - Evert uploads an official ID document. Google's own warning: *do not
+   edit or manipulate documents, as this will cause verification to fail*, which then affects app
+   availability. Takes a few days.
+2. **Declare trader status** - done.
+3. **Verify the organisation's website** - freshaf.io has been added to Google Search Console as a
+   **Domain** property under admin@freshaf.io. It needs this TXT record on freshaf.io at GoDaddy:
+
+   ```
+   google-site-verification=HyUUzeReit9Bj9MfG-oTjTOJkpL8q1CT34MjmpTjG6Y
+   ```
+
+   Then press VERIFY in Search Console, and afterwards **Send verification request** on the Play
+   account details page. GoDaddy is not signed in in Chrome, so Evert must sign in before this can
+   be added.
+
+   **Do NOT use Search Console's automatic "GoDaddy.com" verification.** It opens GoDaddy Domain
+   Connect with scope `domain-verification+gmail-setup`, and a Gmail-setup template can rewrite the
+   **MX records** that carry admin@freshaf.io - the mailbox this whole account depends on. Add the
+   single TXT record by hand instead.
+4. **Verify phone numbers** - unlocks only after identity and organisation are approved.
+
+### Two things to fix before launch, not today
+
+- **Play publishes the organisation name AND address on every listing.** Right now that is
+  35 Sterappel Crescent, Evert's home. Nothing is public until an app goes live. Before launch,
+  register a business or virtual-office address at D&B so the store page does not show where he lives.
+  Evert was told this and chose to carry on (18 Nov 2026).
+- **D&B has the postcode as 8001; CIPC says 7570.** Google will ask for an official document matching
+  what it got from D&B. If the document check bounces, correct it on **our own** record 588248848 -
+  never on 654518140, which belongs to another company.
