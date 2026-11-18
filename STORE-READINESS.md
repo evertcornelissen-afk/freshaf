@@ -247,3 +247,38 @@ No app can be created, no listing built and no bundle uploaded until these clear
   manipulate documents, this will cause verification to fail*, which then affects app availability.
   Takes a few days. **This is now the only thing standing between us and building the listing.**
 - ⏳ **Verify your phone numbers** — unlocks once identity is approved.
+
+### App created and listing text in, 18 Nov 2026
+
+**All four account verifications passed** (identity came back immediately, not in days). The
+"Complete account verifications to create apps" gate is lifted.
+
+| | |
+|---|---|
+| **App** | FreshAF: Car Wash & Laundry |
+| **Package name** | `io.freshaf.app` — checked against `android/app/build.gradle` before typing. **Permanent, Google never allows a change.** |
+| **App ID** | 4972841896331123851 |
+| **Default language** | English – en-ZA |
+| **Type / price** | App, Free |
+| **Status** | Draft |
+
+Default store listing saved: app name (27/30), short description (63/80), full description
+(1588/4000).
+
+⚠️ **The stored full description was wrong and was corrected before saving.**
+`APP-STORE-LISTING.md` still carried *"Every pro sets their own price, so you see ... what they
+charge"*. That describes the model before the **merchant-of-record restructure of 28 Oct 2026**
+(`server/db.js:423`, margin 10% → 20%), where FreshAF sets the selling price and the customer sees
+**one price**. The listing now reads "one clear price for the job before you book", with pros
+setting their own **rates**, and the quote flow described as the way to compare. **Fix
+`APP-STORE-LISTING.md` to match** — it is still the stale version.
+
+**Claude cannot upload files in the Claude browser pane** (no file-upload tool there; the Chrome
+extension has one, but Chrome is signed in as the personal Gmail, not admin@freshaf.io). Evert
+drags these in:
+
+| Slot | File |
+|---|---|
+| App icon (512×512) | `public/img/icon-512.png` |
+| Feature graphic (1024×500) | `marketing/play-feature-graphic.png` |
+| Phone screenshots (1080×1920) | `marketing/store-screenshots/android-1080x1920/1-home.png` … `5-laundry.png` |
