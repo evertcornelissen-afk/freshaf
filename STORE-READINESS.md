@@ -318,3 +318,61 @@ Two judgement calls left for Evert, neither blocking:
 
 Staged for upload in **`play-upload/`** (git-ignored), one folder per Play slot, with
 `READ-ME-FIRST.txt` saying which folder goes where and in what order.
+
+## Store listing images in, App content started, 18 Nov 2026
+
+**Store listing — saved as draft, complete.**
+
+| Slot | File | Result |
+|---|---|---|
+| App icon | `play-upload/1-app-icon/icon-512.png` | 1 / 1 |
+| Feature graphic | `play-upload/2-feature-graphic/play-feature-graphic.png` | 1 / 1 |
+| Phone screenshots | `play-upload/3-phone-screenshots/1..5` | 5 / 8, order 1→5 |
+| Video | — | left empty, no YouTube video |
+| Foldable / Tablet / Desktop / Android XR | — | left empty, phone-only release |
+
+**Gotcha worth remembering.** Dropping all five screenshots in at once put them in
+upload order, not filename order (they landed 3, 1, 2, 5, 4). The first screenshot is
+the one Play shows in search results, so this matters. The tiles carry a `reorderable`
+class but a synthetic drag does not move them. What works: remove the ones that are out
+of place, then re-add them **one at a time** from the asset library — each add appends to
+the end, so adding in order gives the order you want. In the library a tile is selected by
+clicking the small circle in its top-left corner (clicking the tile itself does nothing),
+then the bottom bar shows **Add**.
+
+**App content — done so far:**
+
+| Task | Answer | State |
+|---|---|---|
+| Privacy policy | `https://freshaf.io/privacy` | Saved |
+| Ads | No, my app does not contain ads | Saved |
+| Sign in details | Yes, part of the app is restricted | Customer set filled except password |
+
+`https://freshaf.io/privacy`, `/terms` and `/delete-account` all answered 200 before the
+URL went in. The no-ads answer was checked against the code first, not assumed: there is
+no AdMob, Play Services Ads, AppLovin, Unity, ironSource or Audience Network dependency
+anywhere in `android/app/build.gradle` or the web app.
+
+**Order of the remaining tasks is forced.** Target audience and content refuses to start
+until Sign in details is complete, and Content rating sits behind that. So the reviewer
+logins are the critical path for everything that is left.
+
+**What the reviewer accounts actually do** (read out of `server/routes/admin.js`,
+`server/demo-autopilot.js`, `server/payments.js` and `server/dispatch.js`, so the
+instructions given to Google are true):
+
+- Sign-in is email + password only — `POST /api/auth/login`, bcrypt, no OTP and no 2FA.
+  The WhatsApp code in `/api/auth/phone-code` is sign-up only, so it never blocks a reviewer.
+- `review@freshaf.io` is created with its home address already set to the review pin,
+  `Main Road, Durbanville, Cape Town, 7550` (`REVIEW_PIN`, admin.js:108).
+- `review-pro@freshaf.io` is created approved, online, 25 km radius, both services,
+  standard prices, at the same pin.
+- Demo customers are matched only with demo pros and vice versa
+  (`dispatch.js:119`, `quotes.js:107`), so a reviewer can never reach a real pro.
+- `payments.js:35` short-circuits payment for a demo customer: no card is needed.
+- `demo-autopilot.js` walks an accepted demo booking through en route → in progress →
+  (laundry: out for delivery) → done, so a reviewer sees the whole job without a second device.
+
+`REVIEWER-LOGINS.md` was last written 7 Nov 2026. If either password no longer works,
+re-run `scripts\make-reviewer-logins.ps1` — it resets both and re-confirms the pro is
+approved and online.
