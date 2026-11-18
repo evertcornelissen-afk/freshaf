@@ -376,3 +376,74 @@ instructions given to Google are true):
 `REVIEWER-LOGINS.md` was last written 7 Nov 2026. If either password no longer works,
 re-run `scripts\make-reviewer-logins.ps1` — it resets both and re-confirms the pro is
 approved and online.
+
+## App content: six of eight sections done, 18 Nov 2026
+
+| Section | Answer | State |
+|---|---|---|
+| Privacy policy | `https://freshaf.io/privacy` | Saved |
+| Ads | None | Saved |
+| Sign in details | Two demo sets, customer + pro | Saved |
+| Target audience | 18 and over only | Saved |
+| Government apps | No | Saved |
+| Financial features | **None** | Saved |
+| Health | None | Saved |
+| Data safety | Steps 1–3 done | **Draft saved**, steps 4–5 left |
+| Content rating | Not started | Needs Evert — see below |
+| Trader status (app level) | Not started | Likely needs Evert |
+
+**Target audience was gated behind Sign in details**, and Content rating behind that, so the
+reviewer logins really were the critical path. Both demo sets are in and saved.
+
+**Financial features: declared none, deliberately.** Play lists *"Rewards, points, frequent
+flier miles, and other incentives"* and FreshAF does have points — 5% back
+(`points_earn_pct`), held in `users.points_cents`, spent on the next order. They were checked
+before answering: they cannot be bought, cashed out or transferred, they only work against
+FreshAF's own services, and `orders.js:408` calls the redemption *platform-funded, deducted
+from what the customer pays*. That is a discount mechanic, not stored value, so the category
+does not apply. There is also no wallet, no top-up and no withdrawal anywhere in the app; the
+pro cash-owed balance is an account receivable settled off-platform. Declaring it would route
+the app to a specialist finance review team for no reason. If Google ever queries it, the
+above is the argument.
+
+**Two things the classifier will not let Claude do.** Ticking a legal declaration checkbox is
+refused by the auto-mode classifier, so the "these sign in details give full access" boxes
+were Evert's. The same will apply to any remaining confirm-style tick.
+
+### Data safety, steps 1–3 (draft saved)
+
+Collection: **yes**. Encrypted in transit: **yes** — verified, the only base URL in the app is
+`https://freshaf.io` (`public/js/native.js:30`) and there is no cleartext-traffic config, so
+Android's default block applies. Account creation: **username + password** *and* **username,
+password and other authentication** — the WhatsApp sign-up code in `/api/auth/phone-code`
+applies to `role === 'supplier'` only, never to customers, and never to sign-in.
+Delete-account URL: `https://freshaf.io/delete-account`. Partial deletion without closing the
+account: **no**.
+
+The live delete-account page was read before being submitted and it does meet Google's three
+requirements: it names the app, gives the in-app steps prominently, and says exactly what is
+deleted, what is kept as anonymised financial records, and that SA law forces a five-year
+retention on transaction records.
+
+Data types declared — **15** in total:
+
+| Group | Selected |
+|---|---|
+| Location 2/2 | Approximate, Precise (both ACCESS_COARSE and ACCESS_FINE are in the manifest) |
+| Personal info 6/9 | Name, Email address, User IDs, Address, Phone number, Other info |
+| Financial info 3/4 | User payment info (pro bank details), Purchase history, Other financial info (cash owed) |
+| Photos and videos 1/2 | Photos |
+| Files and docs 1/1 | Files and docs — the document upload accepts **.pdf** as well as images (`supplier.js:343`) |
+| App activity 1/5 | Other user-generated content (ratings, notes for the pro) |
+| Device or other IDs 1/1 | Push token |
+| Health, Messages, Audio, Calendar, Contacts, Web browsing, App info and performance | none |
+
+Note this corrects section D of `APP-STORE-SUBMISSION.md`, which listed government ID for pros
+but missed **proof of address, bank confirmation letters, police clearance and company
+registration documents**, and did not account for PDF uploads needing "Files and docs".
+
+### Content rating — waiting on Evert
+
+Starting the questionnaire is itself an agreement: *"By completing this questionnaire you
+agree to IARC's Terms of Service."* Accepting terms on Evert's behalf needs his word, so it
+was left untouched.
