@@ -71,8 +71,17 @@ The Payments Centre alerts give the real reason — three critical alerts on the
 | **Verify your identity** | "Provide some info about yourself to continue." | Verify now |
 
 So the real prerequisites are **identity verification plus a one-off US$30 payment**, not just a
-card on file. Whether that US$30 is a deposit credited against usage or a non-refundable fee is
-not stated in the alert — the "Pay now" screen will say, and it should be read before paying.
+card on file.
+
+**The US$30 is a prepayment, not a fee.** The "Pay now" dialog says so outright:
+
+> "Your service requires a one-time **prepayment** of at least US$30.00 to become active. If
+> you've already made a payment, it should be credited to your account soon."
+
+It lands as credit on the billing account (which starts at a US$0.00 balance) and usage draws it
+down. Because FreshAF's usage sits inside the free allowances, most of that US$30 will simply sit
+there unspent — so it is best understood as a **deposit to unlock the free tier**, not a running
+cost. Watch for 15% VAT being added at the confirmation step.
 
 **This also explains the first failed attempt.** The account was not "never created": it was
 created and immediately closed for the same reason. Any future attempt will fail the same way
