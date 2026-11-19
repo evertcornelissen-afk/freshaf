@@ -54,8 +54,12 @@ can still be placed — a hit cap costs a nicer map, never a lost job.
 1. Billing → create a billing account (country **South Africa**, type **Business**, name
    **FreshAF (Pty) Ltd**), add the card, and link it to project **FreshAF**
    (`freshaf-514810`). Leave the VAT number blank — FreshAF is not VAT-registered.
-   Then Billing → Budgets & alerts → budget **R200/month**, alerts at 50/90/100% to
+   Then Billing → Budgets & alerts → budget **$10/month**, alerts at 50/90/100% to
    admin@freshaf.io.
+
+   **The currency is locked to USD** — the create form offers no choice for South Africa. So
+   the card is charged in dollars and the bank adds its own forex markup on top of the 15% VAT.
+   Irrelevant at R0, worth knowing before the first real bill.
 
    *State on 19 November 2026: no billing account exists on the Google account at all, and
    none of the three Maps APIs are enabled yet. Only the default BigQuery/Storage APIs are on.
