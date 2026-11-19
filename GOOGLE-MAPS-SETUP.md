@@ -19,16 +19,47 @@ shown on a non-Google map. Switching on address search alone would breach them.
 
 ## Cost
 
-Google's free monthly allowance (per product, from March 2025) is about **10,000 calls each**
-for map loads, address suggestions, address lookups and route distances. FreshAF is far below
-that, so the expected bill is **R0**. A budget alert and daily caps (below) stop any surprise.
+*Checked against Google's own pricing page, 19 November 2026.*
+
+Google's free monthly allowance is **10,000 calls per product**, and each product is counted
+separately:
+
+| What FreshAF uses | Free each month | Price after that |
+|---|---|---|
+| Map picture (Maps JavaScript API, Dynamic Maps) | 10,000 loads | $7.00 / 1,000 |
+| Address suggestions (Autocomplete Essentials) | 10,000 | $2.83 / 1,000 |
+| Driving distance (Compute Routes Essentials) | 10,000 | $5.00 / 1,000 |
+| Pro business lookup (Text Search) | — | runs once per application, a handful a month |
+
+Roughly per booking: one address session, one or two route calls, three to five map loads.
+So **R0 up to about 2,000 bookings a month**, and only tens of dollars a month beyond that —
+map loads cross the line first. Google adds 15% South African VAT, which FreshAF cannot claim
+back (not VAT-registered), so treat any quoted price as price + 15%.
+
+**The old $200 monthly free credit no longer exists.** Google replaced it with the per-product
+allowances above in March 2025. Any advice that mentions the $200 credit is out of date.
+
+Two things keep this safe, and they do different jobs:
+
+- A **budget alert** only emails you. It does not stop spending. Useful, not protection.
+- A **daily quota cap** actually refuses calls once hit. This is the real protection.
+
+Caps are set to keep FreshAF inside the free allowance (see step 4). When a cap is hit the map
+falls back to OpenStreetMap on its own via `gm_authFailure` in `public/js/map.js`, so a booking
+can still be placed — a hit cap costs a nicer map, never a lost job.
 
 ## Setup — Google Cloud project `freshaf-514810` (already created)
 
 **Evert (card, money):**
-1. Billing → create a billing account (type **Business**, name **FreshAF (Pty) Ltd**), add the
-   card, and link it to project **FreshAF**. Billing → Budgets & alerts → budget **$10/month**,
-   alerts at 50/90/100% to admin@freshaf.io.
+1. Billing → create a billing account (country **South Africa**, type **Business**, name
+   **FreshAF (Pty) Ltd**), add the card, and link it to project **FreshAF**
+   (`freshaf-514810`). Leave the VAT number blank — FreshAF is not VAT-registered.
+   Then Billing → Budgets & alerts → budget **R200/month**, alerts at 50/90/100% to
+   admin@freshaf.io.
+
+   *State on 19 November 2026: no billing account exists on the Google account at all, and
+   none of the three Maps APIs are enabled yet. Only the default BigQuery/Storage APIs are on.
+   This step is the only thing blocking the rest.*
 
 **Claude (after billing is linked):**
 2. Enable: **Maps JavaScript API**, **Places API (New)**, **Routes API**.
@@ -39,9 +70,13 @@ that, so the expected bill is **R0**. A budget alert and daily caps (below) stop
      `https://freshaf.io/*`, `https://www.freshaf.io/*`, `https://localhost/*` (Android app),
      `capacitor://localhost/*` (iPhone app), `http://localhost:5757/*` (testing).
      → Render `GOOGLE_MAPS_BROWSER_KEY`.
-4. Quotas: Maps JavaScript API map loads **1,000/day**; Places autocomplete **2,000/day**;
-   Routes **2,000/day**. Generous for FreshAF, small enough that a stolen browser key cannot
-   run up a bill.
+4. Quotas (the part that actually stops a bill): **300 per day** on each of Maps JavaScript
+   API map loads, Places autocomplete requests and Routes compute-routes. 300/day is 9,300 a
+   month, just inside the free 10,000, and still roughly 60-100 bookings a day of capacity.
+
+   **Do not use the old 1,000/2,000/2,000 caps that used to be written here.** Over 30 days
+   those permit about **$530 a month** while the budget alert claims $10. They were written
+   when the $200 credit still existed. Corrected 19 November 2026.
 
 **Evert (keys into Render):**
 5. Each key's copy button, then Render → Environment → add the two variables. One deploy,
@@ -59,6 +94,17 @@ that, so the expected bill is **R0**. A budget alert and daily caps (below) stop
 
 ## The Android app
 
-The APK on the site (v12, 9 Nov) still has the old map file inside it. It keeps working, but it
-shows OpenStreetMap with Google addresses. **Rebuild and re-upload the APK in the same batch** as
-the keys, so the app shows Google's map too.
+*Rechecked 19 November 2026 by unzipping both files.*
+
+| File | Built | Has the Google map code | What to do |
+|---|---|---|---|
+| Play Store bundle `app-release.aab` (release 13, in review) | 17 Nov | **Yes** (`google_key` present) | **Nothing.** It picks up Google Maps as soon as the keys are on Render — no rebuild, no resubmission. |
+| Sideload APK at `/download/freshaf.apk` | 9 Nov | No | Leave it. |
+
+The earlier note here said to rebuild and re-upload the APK alongside the keys. That is no
+longer worth doing: the sideload APK is retired the day the Play release goes live (see the
+comment on the `/download/freshaf.apk` route in `server/index.js`). Until then it keeps working,
+just with OpenStreetMap's picture and Google's addresses.
+
+**Nothing in either app needs a rebuild for Maps.** The browser key is fetched at runtime from
+`/api/map-config`, which is why. Same reason the Stitch keys need no rebuild.
