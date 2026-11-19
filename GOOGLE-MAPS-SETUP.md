@@ -48,6 +48,38 @@ Caps are set to keep FreshAF inside the free allowance (see step 4). When a cap 
 falls back to OpenStreetMap on its own via `gm_authFailure` in `public/js/map.js`, so a booking
 can still be placed — a hit cap costs a nicer map, never a lost job.
 
+## There is a US$30 toll at the door — correction, 19 November 2026
+
+The "Cost" section above is about **usage**, and it is right: 10,000 free calls per product a
+month, so FreshAF's running cost really is R0 for a long time. But opening the billing account
+is not free, and this was only visible once the account existed.
+
+Google closed the new billing account `01607A-E49E72-EB81FF` the moment it was created, with:
+
+> "This billing account is closed. Reopen it to continue using linked projects."
+
+and the reopen button disabled, explaining:
+
+> "You can't reopen this billing account because this account is not in good standing."
+
+The Payments Centre alerts give the real reason — three critical alerts on the profile:
+
+| Alert | Google's wording | Action |
+|---|---|---|
+| **Payment pending** | "Google Cloud 01607A-E49E72-EB81FF: Your service requires a one-off payment of at least **US$30.00**…" | Pay now |
+| **Payment method can't be used** | "Provide the missing details to use Visa ••••9801 to pay." | Update |
+| **Verify your identity** | "Provide some info about yourself to continue." | Verify now |
+
+So the real prerequisites are **identity verification plus a one-off US$30 payment**, not just a
+card on file. Whether that US$30 is a deposit credited against usage or a non-refundable fee is
+not stated in the alert — the "Pay now" screen will say, and it should be read before paying.
+
+**This also explains the first failed attempt.** The account was not "never created": it was
+created and immediately closed for the same reason. Any future attempt will fail the same way
+until the three alerts are cleared.
+
+All three are Evert's: they involve paying money and uploading identity documents.
+
 ## Setup — Google Cloud project `freshaf-514810` (already created)
 
 **Evert (card, money):**
