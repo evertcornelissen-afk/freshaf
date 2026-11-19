@@ -65,7 +65,7 @@ can still be placed — a hit cap costs a nicer map, never a lost job.
    none of the three Maps APIs are enabled yet. Only the default BigQuery/Storage APIs are on.
    This step is the only thing blocking the rest.*
 
-### The payments profile must be a BUSINESS profile — this choice is permanent
+### The payments profile is INDIVIDUAL and cannot be made a business one without a support ticket
 
 *Learned the hard way on 19 November 2026, mid-flow.*
 
@@ -81,7 +81,28 @@ AdSense spells out the only remedy — cancel and open a new one
 ([AdSense](https://support.google.com/adsense/answer/10163?hl=en-GB)). So this is a one-way
 door and it must be got right before pressing **Submit and enable billing**.
 
-Create a **new payments profile, account type Organisation / Business**, with:
+**A business profile is not self-service.** The Payments Centre shows an edit pencil next to
+ACCOUNT TYPE, but clicking it only prints Google's refusal:
+
+> "Your account type can't be changed since it's subject to specific tax laws and other
+> regulations. If you're now registered as an organisation and would like to file taxes and
+> receive invoices through your organisation, contact support to create a new account type."
+
+So the only route to a business profile is a **Google support ticket**, which takes days. Google
+Cloud's billing page also offers no profile chooser at all — it is locked to the single existing
+profile, so a new one cannot be made from inside the Cloud flow either.
+
+**Why this is not worth blocking on.** The payments profile is permanent, but a **Cloud project
+can be moved between billing accounts at any time**. So when a business profile does exist, the
+fix is: make a new billing account on it and relink the FreshAF project. Nothing is lost by
+starting on the individual profile, and the money leaves the company account regardless because
+the card is the company's.
+
+**Decision, 19 November 2026:** proceed on the individual profile with the company card, and
+raise the support ticket separately if the Google bill ever becomes material. At an expected R0
+it is a bookkeeping nicety, not a problem.
+
+If and when the support ticket is raised, these are the details to give:
 
 | Field | Value |
 |---|---|
@@ -93,12 +114,23 @@ Create a **new payments profile, account type Organisation / Business**, with:
 | Tax / VAT number | **Leave blank** — FreshAF is not VAT-registered |
 | Payment method | **FNB Gold Business Debit, Visa ••5406** (already on the account) |
 
-No card number needs typing: four cards are already saved on the Google account, and the FNB
-Gold Business Debit is the right one for company books.
+**No card number ever needs typing.** Four cards are already saved on the Google account:
+
+| Card | State |
+|---|---|
+| RMB Private Bank Debit, Visa ••8290 | the default — personal, do not use |
+| **FNB Gold Business Debit, Visa ••5406** | **the one to use** — business, no warnings |
+| FNB Platinum Business Debit, Visa ••0729 | Google warns: make sure it is active with enough funds |
+| FNB Gold Business Debit, Visa ••9801 | Google warns: more card info needed |
+
+The payment method **resets to the RMB personal card whenever the page reloads**, so check it
+reads FNB Gold Business Debit ••5406 immediately before submitting.
 
 **State at 19 Nov 2026:** billing account shell `01607A-E49E72-EB81FF` named "FreshAF (Pty) Ltd"
-exists but is **not enabled** — nothing submitted, no money committed, project still unlinked.
-The remaining step is swapping the profile to a business one and pressing Submit.
+exists, the card is set to FNB Gold Business Debit ••5406, and everything is staged. It is
+**not enabled** — nothing submitted, no money committed, project still unlinked. The one
+remaining step is pressing **Submit and enable billing**, which Evert must click himself:
+Claude's auto-mode classifier refuses to commit a payment method.
 
 **Claude (after billing is linked):**
 2. Enable: **Maps JavaScript API**, **Places API (New)**, **Routes API**.
