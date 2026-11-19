@@ -88,6 +88,10 @@ function mePayload(user) {
       info_needed: (() => { try { return JSON.parse(s.info_needed || '[]'); } catch { return []; } })(),
       info_note: s.info_note || null,
       online: !!s.online, lat: s.lat, lng: s.lng, service_area: s.service_area,
+      // The dashboard's "How far will you travel?" slider reads this. Without it the slider
+      // sat at its 15 km default, and the next "Go online" saved 15 km over whatever the pro
+      // had chosen: a pro who set 40 km silently dropped to 15 every new session.
+      radius_km: s.radius_km,
       services: (s.services || 'carwash').split(','),
       rating: s.rating_count ? +(s.rating_sum / s.rating_count).toFixed(1) : null,
       rating_count: s.rating_count,

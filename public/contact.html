@@ -30,6 +30,13 @@
     padding: 9px 12px 9px 0; vertical-align: top; width: 210px; white-space: nowrap; }
   .legal td { padding: 9px 0; border-bottom: 1px solid var(--border-soft); }
   .legal th { border-bottom: 1px solid var(--border-soft); }
+  /* On a phone the 210px label column left about 100px for the value, so the table ran past
+     the right edge of the screen. Put each label above its value instead. */
+  @media (max-width: 520px) {
+    .legal tr { display: block; padding: 9px 0; border-bottom: 1px solid var(--border-soft); }
+    .legal th, .legal td { display: block; width: auto; white-space: normal; padding: 0; border-bottom: 0; }
+    .legal th { margin-bottom: 2px; }
+  }
 </style>
 </head>
 <body>

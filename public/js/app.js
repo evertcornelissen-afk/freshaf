@@ -1,6 +1,7 @@
 // FreshAF customer app — home, auth, booking (car wash + laundry), tracking, account.
 let me = null;
 let pricing = null;
+let pricingFor = null; // whose answer `pricing` is: an account id, or null for signed out
 let svc = 'carwash';
 let sel = { package: null, unit: null, lat: null, lng: null };
 let callout = null;
@@ -77,6 +78,7 @@ async function boot() {
     me = user;
     setTopbar();
     pricing = await api('/api/pricing');
+    pricingFor = me ? me.id : null;
     if (!me) {
       renderHomeServices();
       show('view-home');
@@ -131,7 +133,14 @@ el('link-to-login').onclick = (e) => { e.preventDefault(); show('view-login'); }
 el('link-back-home').onclick = (e) => { e.preventDefault(); show('view-home'); };
 
 async function enterApp() {
-  if (!pricing) pricing = await api('/api/pricing');
+  // Always re-read, never reuse the copy loaded while signed out: the answer depends on who
+  // is asking (payments_live is per account). boot() loads pricing before anyone has signed
+  // in, so a demo account, the one Stitch's reviewer and the store reviewers use, signed in
+  // and was shown "cash only" until the page was reloaded. Card checkout looked missing.
+  if (!pricing || pricingFor !== (me ? me.id : null)) {
+    pricing = await api('/api/pricing');
+    pricingFor = me ? me.id : null;
+  }
   // A service picked before signing up only preselects the booking form. Signing in or
   // registering always lands on the main chooser — being dropped straight into a wash
   // booking is disorienting when you have just typed in your details.
@@ -272,7 +281,7 @@ function renderPickers() {
       <span class="tick">${icon('check')}</span>
       <div class="pkg-icon">${icon(svc === 'laundry' ? 'shirt' : 'car', 'lg')}</div>
       <div class="name">${u.name}</div>
-      <div class="desc">${u.mult === 1 ? 'Standard rate' : 'Rate multiplier ' + u.mult}</div>
+      <div class="desc">${u.mult === 1 ? 'Standard price' : '+' + Math.round((u.mult - 1) * 100) + '% on the package price'}</div>
     </div>`).join('');
   pg.querySelectorAll('.pkg').forEach((n) => n.onclick = () => { sel.package = n.dataset.pkg; refreshSel(); });
   vg.querySelectorAll('.pkg').forEach((n) => n.onclick = () => { sel.unit = n.dataset.unit; refreshSel(); });
@@ -488,6 +497,14 @@ el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros
       ? `${r.asked} pro${r.asked === 1 ? '' : 's'} asked · ${r.auto_quoted} answered instantly`
       : 'No pros are online near you right now.';
     renderQuotes();
+    // Nobody was asked, so nobody can answer. The list used to say "Waiting for pros to send
+    // their prices" under "No pros are online", a wait that could never end. Say what is
+    // true and what the customer can do about it.
+    if (!r.asked && !quotesList.length) {
+      el('quote-list').innerHTML = '<p class="empty">We are signing up pros across South Africa and none is '
+        + 'online in your area at the moment. Try again a little later, or choose '
+        + '<strong>Schedule a time</strong> above and ask again.</p>';
+    }
   } catch (e) { showError('order-error', e.message); }
 });
 
@@ -511,7 +528,7 @@ function refreshPaymentMethods() {
     if (cash) cash.checked = true;
     if (!el('pay-note')) {
       el('pay-seg').insertAdjacentHTML('afterend',
-        '<p class="muted small-text mt" id="pay-note">Card payments are coming soon. Pay your pro in cash when the job is done.</p>');
+        '<p class="muted small-text mt" id="pay-note">Pay your pro in cash when the job is done.</p>');
     }
   } else {
     el('pay-note')?.remove();

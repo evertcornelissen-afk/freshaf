@@ -722,3 +722,68 @@ installed copy of the app at once — no new version, no Play review, no wait. S
 
 `server/payments.js:28` also means both conditions must hold: `PAYMENTS_LIVE=true` **and** a
 client id that does not start with `test-`. Test keys never count as live.
+
+
+---
+
+## Full walkthrough audit — 19 November 2026
+
+Everything below was done by hand on a local copy at phone width (375 px), signed in as a new
+customer, as the store-reviewer demo customer and as the demo pro, with the Google Maps keys
+in place. Automated suite before and after: 9 suites, 236 checks, all passing.
+
+### What works, verified end to end
+
+| Area | Result |
+|---|---|
+| Customer sign-up, sign-in (mixed-case email), menu, Account | works |
+| Google address search | house-number suggestions; 20 keystrokes = 1 request |
+| Google map on the booking form | renders, pin set from the saved address |
+| Quote -> book -> order tracker | instant quote, R420 = R280 x 1.25 + 20% |
+| Pro dashboard: job -> en route -> washing -> finish | every step moves |
+| Money after a cash job | pro keeps R350, owes FreshAF R70, R300 limit shown |
+| Rewards and rating | 5% credited (R21), rating recorded and shown on the next quote |
+| Laundry form, return-to-a-different-address option | reads correctly |
+| In-app account deletion (customer) | password-confirmed; signed out; old login refused (401) |
+| "Delete my account" on the pro dashboard | present |
+| A pro session opening the customer app | sent to the pro dashboard |
+| Live site: /privacy /terms /contact /delete-account /reset-password | all 200 |
+| Live security headers | HSTS, CSP, X-Frame-Options DENY, nosniff, Referrer, Permissions |
+| Live pro sign-up | no WhatsApp code required (codes are off until Meta approves) |
+| APK download link inside the store app | removed three ways (JS, CSS class, standalone) |
+| Android | INTERNET, POST_NOTIFICATIONS, location, CAMERA only; target SDK 36 |
+| iPhone permission texts | specific to what each is used for |
+
+### Defects found and fixed
+
+| # | Defect | Who it hurt | Fix lives in | Reaches the store app |
+|---|---|---|---|---|
+| 1 | **Card checkout hidden from the demo account until the page was reloaded.** Payment options are per account but were loaded while signed out and reused after sign-in. | **Stitch's reviewer** and the store reviewers: they sign in and see "cash only" | `public/js/app.js` | website on deploy; app needs release 14 |
+| 2 | **A pro's travel radius silently reset to 15 km.** The account response left `radius_km` out, so the slider sat on its default and the next "Go online" saved 15 km over the pro's choice. | every pro who chose more than 15 km: fewer jobs, no warning | `server/routes/auth.js` | **yes, on deploy** (server) |
+| 3 | No pros nearby: status said "No pros are online" while the list said "Waiting for pros to send their prices", a wait that could never end. | most customers at launch | `public/js/app.js` | release 14 |
+| 4 | The customer's quote card said "From **your** published price list". | every customer | `server/quotes.js` | **yes, on deploy** (server) |
+| 5 | "View" button on My orders ran 14 px past the edge of a 375 px screen; title squeezed to three words wide. | every customer with an order | `public/css/style.css` | release 14 |
+| 6 | Pro job cards printed internal keys: "wash vac · suv". | pros | `public/js/supplier.js` | release 14 |
+| 7 | Earnings said "FreshAF paid you" on cash jobs, where the pro collects the cash and FreshAF pays nothing. | pros | `public/js/supplier.js` | release 14 |
+| 8 | Inside the store app an iPhone pro was told to "add FreshAF Pro to your home screen" (the website's instruction). | iPhone pros; an Apple reviewer | `public/js/supplier.js` | the iPhone build |
+| 9 | "Card payments are coming soon" in the booking form. Apple rejects apps that advertise unreleased features. | Apple review | `public/js/app.js` | the iPhone build |
+| 10 | Vehicle and load sizes described as "Rate multiplier 1.25". Now "+25% on the package price". | customers | `public/js/app.js` | release 14 |
+| 11 | Contact page table ran 4 px past the edge on a phone. | anyone reading /contact | `public/contact.html` | release 14 |
+| 12 | **Privacy policy named OpenStreetMap as the map provider and did not mention Google.** With the Maps keys live, Google receives typed addresses, pins and map views. | POPIA accuracy; both stores | `public/privacy.html` | website on deploy |
+
+### The important structural fact
+
+`capacitor.config.json` has `webDir: "public"` and no `server.url`: **the store app carries its
+own copy of the web files.** A fix in `public/` reaches the website on the next deploy, but
+reaches phones only in a new build. Release 13 (in review) therefore still contains defects
+3 and 5 to 11. None of them blocks approval; all of them should go out as **release 14** once
+13 is approved. Server-side fixes (2 and 4) reach the store app on the next deploy with no
+new build, because the app talks to the live API.
+
+### Open, and not mine to decide
+
+- **Terms & Conditions do not mention Google Maps.** Google's Maps Platform terms ask the
+  app's own terms to say end users are bound by Google's Maps terms. That means adding a
+  clause to the Terms, which is Evert's call. Not added.
+- The pro side is badged "SUPPLIER PORTAL" while every sentence says "pro" / "FreshAF Pro".
+- The Play screenshots still show Durbanville; the app is national.

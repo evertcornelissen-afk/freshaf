@@ -545,6 +545,14 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
   animation: viewIn .4s var(--ease) both;
 }
 .order-item:hover { border-color: var(--border); transform: translateX(3px); box-shadow: var(--shadow); }
+.order-item > div:first-child { min-width: 0; }
+/* Phone width: the status pill, the price and the View button do not fit beside the title.
+   On a 375px screen the View button ended 14px past the right edge and the title was
+   squeezed into a column three words wide. Stack the actions under the title instead. */
+@media (max-width: 520px) {
+  .order-item { flex-direction: column; align-items: stretch; gap: 10px; }
+  .order-item > .row { justify-content: space-between; }
+}
 .order-item .title { font-weight: 700; font-size: .92rem; color: var(--petrol); }
 .order-item .sub { color: var(--muted); font-size: .78rem; margin-top: 3px; }
 .order-item:nth-child(2) { animation-delay: .05s; }

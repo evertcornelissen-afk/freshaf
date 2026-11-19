@@ -231,7 +231,9 @@ function openRequest(request) {
         distanceKm: pro.distance,
         returnDistanceKm: returnDistanceFor(request, pro.lat, pro.lng),
         // For a booked slot the useful thing to show is the slot, not where the price came from.
-        availability: request.scheduled_for ? whenLabel(request.scheduled_for) : 'From your published price list',
+        // Shown to the CUSTOMER on the quote card, and to the pro on their own quote. It used
+        // to say "From your published price list", which told the customer it was theirs.
+        availability: request.scheduled_for ? whenLabel(request.scheduled_for) : "Instant price from this pro's price list",
         note: null, source: 'auto',
       });
       auto++;

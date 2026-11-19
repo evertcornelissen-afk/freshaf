@@ -464,6 +464,9 @@ async function refreshAlertsButton() {
     const show = st === 'prompt' || st === 'denied' || st === 'off';
     el('btn-enable-alerts').classList.toggle('hidden', !show);
     el('alerts-hint').classList.toggle('hidden', !show);
+    // The page's own hint ends "On iPhone, first add FreshAF Pro to your home screen". That
+    // is the website's instruction; in the installed app it is wrong, so replace it.
+    el('alerts-hint').textContent = 'Job alerts notify you of new offers even when this app is closed.';
     return;
   }
   const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
@@ -547,7 +550,8 @@ async function enterDash() {
     el('radius-km').value = me.supplier.radius_km;
     el('radius-label').textContent = me.supplier.radius_km + ' km';
   }
-  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), renderPrices(), refreshAlerts(), refreshRequests()]); // content first, then reveal
+  await renderPrices(); // the job cards name packages from this catalogue
+  await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), refreshAlerts(), refreshRequests()]); // content first, then reveal
   show('view-dash');
   initMap();
   openDeepLink();
@@ -679,7 +683,7 @@ async function refreshOffers() {
         <span class="pill warn">${o.distance_km} km away</span>
       </div>
       <p class="muted small-text" style="margin-top:8px">${icon('pin')} ${o.order.address}</p>
-      <p class="small-text" style="margin-top:5px">${o.order.package.replace(/_/g, ' ')} · ${o.order.vehicle} · ${o.order.payment_method === 'cash' ? `Collect ${rand(o.order.amount_due_cents)} cash` : 'Paid online'}${o.order.callout_fee_cents > 0 ? ` · incl. ${rand(o.order.callout_fee_cents)} callout` : ''}</p>
+      <p class="small-text" style="margin-top:5px">${jobWhat(o.order)} · ${o.order.payment_method === 'cash' ? `Collect ${rand(o.order.amount_due_cents)} cash` : 'Paid online'}${o.order.callout_fee_cents > 0 ? ` · incl. ${rand(o.order.callout_fee_cents)} callout` : ''}</p>
       ${o.order.notes ? `<p class="muted small-text">Note: ${o.order.notes}</p>` : ''}
       <div class="row mt">
         <button class="small" data-action="acceptOffer" data-arg="${o.offer_id}">Accept job</button>
@@ -753,6 +757,16 @@ window.submitHandover = async (orderId) => {
     await Promise.all([refreshJobs(), refreshEarnings()]);
   } catch (e) { showError('dash-error', e.message); }
 };
+// What the job is, in the words the customer chose from: "Wash & Vacuum · SUV / Bakkie".
+// The card used to print our internal keys ("wash vac · suv"). priceCat only lists the
+// services this pro offers and loads with the dashboard, so fall back to the tidied key.
+function jobWhat(o) {
+  const svc = priceCat && priceCat[o.service];
+  const pkg = svc && (svc.packages || []).find((p) => p.key === o.package);
+  const unit = svc && (svc.units || []).find((u) => u.key === o.vehicle);
+  const tidy = (k) => String(k || '').replace(/_/g, ' ');
+  return `${escapeHtml(pkg ? pkg.name : tidy(o.package))} · ${escapeHtml(unit ? unit.name : tidy(o.vehicle))}`;
+}
 const svcBadge = (s) => `<span class="pill ${s === 'laundry' ? 'ok' : 'warn'}" style="margin-right:6px">${serviceName(s)}</span>`;
 
 async function refreshJobs() {
@@ -767,7 +781,7 @@ async function refreshJobs() {
           <span class="pill warn live">${statusLabel(o.status, o.service)}</span>
         </div>
         ${jobAddresses(o)}
-        <p class="small-text" style="margin-top:5px">${o.package.replace(/_/g, ' ')} · ${o.vehicle} · ${o.payment_method === 'cash' ? `Collect ${rand(o.amount_due_cents)} cash on completion` : 'Paid online'}${o.callout_fee_cents > 0 ? ` · incl. ${rand(o.callout_fee_cents)} callout` : ''}${o.return_leg_fee_cents > 0 ? ` · incl. ${rand(o.return_leg_fee_cents)} return trip` : ''}</p>
+        <p class="small-text" style="margin-top:5px">${jobWhat(o)} · ${o.payment_method === 'cash' ? `Collect ${rand(o.amount_due_cents)} cash on completion` : 'Paid online'}${o.callout_fee_cents > 0 ? ` · incl. ${rand(o.callout_fee_cents)} callout` : ''}${o.return_leg_fee_cents > 0 ? ` · incl. ${rand(o.return_leg_fee_cents)} return trip` : ''}</p>
         ${o.notes ? `<p class="muted small-text">Note: ${escapeHtml(o.notes)}</p>` : ''}
         ${o.status === 'out_for_delivery'
           ? handoverForm(o)
@@ -994,7 +1008,7 @@ async function refreshEarnings() {
     : '';
   el('earnings-box').innerHTML = `
     <div class="stat"><div class="v">${e.jobs}</div><div class="l">Jobs done</div></div>
-    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">FreshAF paid you — your price in full</div></div>` + owed + blocked;
+    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">You earned — your price in full</div></div>` + owed + blocked;
 }
 
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {
