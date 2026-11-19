@@ -311,3 +311,9 @@ just with OpenStreetMap's picture and Google's addresses.
 
 **Nothing in either app needs a rebuild for Maps.** The browser key is fetched at runtime from
 `/api/map-config`, which is why. Same reason the Stitch keys need no rebuild.
+
+## LIVE — 19 November 2026, about 18:15
+
+Deployed with the 30 held commits (51a5f84). After the restart `/api/map-config` serves the
+browser key, `/api/geocode` answers from Google (results carry `place_id`), and Evert confirmed
+the Google map on the live booking form. Backup taken first: `freshaf-2026-11-19-16-09.db`.
