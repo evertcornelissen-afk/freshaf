@@ -196,6 +196,49 @@ Claude's auto-mode classifier refuses to commit a payment method.
    `powershell -ExecutionPolicy Bypass -File scripts\set-secret.ps1 GOOGLE_MAPS_BROWSER_KEY`
    (and the same for `GOOGLE_MAPS_API_KEY`).
 
+## DONE — 19 November 2026
+
+Everything on the Google side is finished. The only step left is pasting two values into Render.
+
+| Step | State |
+|---|---|
+| Billing account `01607A-E49E72-EB81FF` "FreshAF (Pty) Ltd" | **done**, card FNB Gold Business Debit ••5406 |
+| US$30 prepayment + identity verification | **done** (verification was the real blocker) |
+| Project `freshaf-514810` linked | **done** — "Paid account", US$0.00 |
+| Maps JavaScript API / Places API (New) / Routes API | **enabled** |
+| `FreshAF server` key | **created** — Places API (New) + Routes API only, no site restriction |
+| `FreshAF browser map` key | **created** — Maps JavaScript API only, restricted to 5 origins |
+| Google's unrestricted auto-created key | **deleted** |
+| Daily quota caps | **set** (see table) |
+| Budget US$10/month, alerts at 50/90/100% | **created** |
+
+**The console UI could not do this.** Its Create button silently failed twice and the renderer
+froze repeatedly. Installed the gcloud CLI (`winget install Google.CloudSDK`) and did the whole
+thing from the command line in minutes. Use gcloud for anything like this in future.
+
+### Quota caps as set
+
+| Quota | Service | Per day |
+|---|---|---|
+| `BillableDefaultPerDayPerProject` (map loads) | maps-backend | 300 |
+| `AutocompletePlacesRequestPerDayPerProject` | places | 300 |
+| `GetPlaceRequestPerDayPerProject` | places | 300 |
+| `SearchTextRequestPerDayPerProject` (pro lookup) | places | 50 |
+| `ComputeRoutesRequestsPerDay` | routes | 300 |
+
+Google refuses a large quota decrease by default. The flags that allow it are
+`--allow-high-percentage-quota-decrease` and `--allow-quota-decrease-below-usage`.
+
+### Still to do
+
+The two key values are in `drafts/RENDER-MAPS-KEYS.txt` (gitignored, never committed). Evert
+pastes them into Render as `GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_BROWSER_KEY` with **Save only**,
+then they go live on the next batched deploy. Delete that file afterwards.
+
+Budget alerts go to the billing account's admins, which is `evertcornelissen@gmail.com`. Routing
+them to `admin@freshaf.io` instead needs a Pub/Sub or monitoring notification channel and was not
+set up.
+
 ## Progress log — 19 November 2026
 
 | Step | State |
