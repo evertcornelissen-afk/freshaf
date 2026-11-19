@@ -65,6 +65,41 @@ can still be placed — a hit cap costs a nicer map, never a lost job.
    none of the three Maps APIs are enabled yet. Only the default BigQuery/Storage APIs are on.
    This step is the only thing blocking the rest.*
 
+### The payments profile must be a BUSINESS profile — this choice is permanent
+
+*Learned the hard way on 19 November 2026, mid-flow.*
+
+Google Cloud's "Set up your billing profile" page silently reuses the **existing personal
+payments profile** — on this account that is `E CORNELISSEN`, type **Individual**, shared with
+Google Play Apps, Google One and YouTube. Submitting with it would make the Google Cloud bill a
+personal expense invoiced to a person, not to FRESHAF (PTY) LTD.
+
+**Google cannot change a payments profile's account type after it is created.** Its own help
+says so ([Set your account type](https://support.google.com/paymentscenter/answer/11543916),
+[Create & manage your payments profile](https://support.google.com/paymentscenter/answer/9028746));
+AdSense spells out the only remedy — cancel and open a new one
+([AdSense](https://support.google.com/adsense/answer/10163?hl=en-GB)). So this is a one-way
+door and it must be got right before pressing **Submit and enable billing**.
+
+Create a **new payments profile, account type Organisation / Business**, with:
+
+| Field | Value |
+|---|---|
+| Account type | **Organisation / Business** (never Individual) |
+| Name | **FRESHAF (PTY) LTD** |
+| Address | 35 Sterappel Crescent, Essenhout Estate, Langeberg Heights |
+| City / Province / Code | Cape Town, Western Cape, **7570** |
+| Country | South Africa |
+| Tax / VAT number | **Leave blank** — FreshAF is not VAT-registered |
+| Payment method | **FNB Gold Business Debit, Visa ••5406** (already on the account) |
+
+No card number needs typing: four cards are already saved on the Google account, and the FNB
+Gold Business Debit is the right one for company books.
+
+**State at 19 Nov 2026:** billing account shell `01607A-E49E72-EB81FF` named "FreshAF (Pty) Ltd"
+exists but is **not enabled** — nothing submitted, no money committed, project still unlinked.
+The remaining step is swapping the profile to a business one and pressing Submit.
+
 **Claude (after billing is linked):**
 2. Enable: **Maps JavaScript API**, **Places API (New)**, **Routes API**.
 3. Create **two keys** (names below). Nothing is pasted into chat.
