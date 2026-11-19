@@ -688,3 +688,37 @@ app. Review is typically 7 days, so there is time - but it has to happen before 
 
 Review is typically completed within 7 days and can take longer for a brand-new organisation
 account.
+
+## Support address settled: admin@freshaf.io only, 19 Nov 2026
+
+Evert: *"admin@freshaf.io is the only account currently being used."* The earlier inconsistency
+note above is now resolved — treat **admin@freshaf.io** as the single address everywhere.
+
+What was actually found when fixing it: **the live site was already correct.** `freshaf.io`
+serves from `public/`, and every page there already showed admin@freshaf.io. The stale
+`support@freshaf.co.za` only survived in `site/`, an unused copy of the old marketing site last
+touched in July, plus a historical note in `PAYFAST-REGISTRATION.md`. The four `site/` pages
+have been updated so nothing stale remains anywhere.
+
+`site/` looks dead. It is not what freshaf.io serves. Worth deleting at some point, but it was
+left in place rather than removed as a side effect of an email fix.
+
+If a `support@freshaf.co.za` **mailbox** still exists at the mail host, deleting it is a change
+at GoDaddy that only Evert should make — nothing in the app points at it any more.
+
+## Stitch going live: no app update needed
+
+Evert asked whether switching to live Stitch keys after the app is on the Play Store means
+re-submitting. **It does not.** Checked in the code rather than assumed:
+
+- `server/routes/orders.js:15` returns `payments_live: payments.cardAvailableFor(viewer(req))`
+  from `/api/orders/pricing`.
+- `public/js/app.js:505` reads `pricing.payments_live` at runtime and shows or hides the card
+  option (`refreshPaymentMethods`).
+
+So card availability is **fetched from the server every time**, never compiled into the bundle.
+Putting the live Stitch keys and `PAYMENTS_LIVE=true` on Render switches card on for every
+installed copy of the app at once — no new version, no Play review, no wait. Same for iOS later.
+
+`server/payments.js:28` also means both conditions must hold: `PAYMENTS_LIVE=true` **and** a
+client id that does not start with `test-`. Test keys never count as live.
