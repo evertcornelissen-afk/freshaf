@@ -1136,6 +1136,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
     const serviceArea = serviceAreaText();
     if (!serviceArea) throw fail('Tick at least one service area, or type it under Other areas', 'area');
     if (el('reg-password').value.length < 8) throw fail('Choose a password of at least 8 characters', 'reg-password');
+    if (el('reg-password').value !== el('reg-password2').value) throw fail('The two passwords do not match. Type the same password in both boxes', 'reg-password2');
     if (!el('reg-terms').checked) throw fail('Please accept the Terms & Conditions to continue', 'terms');
     const services = [];
     if (el('svc-carwash').checked) services.push('carwash');

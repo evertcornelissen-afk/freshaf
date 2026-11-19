@@ -635,6 +635,7 @@ el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn
 
 el('register-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-register'), 'Creating your account…', async () => {
   try {
+    if (el('reg-password').value !== el('reg-password2').value) throw new Error('The two passwords do not match. Type the same password in both boxes');
     if (!el('reg-terms').checked) throw new Error('Please accept the Terms & Conditions to continue');
     const { user } = await api('/api/auth/register', {
       method: 'POST',
