@@ -501,3 +501,44 @@ other side of the booking receives (name, address, phone, both location types, o
 and the handover photo), and collected-only for everything else. Phone number is marked as
 a user choice, because `/register` requires it for suppliers only and the customer sign-up
 form has no required attribute on it.
+
+## Data safety step 4 in progress, 19 Nov 2026 — and a trap worth knowing
+
+**The trap.** Saving inside a data-type dialog is NOT enough. The step-4 page has its own
+**Save draft** button, and until that is pressed the per-type answers live only in the page's
+memory. Two location types were completed, each dialog saved, the page left without pressing
+Save draft — and all of it was gone on the next visit. Press **Save draft** after every type.
+
+**Working in Chrome now, not the browser pane.** The pane lost its Google session when it was
+closed, and signing in again would have meant a second round of 2-step. Chrome has
+admin@freshaf.io signed in, and the Play Console for this account lives at **`/u/4`** — `/u/0`
+is Evert's personal Gmail with only Social_Ideas on it, and a `/u/0` console URL silently
+redirects to the account picker. Always use `/u/4` for FreshAF.
+
+Element references beat coordinates here. The form grows as it is answered, so coordinates
+move under you; `find` returns stable refs. Two mis-clicks happened before the switch and both
+were caught by reading the checkbox states back after every batch. Keep verifying: a wrong
+purpose (Analytics was ticked once by accident) is a false declaration, not a cosmetic slip.
+
+### Personal info — complete, 6 of 6
+
+| Data type | Collected | Shared | Ephemeral | Required? | Purposes |
+|---|---|---|---|---|---|
+| Name | Yes | Yes | No | Required | App functionality, Account management / shared: App functionality |
+| Email address | Yes | No | No | Required | App functionality, Account management, Developer communications |
+| User IDs | Yes | No | No | Required | App functionality, Account management |
+| Address | Yes | Yes | No | Required | App functionality / shared: App functionality |
+| Phone number | Yes | Yes | No | **Users can choose** | App functionality, Account management / shared: App functionality |
+| Other info | Yes | No | No | Required | Fraud prevention, security, and compliance |
+
+**Why phone number is optional and the rest are required.** `/api/auth/register` only enforces
+name, email and password, plus `home_address` for customers; the WhatsApp number is demanded
+for `role === 'supplier'` only, and `public/index.html:153` has no required attribute on the
+customer phone field. So a customer can use FreshAF without ever giving a number.
+
+**Why "shared" is Yes on name, address, phone and location.** The live privacy policy says in
+*Who receives it*: "when a pro takes your booking they see your name, service address, contact
+number and notes". Declaring that as collected-only would understate it.
+
+Still to do: 3 financial types, 2 location types, photos, files and docs, app activity,
+device or other IDs — then step 5 preview and the final save.
