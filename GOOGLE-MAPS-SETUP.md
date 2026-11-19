@@ -229,11 +229,22 @@ thing from the command line in minutes. Use gcloud for anything like this in fut
 Google refuses a large quota decrease by default. The flags that allow it are
 `--allow-high-percentage-quota-decrease` and `--allow-quota-decrease-below-usage`.
 
-### Still to do
+### Render — done too
 
-The two key values are in `drafts/RENDER-MAPS-KEYS.txt` (gitignored, never committed). Evert
-pastes them into Render as `GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_BROWSER_KEY` with **Save only**,
-then they go live on the next batched deploy. Delete that file afterwards.
+Both keys are **in Render**, added via Environment -> Add variable -> Import from .env, saved with
+**Save only** so the service did not restart and there was no downtime. Verified by reloading the
+page: `GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_BROWSER_KEY` both persist. Site checked straight
+after: HTTP 200.
+
+They are also written into the local `.env` (gitignored) so local testing uses them.
+
+`/api/map-config` still returns `google_key: null` and that is correct — **Save only** does not
+restart the service, so the new variables are not in the running process yet. They take effect on
+the next deploy. Nothing more to do for Maps until then.
+
+**A trap worth remembering:** `scripts\copy-render-env-release.ps1` copies BACKUP_TOKEN as well,
+and BACKUP_TOKEN is already in Render from 17 Nov. Pasting the script's full block would have
+re-added it. Check what Render already has before importing a block.
 
 Budget alerts go to the billing account's admins, which is `evertcornelissen@gmail.com`. Routing
 them to `admin@freshaf.io` instead needs a Pub/Sub or monitoring notification channel and was not
