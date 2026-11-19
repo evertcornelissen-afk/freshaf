@@ -305,6 +305,31 @@ Demo login: admin app → **Store reviewer accounts** (shows whether the demo pr
 online). Pressing **Create** again resets both passwords — if Apple/Google already have them,
 give Stitch the same ones instead.
 
+## Pre-flight verified from the live dashboard, 19 Nov 2026
+
+Checked while chasing Stitch. **Nothing is outstanding on our side** — every item below was
+read off the account, not assumed:
+
+| Check | State |
+|---|---|
+| Submit your verification | ✅ green tick, submitted **09 Nov 2026** |
+| Build your integration — all 4 items | ✅ all four green-ticked (payment link, redirect URL, test payment, webhook) |
+| Submit your integration for review | ✅ green tick, submitted **06 Nov 2026**, *"Our team will be in touch"* |
+| Go Live | ⬜ step 4, not reached — needs Stitch to verify + pass review |
+| Redirect URLs registered | `https://freshaf.io/payment-complete` **and** `http://localhost:5757/payment-complete` |
+| Webhook endpoint | `https://freshaf.io/api/payments/stitch/webhook` — *"FreshAF order payment confirmations"*, **error rate 0.0%** |
+| Client ID | `test-45a2e8dd-…` — still a test client, so card stays hidden from real customers |
+| `GET https://freshaf.io/api/pricing` (public, no auth) | `"payments_live": false` ✅ matches |
+
+So the production redirect and webhook are **already registered and healthy**. The only thing
+between FreshAF and live card payments is Stitch activating the account.
+
+A chase was sent 19 Nov 2026 (draft kept at `drafts/stitch-verification-chase.txt`), quoting
+both submission dates and the silence since.
+
+Note for step 4 of the runbook below: the public endpoint is **`/api/pricing`**, not
+`/api/orders/pricing` — the latter is the router path and answers 401 when signed out.
+
 ## When Stitch approves — switching to live keys
 
 Live keys are a **separate Stitch client**: assume the test client's return URL and webhook
