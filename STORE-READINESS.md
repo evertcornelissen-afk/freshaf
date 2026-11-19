@@ -648,3 +648,43 @@ it is served from `public/`, so it goes live with the next FreshAF deploy.
 **Still needed before internal testers can install:** the Internal testing track has no testers
 yet ("Select testers" is unstarted). That needs real Google account addresses, so it is Evert's
 call who goes on the list.
+
+## SUBMITTED TO GOOGLE, 19 Nov 2026
+
+Publishing overview now reads **"Changes in review"**. 11 changes went across: the production
+release 13 (1.0), South Africa as the only country, the default store listing, content rating,
+target audience, privacy policy, ads declaration, data safety, health, app-level trader status,
+and the app category.
+
+Evert overrode the internal-testing-first recommendation - he had already installed and tested
+the APK - so the build went straight to production. Worth noting for honesty: the APK he tested
+was signed with the **upload key**, while Play re-signs with its own app signing key, so the
+artifact users receive is not byte-identical to the one that was tested. Same code, different
+signature.
+
+**Two things had to be fixed before Play would accept the submission.**
+
+1. **No countries selected.** A production release is blocked until the track has at least one
+   country. Set to **South Africa only** - correct for a South African service, and it is the
+   whole country, not a region.
+2. **Incomplete advertising ID declaration.** A separate declaration from the Ads one, required
+   of everything targeting Android 13+. Answered **No**, and that was verified properly rather
+   than assumed: `AD_ID` appears nowhere in the merged release manifest and nowhere inside
+   `app-release.aab` itself, so no dependency is injecting it.
+
+Two warnings were left as-is because they do not block anything and only affect crash
+readability: no R8/proguard deobfuscation file, and no native debug symbols.
+
+### Two things that still need attention
+
+**Managed publishing is OFF.** That means FreshAF goes live in South Africa **the moment Google
+approves it**, with no further click from Evert. If he wants to choose the launch moment, turn
+Managed publishing on in Publishing overview before the review completes.
+
+**`assetlinks.json` has not been deployed.** The file now carries the real Play app signing
+SHA-256 but it still lives only in this repository. Until a FreshAF deploy puts it on
+freshaf.io, Android App Links will not verify and links will open in the browser instead of the
+app. Review is typically 7 days, so there is time - but it has to happen before the app is live.
+
+Review is typically completed within 7 days and can take longer for a brand-new organisation
+account.
