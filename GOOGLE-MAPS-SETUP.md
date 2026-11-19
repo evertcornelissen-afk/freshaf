@@ -196,6 +196,43 @@ Claude's auto-mode classifier refuses to commit a payment method.
    `powershell -ExecutionPolicy Bypass -File scripts\set-secret.ps1 GOOGLE_MAPS_BROWSER_KEY`
    (and the same for `GOOGLE_MAPS_API_KEY`).
 
+## Progress log — 19 November 2026
+
+| Step | State |
+|---|---|
+| Billing account `01607A-E49E72-EB81FF` "FreshAF (Pty) Ltd" | **created** |
+| Card on it | **FNB Gold Business Debit ••5406** |
+| US$30 prepayment | **paid** |
+| Identity verification | **passed** (this is what unlocked the closed account) |
+| Project `freshaf-514810` linked to the billing account | **done** — shows "Paid account", US$0.00 |
+| Maps JavaScript API | **enabled** |
+| Places API (New) | **enabled** |
+| Routes API | **enabled** |
+| Two restricted keys | **not done** — see below |
+| Quota caps 300/day | not done |
+| Budget $10 + alerts | not done |
+
+**The key work is unfinished and there is a live security problem.** Enabling Maps JavaScript API
+ran Google's onboarding flow, which auto-created a key called **"Maps Platform API Key"** with
+**32 APIs** allowed and, in Google's own words on the edit page:
+
+> "This key can currently be used with any application."
+
+That key is unrestricted. It is not in Render and nothing uses it, but it should not be left as
+it is.
+
+Two console quirks cost a lot of time and are worth knowing before trying again:
+
+1. **The API-restrictions dropdown discards your selections if you click anywhere outside it** —
+   including on the Application restrictions radio buttons. Select the APIs, then close the
+   dropdown by clicking the combobox itself, and only then touch anything else.
+2. **There is no "clear all"** in that dropdown, so fixing the auto-created key means
+   un-ticking 31 APIs by hand. Creating fresh keys is less work than repairing that one.
+3. The Create button in the "Create API key" dialog did nothing on two attempts and the console
+   renderer froze repeatedly. No duplicate keys were created — the credentials list still shows
+   only the auto-created key. `gcloud` is not installed on this PC; installing it would make the
+   remaining steps scriptable and avoid the flaky console entirely.
+
 ## Check it worked
 
 - `curl -s https://freshaf.io/api/map-config` shows a `google_key` (it is public by design).
