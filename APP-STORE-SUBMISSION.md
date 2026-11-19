@@ -294,6 +294,7 @@ the payment provider is a processor, not a recipient, and nothing is sold or use
 | Phone number | Yes | The Pro calls you on arrival | Required |
 | Physical address + precise location | Yes | The job happens at your address | Required |
 | Government ID (Pros only) | Yes | Vetting; **encrypted at rest** | Required for Pros |
+| Proof of address, bank confirmation letter, police clearance, company registration (Pros only) | Yes | Vetting. Uploaded as **.jpg/.png or .pdf**, so Play's **Files and docs** type must be declared too | Required for Pros |
 | Bank details (Pros only) | Yes | Paying the Pro; **encrypted at rest** | Required for Pros |
 | Purchase history | Yes | Order history, receipts, tax records | Required |
 | Photos (optional) | Yes | Job condition photos; laundry handover photo taken by the pro | Optional |
@@ -301,6 +302,11 @@ the payment provider is a processor, not a recipient, and nothing is sold or use
 | **Device or other IDs** (push token) | Yes | Booking and job alerts to this phone (Firebase Cloud Messaging / Apple Push) | Optional (alerts can be off) |
 | Payment card details | **No** | Entered on the provider's own pages; never reach FreshAF | — |
 | Advertising ID / tracking | **No** | No ads, no third-party analytics, no tracking | — |
+
+> **Checked against the code on 19 Nov 2026 and corrected.** The original table missed the
+> non-ID vetting documents above, and missed that `public/js/supplier.js:343` accepts `.pdf`
+> as well as images - which is why **Files and docs** is declared, not just Photos. What was
+> actually entered in Play is recorded in `STORE-READINESS.md`; that is the source of truth.
 
 **Security practices to declare:** data encrypted in transit (HTTPS); users can request
 deletion (`freshaf.io/delete-account`); ID and banking data encrypted at rest.

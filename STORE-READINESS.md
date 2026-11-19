@@ -612,3 +612,39 @@ actually missing, so this almost certainly clears once the listing is sent for r
 
 Publishing overview currently says: *"To send changes for review, complete the required steps
 in the app dashboard."* So trader status is the gate on everything downstream.
+
+## 12 of 12 complete, bundle uploaded, 19 Nov 2026
+
+Trader status saved (Yes + `https://freshaf.io/terms`). The store listing finally ticked once
+it was taken through its own **step 2 Review → Save**; "Save as draft" alone never completed
+that task. All setup tasks are done and the release tracks are unlocked.
+
+**Internal testing release, saved as a draft** (Evert chose internal testing over a production
+draft, so the first bundle gets installed on a real phone before Google ever sees it):
+
+| | |
+|---|---|
+| File | `app-release.aab`, 7 860 KB |
+| Version | **13 (1.0)** |
+| Min API | 24+ |
+| Target SDK | 36 |
+| Signing | **Enhanced** - Play App Signing enrolled on this first upload, no key error |
+| Release name | 13 (1.0) |
+| Release notes | written for en-ZA |
+| State | **Draft. Not rolled out.** |
+
+**`assetlinks.json` is now real.** Play's own Digital Asset Links snippet gave the app-signing
+SHA-256, and `public/.well-known/assetlinks.json` now carries it instead of the placeholder:
+
+```
+2B:27:63:59:43:3B:D4:F3:5E:C1:BD:AC:27:82:E2:62:7A:25:45:56:8A:32:7B:EE:12:F1:D7:84:3F:CD:49:9B
+```
+
+Note this is the **Play app signing key**, so App Links verify for builds Google distributes.
+A locally sideloaded build signed with the upload key will not verify app links; that is
+expected and not a fault. **This file has to be deployed to freshaf.io before App Links work** —
+it is served from `public/`, so it goes live with the next FreshAF deploy.
+
+**Still needed before internal testers can install:** the Internal testing track has no testers
+yet ("Select testers" is unstarted). That needs real Google account addresses, so it is Evert's
+call who goes on the list.

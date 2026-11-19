@@ -40,7 +40,7 @@ valet,mobile wash,laundromat,ironing,duvet,cleaning,detailing,wash and fold,Sout
 
 FreshAF brings the car wash and the laundromat to you.
 
-Pick a service, drop a pin where your car is parked or where your laundry should be collected, and choose from the vetted pros near you. Every pro sets their own price, so you see who is available, what they charge and how far away they are before you book. The price you see is the price you pay.
+Pick a service, drop a pin where your car is parked or where your laundry should be collected, and see the vetted pros available near you. You get one clear price for the job before you book, and the price you see is the price you pay. Prefer to compare? Ask several pros for a quote and pick the one you want.
 
 CAR WASH, WHEREVER IT IS PARKED
 • Express Wash: exterior hand wash and dry
@@ -67,7 +67,7 @@ WHY FRESHAF
 • Rate every job, so the best pros rise to the top.
 
 FOR PROS
-Run your own car wash or laundry business through FreshAF Pro: set your own prices, choose how far you travel, go online when you want work, and get job alerts on your phone.
+Run your own car wash or laundry business through FreshAF Pro: set your own rates, choose how far you travel, go online when you want work, and get job alerts on your phone.
 
 FreshAF is signing up pros across South Africa. If no pro works near you yet, the app shows that before you book, so you never pay for a service nobody can do.
 
