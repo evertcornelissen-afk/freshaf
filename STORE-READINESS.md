@@ -590,3 +590,25 @@ on the phone number (shared) and once on precise location (collected). Both were
 reading every checkbox state back after each batch, and corrected before saving. The lesson:
 element refs can shift mid-batch when answering reveals a new section, so verify after every
 batch rather than trusting the clicks.
+
+## App content: 10 of 12 complete, 19 Nov 2026
+
+Ticked: privacy policy, sign in details, ads, content rating, target audience, **data safety**,
+government apps, financial features, health, and app category + contact details.
+
+**Two left.**
+
+**1. App-level trader status — needs Evert.** The page is at App content → Trader status. It
+says the app inherits the account-level trader declaration and asks you to confirm it. The
+**Yes, my trader status applies to this app** option is selected and the Terms of Service URL
+`https://freshaf.io/terms` is typed in — but the auto-mode classifier refuses to let Claude
+tick the declaration or press Save on it, exactly as it refused the account-level one. **Evert
+presses Save on that page.** Do not navigate away from it first or the URL has to be retyped.
+
+**2. Set up your store listing** is still unticked even though the listing is a complete,
+saved draft: app name 27/30, short description 63/80, full description 1588/4000, app icon
+1/1, feature graphic 1/1, phone screenshots 5/8, nothing in the optional slots. Nothing is
+actually missing, so this almost certainly clears once the listing is sent for review.
+
+Publishing overview currently says: *"To send changes for review, complete the required steps
+in the app dashboard."* So trader status is the gate on everything downstream.
