@@ -542,3 +542,51 @@ number and notes". Declaring that as collected-only would understate it.
 
 Still to do: 3 financial types, 2 location types, photos, files and docs, app activity,
 device or other IDs — then step 5 preview and the final save.
+
+## Data safety COMPLETE, 19 Nov 2026
+
+All 15 data types answered, step 5 preview checked, saved: *"Change saved. Send for review in
+Publishing overview."*
+
+What users will see on the store listing:
+
+**Data shared** — Name, Address, Phone number, Approximate location, Precise location, Photos,
+Other user-generated content. That is exactly the set the privacy policy says the other side
+of the booking receives, and no more.
+
+**Data collected** — Personal info (Name, Email address, User IDs, Address, Phone number,
+Other info), Financial info (User payment info, Purchase history, Other financial info),
+Location (both), Photos, Files and docs, Other user-generated content, Device or other IDs.
+
+Nothing is declared for Analytics, Advertising or marketing, or Personalization anywhere,
+which matches the code: there is no analytics or ad SDK in the build at all.
+
+| Data type | Shared | Required? | Purposes (collected) |
+|---|---|---|---|
+| Name | Yes | Required | App functionality, Account management |
+| Email address | No | Required | App functionality, Account management, Developer communications |
+| User IDs | No | Required | App functionality, Account management |
+| Address | Yes | Required | App functionality |
+| Phone number | Yes | Users can choose | App functionality, Account management |
+| Other info | No | Required | Fraud prevention, security, compliance |
+| User payment info | No | Required | App functionality, Fraud prevention |
+| Purchase history | No | Required | App functionality, Account management |
+| Other financial info | No | Required | App functionality |
+| Approximate location | Yes | Users can choose | App functionality |
+| Precise location | Yes | Users can choose | App functionality |
+| Photos | Yes | Required | App functionality, Fraud prevention |
+| Files and docs | No | Required | Fraud prevention, security, compliance |
+| Other user-generated content | Yes | Users can choose | App functionality |
+| Device or other IDs | No | Users can choose | App functionality, Developer communications |
+
+**Required vs optional, the rule used.** Optional where a user genuinely has a choice and can
+still use the app: the phone number (customer sign-up does not enforce it), both location
+types (the policy says you can always type an address instead), order notes and ratings, and
+the push token (notifications can be declined). Everything else is required in the flow where
+it is collected — pro vetting documents, bank details and purchase records cannot be turned off.
+
+**Two clicks went wrong and were caught.** Analytics was ticked by accident as a purpose, once
+on the phone number (shared) and once on precise location (collected). Both were spotted by
+reading every checkbox state back after each batch, and corrected before saving. The lesson:
+element refs can shift mid-batch when answering reveals a new section, so verify after every
+batch rather than trusting the clicks.
