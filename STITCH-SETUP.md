@@ -28,6 +28,27 @@ account FreshAF can actually get.
 
 ## Verification — where it stands
 
+> **⚠️ UPDATED 19 Nov 2026, read from the live dashboard. The 3 November table below is
+> OUT OF DATE and must not be used to decide anything.**
+>
+> `express.stitch.money/verification` now shows:
+>
+> | | |
+> |---|---|
+> | Status | **In progress** |
+> | Integration submitted for review | **06 Nov 2026** - *"Our team will be in touch."* |
+> | Verification submitted | **09 Nov 2026** |
+> | Go live | *"Live payments switch on when your business is verified and your integration has passed review. Both are required."* |
+>
+> **Nothing on the dashboard is flagged as waiting on us.** The ID numbers, selfie, bank
+> account and proof-of-address items listed below were all resolved before the 9 November
+> submission. Both halves are sitting with Stitch and neither has come back.
+>
+> A chase was drafted on 19 Nov at `drafts/stitch-verification-chase.txt` for Evert to send.
+
+### The original 3 November notes, kept for history
+
+
 *3 November 2026. Five steps at https://express.stitch.money/verification. "We save as you go",
 so it can be finished in any order.*
 
