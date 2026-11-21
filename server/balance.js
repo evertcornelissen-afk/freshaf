@@ -7,9 +7,13 @@
 // offered work until they settle.
 const { db, getSetting } = require('./db');
 
+// FreshAF's money in the pro's hand on one cash job: our fee, less any rewards the customer
+// spent, because rewards come off what the pro collects at the door (found 21 Nov 2026: a
+// R10.80 rewards spend billed the pro R10.80 they never received).
+const SHARE = 'platform_fee_cents - COALESCE(points_used_cents, 0)';
 // Matches the sum shown to the pro in their earnings screen.
 const OWED_SQL = `
-  SELECT COALESCE(SUM(platform_fee_cents), 0) AS c
+  SELECT COALESCE(SUM(${SHARE}), 0) AS c
   FROM orders
   WHERE supplier_id = ? AND status = 'completed'
     AND payment_method = 'cash' AND fee_settled = 0`;
@@ -59,7 +63,7 @@ function settle(userId) {
 // Pros who are over the cap, as a Set, for filtering a list of candidates in one query.
 function blockedSupplierIds() {
   const rows = db.prepare(`
-    SELECT supplier_id, SUM(platform_fee_cents) AS owed
+    SELECT supplier_id, SUM(${SHARE}) AS owed
     FROM orders
     WHERE supplier_id IS NOT NULL AND status = 'completed'
       AND payment_method = 'cash' AND fee_settled = 0

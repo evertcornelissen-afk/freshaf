@@ -700,9 +700,7 @@ router.get('/earnings', (req, res) => {
       COALESCE(SUM(platform_fee_cents),0) AS fees
     FROM orders WHERE supplier_id = ? AND status = 'completed'`).get(req.user.id);
   // Cash jobs: the pro collected our fee at the door, so it is owed back to us.
-  const owed = db.prepare(`SELECT COALESCE(SUM(platform_fee_cents),0) AS c
-    FROM orders WHERE supplier_id = ? AND status = 'completed'
-      AND payment_method = 'cash' AND fee_settled = 0`).get(req.user.id).c;
+  const owed = balance.cashOwed(req.user.id);
   res.json({
     jobs: row.jobs,
     earned_cents: row.earned,
