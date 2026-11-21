@@ -403,14 +403,19 @@ function tellCustomerAccepted(request, supplierId, totalCents) {
   const price = `R${(totalCents / 100).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`;
   const noun = SERVICES[request.service]?.providerNoun || 'pro';
   const who = pro?.business_name || `A ${noun}`;
-  const line = `${who} can do your ${pkgName} on ${whenLabel(request.scheduled_for)} for ${price}.`;
+  // "As soon as possible" is a request, not a booking yet; a booked time names the slot.
+  const booked = !!request.scheduled_for;
+  const what = booked ? 'booking' : 'request';
+  const line = booked
+    ? `${who} can do your ${pkgName} on ${whenLabel(request.scheduled_for)} for ${price}.`
+    : `${who} can come and do your ${pkgName} now, for ${price}.`;
   push.sendToUser(request.customer_id, {
-    title: `${who} accepted your booking`, body: `${line} Tap to book.`, url: '/?requests=1', tag: `req-${request.id}`,
+    title: `${who} accepted your ${what}`, body: `${line} Tap to book.`, url: '/?requests=1', tag: `req-${request.id}`,
   }).catch(() => {});
   if (cust?.email) {
     mailer.send({
-      to: cust.email, subject: `${who} accepted your booking`,
-      heading: 'Your booking was accepted',
+      to: cust.email, subject: `${who} accepted your ${what}`,
+      heading: `Your ${what} was accepted`,
       paragraphs: [line, `Book in FreshAF before ${whenLabel(utcToWall(request.expires_at))}${cardOnly(request.service) ? ', paying by card' : ''}. Other ${noun}s may still accept, and you can choose.`],
       cta: { label: 'See and book', url: `${SITE()}/?requests=1` },
     }).catch(() => {});

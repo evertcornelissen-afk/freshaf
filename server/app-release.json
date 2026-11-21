@@ -2,7 +2,7 @@
   "_comment": "App-store status shown in the admin readiness panel. Claude updates this file whenever a release step changes; push status is read live from the server's settings instead.",
   "updated": "2026-11-21",
   "android_apk": {
-    "version": 15,
+    "version": 16,
     "date": "2026-11-21",
     "url": "/download/freshaf.apk"
   },
@@ -16,7 +16,7 @@
   },
   "google_play": {
     "ok": false,
-    "detail": "Organisation account FreshAF (ID 5459039805433028598), app io.freshaf.app (app ID 4972841896331123851). Production release 13 (1.0) SUBMITTED 19 Nov 2026, South Africa only, status Changes in review. Managed publishing is OFF, so it goes live the moment Google approves it. Release 13 carries the web files of 19 Nov: it lacks the 21 Nov release (every job accepted by a pro, booking requests, business hours) and eight walkthrough fixes. Release 15 bundle is built and ready: Desktop/FreshAF-release/freshaf-1.0-vc15.aab (versionCode 15, upload key; 14 was never uploaded). Plan (Evert, 21 Nov): Managed publishing ON, replace release 13 with 15, new screenshots (six, four in night mode), and publish only when Evert says ready. assetlinks.json with the Play app-signing SHA-256 is live on freshaf.io."
+    "detail": "Organisation account FreshAF (ID 5459039805433028598), app io.freshaf.app (app ID 4972841896331123851). Production release 13 (1.0) SUBMITTED 19 Nov 2026, South Africa only, status Changes in review. Managed publishing is OFF, so it goes live the moment Google approves it. Release 13 carries the web files of 19 Nov: it lacks the 21 Nov release (every job accepted by a pro, booking requests, business hours) and eight walkthrough fixes. Release 16 bundle is built and ready: Desktop/FreshAF-release/freshaf-1.0-vc16.aab (versionCode 16, upload key; carries the 21 Nov simulation fixes; 14 and 15 were never uploaded). Plan (Evert, 21 Nov): Managed publishing ON, replace release 13 with 16, new screenshots (six, four in night mode), and publish only when Evert says ready. assetlinks.json with the Play app-signing SHA-256 is live on freshaf.io."
   },
   "app_store": {
     "ok": false,

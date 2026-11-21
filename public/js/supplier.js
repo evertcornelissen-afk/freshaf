@@ -878,23 +878,40 @@ function jobWhat(o) {
 }
 const svcBadge = (s) => `<span class="pill ${s === 'laundry' ? 'ok' : 'warn'}" style="margin-right:6px">${serviceName(s)}</span>`;
 
+// Booked jobs: South African wall time, the same on any phone whatever its time zone.
+const SET_OFF_HOURS = 2;
+const bookedWall = (text) => Date.parse(`${String(text).replace(' ', 'T').slice(0, 16)}:00Z`);
+const wallLabel = (ms) => new Date(ms).toLocaleString('en-ZA', {
+  weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC',
+});
+// A booked job that is not due yet: shown with its time, and no "Start driving" until
+// SET_OFF_HOURS before it (the server refuses earlier too).
+const upcoming = (o) => o.status === 'accepted' && o.scheduled_for
+  && Date.now() + 2 * 3600e3 < bookedWall(o.scheduled_for) - SET_OFF_HOURS * 3600e3;
+
 async function refreshJobs() {
   const { active, history } = await api('/api/supplier/jobs');
+  // Jobs to do now first, then bookings in time order.
+  active.sort((a, b) => (upcoming(a) - upcoming(b))
+    || (a.scheduled_for ? bookedWall(a.scheduled_for) : 0) - (b.scheduled_for ? bookedWall(b.scheduled_for) : 0));
   if (!active.length) {
-    el('active-box').innerHTML = '<p class="empty">No active job.</p>';
+    el('active-box').innerHTML = '<p class="empty">No jobs yet. Jobs you are booked for appear here.</p>';
   } else {
     el('active-box').innerHTML = active.map((o) => `
       <div data-job="${o.id}">
         <div class="row spread">
           <strong>${svcBadge(o.service)} Order #${o.id} — ${rand(o.price_cents)}</strong>
-          <span class="pill warn live">${statusLabel(o.status, o.service)}</span>
+          <span class="pill ${upcoming(o) ? 'ok' : 'warn live'}">${upcoming(o) ? 'Booked' : statusLabel(o.status, o.service)}</span>
         </div>
+        ${o.scheduled_for ? `<p class="small-text" style="margin-top:6px;color:var(--accent-dim);font-weight:700">${icon('clock')} Booked for ${wallLabel(bookedWall(o.scheduled_for))}</p>` : ''}
         ${jobAddresses(o)}
         <p class="small-text" style="margin-top:5px">${jobWhat(o)} · ${o.payment_method === 'cash' ? `Collect ${rand(o.amount_due_cents)} cash on completion` : 'Paid online'}${o.callout_fee_cents > 0 ? ` · incl. ${rand(o.callout_fee_cents)} callout` : ''}${o.return_leg_fee_cents > 0 ? ` · incl. ${rand(o.return_leg_fee_cents)} return trip` : ''}</p>
         ${o.notes ? `<p class="muted small-text">Note: ${escapeHtml(o.notes)}</p>` : ''}
         ${o.status === 'out_for_delivery'
           ? handoverForm(o)
-          : `<div class="mt"><button data-action="advanceJob" data-arg="${o.id}">${(NEXT_LABEL[o.service] || NEXT_LABEL.carwash)[o.status] || 'Update'}</button></div>`}
+          : upcoming(o)
+            ? `<p class="muted small-text mt">Upcoming. You can set off from ${wallLabel(bookedWall(o.scheduled_for) - SET_OFF_HOURS * 3600e3)}.</p>`
+            : `<div class="mt"><button data-action="advanceJob" data-arg="${o.id}">${(NEXT_LABEL[o.service] || NEXT_LABEL.carwash)[o.status] || 'Update'}</button></div>`}
       </div>`).join('<hr class="divider">');
   }
   if (!history.length) {

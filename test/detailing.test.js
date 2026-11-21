@@ -263,6 +263,24 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     await call(carPro, `/api/supplier/quote-requests/${satAgain.json.request_id}/quote`, 'POST', { price_cents: 18000 });
     const dupOrder = db.prepare("SELECT id FROM orders WHERE customer_id = ? AND service = 'carwash' AND scheduled_for = ?").get(customer.id, dayOut(7, '10:00').replace('T', ' '));
     check('the Sunday booking is its own order', !!dupOrder, true);
+    // Found in the 21 Nov simulation: a booked job showed "Start driving" a week early.
+    r = await call(carPro, `/api/supplier/jobs/${dupOrder.id}/advance`, 'POST');
+    check('a booked job cannot be started days early', [r.status, /You can set off from/.test(r.json?.error || '')], [400, true]);
+    const soon = db.prepare("SELECT id FROM orders WHERE customer_id = ? AND service = 'carwash' AND scheduled_for IS NULL AND status = 'accepted'").get(customer.id);
+    r = await call(carPro, `/api/supplier/jobs/${soon.id}/advance`, 'POST');
+    check('a job for now still starts straight away', [r.status, r.json?.order?.status], [200, 'en_route']);
+    const wallIn = (h) => new Date(Date.now() + 2 * 3600e3 + h * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+    db.prepare('UPDATE orders SET scheduled_for = ? WHERE id = ?').run(wallIn(1.5), dupOrder.id);
+    r = await call(carPro, `/api/supplier/jobs/${dupOrder.id}/advance`, 'POST');
+    check('within 2 hours of the booked time the pro can set off', [r.status, r.json?.order?.status], [200, 'en_route']);
+    // Found in the 21 Nov simulation: Decline used to leave the job on the pro's screen.
+    r = await call(carPro, '/api/supplier/quote-requests');
+    check('before declining, the pro sees the Saturday booking', r.json.requests.some((x) => x.id === satAgain.json.request_id), true);
+    r = await call(carPro, `/api/supplier/quote-requests/${satAgain.json.request_id}/decline`, 'POST');
+    check('the pro declines it', r.status, 200);
+    r = await call(carPro, '/api/supplier/quote-requests');
+    check('a declined request is gone from the pro list', r.json.requests.some((x) => x.id === satAgain.json.request_id), false);
+    check('and the customer is not told about a decline (no "accepted" left for that pro)', quotesOn(satAgain.json.request_id).some((q) => q.supplier_id === carPro.id), false);
     db.prepare("UPDATE orders SET status = 'cancelled' WHERE customer_id = ? AND service = 'carwash'").run(customer.id);
     db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE customer_id = ? AND status = 'open'").run(customer.id);
 

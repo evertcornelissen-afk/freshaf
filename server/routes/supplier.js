@@ -359,6 +359,11 @@ router.post('/offers/:id/decline', requireApproved, (req, res) => {
 });
 
 const STATUS_FLOW = { accepted: 'en_route', en_route: 'in_progress', in_progress: 'completed' };
+const bh = require('../business-hours');
+// How early a pro may set off for a booked job.
+const SET_OFF_HOURS = 2;
+// "2026-11-22 10:00" (South African time) as wall-clock milliseconds.
+const bookedWallMs = (text) => Date.parse(`${String(text).replace(' ', 'T').slice(0, 16)}:00Z`);
 
 // Closing a job: FreshAF's revenue recorded, cash collected, rewards earned. Used by the
 // advance button for car washes and by the laundry handover.
@@ -382,6 +387,15 @@ router.post('/jobs/:orderId/advance', requireApproved, (req, res) => {
   if (!order) return res.status(404).json({ error: 'Job not found' });
   const next = STATUS_FLOW[order.status];
   if (!next) return res.status(400).json({ error: 'Job cannot be advanced from its current status' });
+  // A booked job cannot be started a day early by mistake (found in the 21 Nov simulation):
+  // the pro can set off from SET_OFF_HOURS before the booked time, not before.
+  if (order.status === 'accepted' && order.scheduled_for) {
+    const from = bookedWallMs(order.scheduled_for) - SET_OFF_HOURS * 3600e3;
+    if (bh.wallNow() < from) {
+      return res.status(400).json({ error: `This job is booked for ${quotes.whenLabel(bh.wallText(bookedWallMs(order.scheduled_for)))}. `
+        + `You can set off from ${quotes.whenLabel(bh.wallText(from))}.` });
+    }
+  }
 
   // Laundry: laundered -> out for delivery -> handed over (with a photo and a name, below).
   if (order.service === 'laundry' && order.status === 'in_progress') {
@@ -491,7 +505,10 @@ router.get('/quote-requests', requireApproved, (req, res) => {
   for (const x of db.prepare('SELECT service, package, price_cents FROM supplier_prices WHERE user_id = ?').all(req.user.id)) {
     listed[`${x.service}:${x.package}`] = x.price_cents;
   }
-  const requests = rows.filter((r) => mine.includes(r.service) && (!offline || quotes.needsAcceptance(r))).map((r) => {
+  // A request this pro declined is gone from their list for good (it used to stay, so
+  // Decline looked like it did nothing).
+  const requests = rows.filter((r) => mine.includes(r.service) && r.my_quote_status !== 'declined'
+    && (!offline || quotes.needsAcceptance(r))).map((r) => {
     const distance = dispatch.haversineKm(r.lat, r.lng, me.lat, me.lng);
     if (distance > limit) return null;
     const svc = SERVICES[r.service];

@@ -821,3 +821,11 @@ android-1080x1920, iphone-6.7-1290x2796, iphone-6.9-1320x2868. Answer-by times n
 
 **Evert, 21 Nov:** Managed publishing ON, replace release 13 with 15, and Google publishes only
 when Evert says we are ready.
+
+### v16 (21 Nov 2026, late): simulation fixes
+An end-to-end simulation (admin, customer, two pros, on a throwaway copy) found three defects,
+fixed and covered by tests: a pro's Decline left the job on their screen; a booked job showed
+"Start driving" days early (now refused by the server until 2 hours before, and shown as
+"Booked for …"); the "accepted" email for a job now read "on As soon as possible".
+Website APK = v16. Bundle: `Desktop/FreshAF-release/freshaf-1.0-vc16.aab` (vc15 deleted, never
+uploaded). Play: replace release 13 with **16**. Next build = 17.
