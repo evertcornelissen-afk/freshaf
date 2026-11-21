@@ -7,6 +7,13 @@ const stitch = require('../stitch');
 const dispatch = require('../dispatch');
 const maps = require('../maps');
 const realtime = require('../realtime');
+const balance = require('../balance');
+const { rateLimit } = require('../ratelimit');
+// Every request pushes (and, booked, emails) every pro nearby: a script must not spam them.
+const requestLimit = rateLimit({
+  name: 'quote-request', windowMs: 60 * 60_000, max: 30, keyBy: (req) => `u${req.user?.id}`,
+  message: 'Too many requests in a short time. Wait a little and try again.',
+});
 
 const router = express.Router();
 const SERVICES_ALL = require('../pricing').SERVICES;
@@ -219,7 +226,7 @@ function parseReturn(body, service, pkg, scheduledFor) {
   };
 }
 
-router.post('/quote-requests', authRequired('customer'), (req, res) => {
+router.post('/quote-requests', authRequired('customer'), requestLimit, (req, res) => {
   const { service, package: pkg, vehicle, address, lat, lng, notes, scheduled_for } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
   const customerRow = db.prepare('SELECT id, is_demo FROM users WHERE id = ?').get(req.user.id);
@@ -389,12 +396,25 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
       : 'You already have a job on the way for this service. Complete or cancel it first.' });
   }
 
+  // The pro must still be allowed to work: suspended since they accepted, or now over the
+  // cash limit, and the job would land on someone who cannot start it (audit, 21 Nov 2026).
+  const proRow = db.prepare('SELECT status FROM suppliers WHERE user_id = ?').get(q.supplier_id);
+  if (proRow?.status !== 'approved' || balance.isBlocked(q.supplier_id)) {
+    db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE id = ?").run(q.id);
+    return res.status(409).json({ error: 'That pro cannot take jobs right now. Please pick another.' });
+  }
+
   // For work happening now the pro must still be free. A booking for a future date is
-  // fine even if they are mid-job today.
+  // fine even if they are mid-job today, but not if they are already booked for that time.
   if (!q.scheduled_for && !demo) {
     const busy = db.prepare(`SELECT id FROM orders WHERE supplier_id = ?
       AND status IN ('accepted','en_route','in_progress') AND scheduled_for IS NULL`).get(q.supplier_id);
     if (busy) return res.status(409).json({ error: 'That pro has just taken another job. Please pick another quote.' });
+  }
+  if (q.scheduled_for && !demo) {
+    const clash = db.prepare(`SELECT id FROM orders WHERE supplier_id = ? AND scheduled_for = ?
+      AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(q.supplier_id, q.scheduled_for);
+    if (clash) return res.status(409).json({ error: 'That pro has just been booked for that time. Please pick another.' });
   }
 
   const customer = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
@@ -600,7 +620,12 @@ router.post('/orders/:id/pay-sandbox', authRequired('customer'), (req, res) => {
 });
 
 // PayFast ITN webhook (live mode).
+// Off unless PayFast is the provider AND its passphrase is set: without the passphrase anyone
+// can compute the md5 signature and mark an unpaid order paid (audit, 21 Nov 2026).
 router.post('/payments/payfast/itn', express.urlencoded({ extended: false }), (req, res) => {
+  if ((process.env.PAYMENT_PROVIDER || '').toLowerCase() !== 'payfast' || !process.env.PAYFAST_PASSPHRASE) {
+    return res.status(404).send('not found');
+  }
   const data = { ...req.body };
   const signature = data.signature;
   delete data.signature;

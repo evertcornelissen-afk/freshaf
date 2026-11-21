@@ -23,8 +23,10 @@ const upload = multer({
   storage: multer.diskStorage({
     destination: UPLOAD_DIR,
     filename: (req, file, cb) => {
+      // Never put what the browser sent into a path: "kind" could be "../../x" (audit, 21 Nov 2026).
       const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${req.user.id}-${req.body.kind || 'doc'}-${Date.now()}${ext}`);
+      const kind = onboarding.DOC_KINDS.includes(req.body.kind) ? req.body.kind : 'doc';
+      cb(null, `${req.user.id}-${kind}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ALLOWED_EXT.includes(ext) ? ext : '.bin'}`);
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -36,6 +38,7 @@ const upload = multer({
 router.post('/documents', upload.single('file'), (req, res) => {
   const kind = req.body.kind;
   if (!onboarding.DOC_KINDS.includes(kind)) {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch {} }
     return res.status(400).json({ error: 'Invalid document type' });
   }
   if (!req.file) return res.status(400).json({ error: 'Attach a JPG, PNG or PDF up to 5 MB' });
@@ -419,8 +422,11 @@ const handoverUpload = multer({
   storage: multer.diskStorage({
     destination: UPLOAD_DIR,
     filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-      cb(null, `handover-${req.params.orderId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+      // Only an image extension is ever stored, whatever the file claims to be: a ".html"
+      // "photo" would otherwise be served to the customer as a page (audit, 21 Nov 2026).
+      const ext = path.extname(file.originalname).toLowerCase();
+      const safe = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'].includes(ext) ? ext : '.jpg';
+      cb(null, `handover-${Number(req.params.orderId) || 0}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${safe}`);
     },
   }),
   limits: { fileSize: 10 * 1024 * 1024 },

@@ -261,6 +261,10 @@ function setSupplierStatus(req, res, status) {
   db.prepare(`UPDATE suppliers SET status = ?, status_reason = ?, online = ?,
     info_needed = NULL, info_note = NULL WHERE user_id = ?`)
     .run(status, reason, online, s.user_id);
+  // Suspended or rejected: their open prices come off customers' screens at once.
+  if (status !== 'approved') {
+    db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE supplier_id = ? AND status = 'open'").run(s.user_id);
+  }
   realtime.send(s.user_id, 'account_update', { status, reason });
   // The pro is rarely looking at the app when this happens, so tell them on every channel.
   const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(s.user_id);

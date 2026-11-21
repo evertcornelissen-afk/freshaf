@@ -73,7 +73,12 @@ app.get('/api/events', sseAuth(), realtime.sseHandler);
 // app still works without a key. The API key stays on the server — a browser key would
 // be scraped off the page and spent by someone else.
 const geoCache = new Map();
-app.get('/api/geocode', async (req, res) => {
+// Google Places is billed per call: a script must not run up the bill (audit, 21 Nov 2026).
+const geocodeLimit = require('./ratelimit').rateLimit({
+  name: 'geocode', windowMs: 10 * 60_000, max: 120,
+  message: 'Too many address lookups. Wait a minute and try again.',
+});
+app.get('/api/geocode', geocodeLimit, async (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 3) return res.json({ results: [] });
   const key = q.toLowerCase();

@@ -174,6 +174,44 @@ const dayOut = (d, hhmm) => `${new Date(Date.now() + d * 86400e3).toLocaleString
     check('after settling, pro A is free again', r.json.cash_blocked, false);
     await call(cust, `/api/quote-requests/${openReq()}/cancel`, 'POST');
 
+    // ---- found by the 21 Nov audit ----
+    // One pro, one slot: two customers cannot book the same pro for the same time.
+    const slotX = dayOut(4, '10:00');
+    const reqX = await call(cust, '/api/quote-requests', 'POST', { service: 'carwash', package: 'express', vehicle: 'sedan', address: 'A street', lat: -33.84, lng: 18.65, scheduled_for: slotX });
+    const reqY = await call(other, '/api/quote-requests', 'POST', { service: 'carwash', package: 'express', vehicle: 'sedan', address: 'B street', lat: -33.84, lng: 18.65, scheduled_for: slotX });
+    await call(proA, `/api/supplier/quote-requests/${reqX.json.request_id}/quote`, 'POST', { price_cents: 18000 });
+    await call(proA, `/api/supplier/quote-requests/${reqY.json.request_id}/quote`, 'POST', { price_cents: 18000 });
+    const qOf = (rid, sid) => db.prepare("SELECT id FROM quotes WHERE request_id = ? AND supplier_id = ? AND status = 'open'").get(rid, sid)?.id;
+    r = await call(cust, `/api/quotes/${qOf(reqX.json.request_id, proA.id)}/accept`, 'POST', { payment_method: 'cash' });
+    check('the first customer books pro A for Thursday 10:00', r.status, 200);
+    r = await call(other, `/api/quotes/${qOf(reqY.json.request_id, proA.id)}/accept`, 'POST', { payment_method: 'cash' });
+    check('a second customer cannot book pro A for the same time', r.status, 409);
+    // A pro suspended after accepting cannot be booked.
+    await call(proB, `/api/supplier/quote-requests/${reqY.json.request_id}/quote`, 'POST', { price_cents: 18000 });
+    const qB = qOf(reqY.json.request_id, proB.id);
+    r = await call(admin, `/api/admin/suppliers/${proB.id}/suspend`, 'POST', { reason: 'Test' });
+    check('admin suspends pro B', r.status, 200);
+    r = await call(other, `/api/quotes/${qB}/accept`, 'POST', { payment_method: 'cash' });
+    check('a suspended pro cannot be booked', r.status, 409);
+    db.prepare("UPDATE suppliers SET status = 'approved' WHERE user_id = ?").run(proB.id);
+    // The old PayFast callback cannot mark anything paid while PayFast is not the provider.
+    r = await fetch(`${BASE}/api/payments/payfast/itn`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `m_payment_id=${o1.id}&payment_status=COMPLETE&signature=x` });
+    check('a forged PayFast callback is refused', r.status, 404);
+    // Uploads never leave the uploads folder, whatever "kind" says.
+    const up = new FormData(); up.append('kind', '../../escaped'); up.append('file', new Blob([PNG], { type: 'image/png' }), 'x.png');
+    r = await call(proA, '/api/supplier/documents', 'POST', up);
+    const escaped = fs.readdirSync(DATA_DIR).concat(fs.readdirSync(path.dirname(DATA_DIR))).some((f) => f.includes('escaped'));
+    const left = fs.readdirSync(path.join(DATA_DIR, 'uploads')).some((f) => f.includes('escaped'));
+    check('a document upload with a made-up type is refused and nothing is written outside uploads', [r.status, escaped, left], [400, false, false]);
+    // A handover "photo" called .html is stored as an image.
+    const l2 = await book({ service: 'laundry', pkg: 'wash_fold', vehicle: 'small' });
+    await advance(l2); await advance(l2); await advance(l2); await advance(l2);
+    const fd2 = new FormData(); fd2.append('receiver', 'Gate'); fd2.append('photo', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'evil.html');
+    await call(proA, `/api/supplier/jobs/${l2.id}/handover`, 'POST', fd2);
+    const stored = db.prepare('SELECT handover_photo FROM orders WHERE id = ?').get(l2.id).handover_photo || '';
+    check('a handover file named .html is stored as .jpg', [stored.endsWith('.jpg'), stored.includes('.html')], [true, false]);
+
     // ---- a booking nobody answers ----
     r = await call(cust, '/api/quote-requests', 'POST', { service: 'carwash', package: 'express', vehicle: 'sedan', address: 'Unanswered', lat: -33.84, lng: 18.65, scheduled_for: dayOut(3, '11:00') });
     const lonely = r.json.request_id;
