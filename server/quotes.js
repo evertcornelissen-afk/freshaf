@@ -94,7 +94,9 @@ function bookedExpiry(service, scheduledFor) {
   const slot = slotWallMs(scheduledFor);
   if (Number.isNaN(slot)) return null;
   const end = Math.min(bh.addBusinessHours(bh.wallNow(), r.windowH), bh.subtractBusinessHours(slot, r.cutoffH));
-  return bh.wallToUtcSql(Math.max(end, bh.wallNow() + 15 * 60000));
+  // On a 5-minute mark, so pros read "answer by 08:40", not "08:42".
+  const tidy = Math.floor(Math.max(end, bh.wallNow() + 15 * 60000) / 300000) * 300000;
+  return bh.wallToUtcSql(tidy);
 }
 
 // Whether pros can apply for detailing yet (second switch, also off by default).

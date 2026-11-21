@@ -805,3 +805,19 @@ A short-lived v13 APK went out on freshaf.io on 21 Nov; v14 replaces it the same
 upload a bundle numbered 13 or lower to Play again. The next build after this is **15**.
 
 Pro portal badge now reads **FreshAF Pro** (was "Supplier Portal").
+
+## Release 15 and new screenshots, 21 Nov 2026
+
+The FreshAF Pro badge was cut in half in the phone header (it wrapped under the logo); fixed in
+`public/css/style.css`, so the Play bundle moved to **versionCode 15** (14 was never uploaded to
+Play). Website APK = v15. Bundle: `Desktop/FreshAF-release/freshaf-1.0-vc15.aab`. Next build = 16.
+
+New store screenshots, made by `marketing/store-screenshots/shoot.js` from the real app on a
+throwaway local copy with fictional Johannesburg pros (Rosebank, not Durbanville). Six screens,
+four in night mode: 1 home (night), 2 book a wash (day), 3 pros who accepted (night), 4 live
+tracking (day), 5 your booking requests (night), 6 Pro app accept/decline (night). Sizes:
+android-1080x1920, iphone-6.7-1290x2796, iphone-6.9-1320x2868. Answer-by times now land on
+5-minute marks.
+
+**Evert, 21 Nov:** Managed publishing ON, replace release 13 with 15, and Google publishes only
+when Evert says we are ready.

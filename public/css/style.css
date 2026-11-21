@@ -935,7 +935,11 @@ button:active { transform: translateY(0) scale(.975); }
 @media (max-width: 700px) {
   .topbar { padding: 11px 13px; gap: 8px; flex-wrap: nowrap; }
   .topbar .brand { min-width: 0; }
-  .topbar .brand .stack { display: block; min-width: 0; }
+  /* Keep the portal pill on the wordmark's line: as a block it dropped below the logo and
+     the bar's overflow cut it in half (seen on the FreshAF Pro badge, 21 Nov 2026). */
+  .topbar .brand .stack { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .topbar .brand .stack .logo-img { flex: 0 1 auto; min-width: 0; }
+  .topbar .brand .stack .tag { flex: none; }
   .topbar .brand .logo-img { height: 28px; }
   .topbar .brand .tag { font-size: .55rem; padding: 3px 7px; letter-spacing: .1em; }
   .topbar > .row { flex-wrap: nowrap; gap: 6px; flex: none; }
@@ -1180,3 +1184,5 @@ body.drawer-open { overflow: hidden; }
 .role-seg .seg-off { color: var(--muted); background: transparent; }
 .role-seg .seg-off:hover { color: var(--petrol); }
 [data-theme="dark"] .role-seg .seg-on { color: var(--text); }
+/* The narrowest phones: the wordmark and the controls come first. */
+@media (max-width: 340px) { .topbar .brand .tag { display: none; } }

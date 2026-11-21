@@ -176,7 +176,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     const reqId = r.json.request_id;
     const exp = db.prepare('SELECT expires_at FROM quote_requests WHERE id = ?').get(reqId).expires_at;
     const want = quotesMod.bookedExpiry('detailing', slot.replace('T', ' '));
-    check('detailers get 12 business hours to answer', Math.abs(Date.parse(`${exp.replace(' ', 'T')}Z`) - Date.parse(`${want.replace(' ', 'T')}Z`)) < 120e3, true);
+    check('detailers get 12 business hours to answer', Math.abs(Date.parse(`${exp.replace(' ', 'T')}Z`) - Date.parse(`${want.replace(' ', 'T')}Z`)) <= 300e3, true); // both on 5-minute marks
     check('the customer is not notified just for asking', /accepted your booking/.test(log), false);
     await new Promise((res) => setTimeout(res, 300));
     check('the detailer is emailed the booking request', /mail:dry-run\] Detailing booking request: Interior Detail/.test(log), true);
