@@ -2,7 +2,7 @@
 
 One page: what is ready, where it is, and exactly what Evert does, in order. Details behind
 each step: `APP-STORE-SUBMISSION.md` (sections A–F) and `APP-STORE-LISTING.md` (copy).
-The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/freshaf-test.apk redirects) stays until the app is on Google Play. APK v13 (21 Nov: detailing, booked jobs in business hours, every job accepted by a pro) is signed with the upload key and installs over v12; Play bundle vc13 is at DesktopFreshAF-releasereshaf-1.0-vc13.aab; phones with the pre-v11 APK uninstall it once first.
+The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/freshaf-test.apk redirects) stays until the app is on Google Play. APK v14 (21 Nov: detailing switched off, booked jobs in business hours, every job accepted by a pro, plus the 19 Nov walkthrough fixes) is signed with the upload key and installs over v12/v13; the Play bundle for release 14 is Desktop/FreshAF-release/freshaf-1.0-vc14.aab (Play already holds versionCode 13, submitted 19 Nov); phones with the pre-v11 APK uninstall it once first.
 
 ## Ready (done by Claude)
 
@@ -787,3 +787,21 @@ new build, because the app talks to the live API.
   clause to the Terms, which is Evert's call. Not added.
 - The pro side is badged "SUPPLIER PORTAL" while every sentence says "pro" / "FreshAF Pro".
 - The Play screenshots still show Durbanville; the app is national.
+
+## Release 14 built, 21 Nov 2026
+
+Play already holds **versionCode 13** (production, submitted 19 Nov, in review). The 21 Nov
+release (detailing switched off, booked jobs in business hours, every job accepted by a pro,
+several bookings per service, the busy-pro fix) and the eight walkthrough fixes above that
+said "release 14" are all in **versionCode 14**:
+
+| | |
+|---|---|
+| Play bundle | `Desktop/FreshAF-release/freshaf-1.0-vc14.aab` (upload key, Play re-signs) |
+| Website APK | `downloads/freshaf.apk` = v14, served at freshaf.io/download/freshaf.apk |
+| Signer | CN=FreshAF (Pty) Ltd, SHA-256 8db4ceac…51da5 (installs over v12/v13 APKs) |
+
+A short-lived v13 APK went out on freshaf.io on 21 Nov; v14 replaces it the same day. Never
+upload a bundle numbered 13 or lower to Play again. The next build after this is **15**.
+
+Pro portal badge now reads **FreshAF Pro** (was "Supplier Portal").
