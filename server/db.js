@@ -634,6 +634,30 @@ CREATE TABLE IF NOT EXISTS password_resets (
 CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
 `);
 
+// Detailing (21 Nov 2026). Its own approval on top of the normal one: a pro applies with
+// photos of past work and a link to their reviews or website, and only an approved
+// detailer gets 'detailing' added to their services. Two switches, both OFF until the
+// owner turns them on in the admin app: pros applying, and customers booking.
+// Margin 10% fixed for now (Evert, 21 Nov 2026), separate from the 20% on everything else.
+addColumn('suppliers', 'detailing_status TEXT');      // null | pending | approved | declined
+addColumn('suppliers', 'detailing_link TEXT');
+addColumn('suppliers', 'detailing_applied_at TEXT');
+addColumn('suppliers', 'detailing_decided_at TEXT');
+addColumn('suppliers', 'detailing_reason TEXT');
+db.exec(`
+CREATE TABLE IF NOT EXISTS detailing_photos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  original_name TEXT,
+  stored_name TEXT NOT NULL,
+  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_detailing_photos_user ON detailing_photos(user_id);
+`);
+if (!getSetting('detailing_fee_pct')) setSetting('detailing_fee_pct', '10');
+if (!getSetting('detailing_signup')) setSetting('detailing_signup', '0');
+if (!getSetting('detailing_booking')) setSetting('detailing_booking', '0');
+
 // Encrypt any ID or bank details written before a key existed. No-op once clean.
 try {
   require('./secrets').migrate(db);

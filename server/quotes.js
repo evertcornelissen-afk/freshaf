@@ -6,16 +6,18 @@
 // within a second. Pros who price per job — most small operators — get a notification and
 // send back their own price and when they can come. The customer picks from whatever arrives.
 const { db, getSetting } = require('./db');
-const { priceFor, platformFee, quote: publishedPrice } = require('./pricing');
+const { SERVICES, SERVICE_KEYS, priceFor, platformFee, quote: publishedPrice, serviceLabel } = require('./pricing');
 const realtime = require('./realtime');
 const push = require('./push');
 const whatsapp = require('./whatsapp');
 const dispatch = require('./dispatch');
 const balance = require('./balance');
+const mailer = require('./mailer');
 
 function settings() {
   return {
     feePct: Number(getSetting('platform_fee_pct', '20')),
+    detailingFeePct: Number(getSetting('detailing_fee_pct', '10')),
     maxRadius: Number(getSetting('dispatch_radius_km', '25')),
     freeKm: Number(getSetting('callout_free_km', '5')),
     perKm: Number(getSetting('callout_per_km_cents', '1000')),
@@ -30,6 +32,73 @@ function settings() {
     returnCap: Number(getSetting('return_leg_cap_cents', '15000')),
   };
 }
+
+// FreshAF's margin for a service. Detailing has its own (10%, Evert 21 Nov 2026); every
+// other service uses the main margin. Every place that prices a job goes through here, so
+// the two can never be mixed up between a quote, an order and the pro's own screens.
+function feePctFor(service) {
+  const { feePct, detailingFeePct } = settings();
+  return service === 'detailing' ? detailingFeePct : feePct;
+}
+
+// Whether this customer can book a service right now. Detailing stays closed until the owner
+// switches it on in the admin app, and it is paid by card only (Evert, 21 Nov 2026), so it
+// is also closed to anyone card is not open to yet. Demo accounts can rehearse it.
+function serviceOpen(service, customer = null) {
+  if (!SERVICE_KEYS.includes(service)) return false;
+  if (service === 'detailing') {
+    return getSetting('detailing_booking', '0') === '1' && require('./payments').cardAvailableFor(customer);
+  }
+  return true;
+}
+function openServiceKeys(customer = null) { return SERVICE_KEYS.filter((k) => serviceOpen(k, customer)); }
+// Services that can only be paid by card.
+function cardOnly(service) { return !!SERVICES[service]?.cardOnly; }
+
+// Booked jobs (Evert, 21 Nov 2026): any job for a later time, and every detailing job, is
+// accepted or declined by the pro. We cannot assume a pro is free on Saturday because they
+// published a price. So a booked request goes to every eligible pro, online or not, nothing
+// is answered for them, and the customer is only told once someone accepts.
+// Timings count BUSINESS hours (server/business-hours.js): the slot must be at least leadH
+// business hours away and inside business hours; pros have up to windowH business hours to
+// answer; answers stop cutoffH business hours before the slot.
+const BOOKED_RULES = {
+  detailing: { leadH: 12, windowH: 12, cutoffH: 3 },
+  default: { leadH: 2, windowH: 2, cutoffH: 1 },
+};
+const bh = require('./business-hours');
+function bookAhead(service) { return !!SERVICES[service]?.bookAhead; }      // detailing: never "as soon as possible"
+function bookedRules(service) { return BOOKED_RULES[service] || BOOKED_RULES.default; }
+// Whether this request waits for pros to accept (a booked time, or a booked-ahead service).
+function needsAcceptance(request) { return !!request?.scheduled_for || bookAhead(request?.service); }
+const slotWallMs = (scheduledFor) => {
+  const m = String(scheduledFor || '').match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  return m ? Date.parse(`${m[1]}T${m[2]}:00Z`) : NaN;
+};
+// The earliest slot a customer may pick for this service, as "YYYY-MM-DD HH:MM" wall time.
+function earliestBooking(service) { return bh.wallText(bh.earliestSlot(bookedRules(service).leadH)); }
+// null when the slot is fine, otherwise the reason it is not.
+function bookedSlotError(service, scheduledFor) {
+  const slot = slotWallMs(scheduledFor);
+  if (Number.isNaN(slot)) return 'That date and time could not be read';
+  if (!bh.isOpenAt(slot)) return `Choose a time between ${bh.label()}, our business hours`;
+  const earliest = bh.earliestSlot(bookedRules(service).leadH);
+  if (slot < earliest - 60000) {
+    return `The earliest you can book is ${whenLabel(bh.wallText(earliest))}, so pros have time to accept`;
+  }
+  return null;
+}
+// When a booked request stops taking answers, as an SQL datetime (UTC, like datetime('now')).
+function bookedExpiry(service, scheduledFor) {
+  const r = bookedRules(service);
+  const slot = slotWallMs(scheduledFor);
+  if (Number.isNaN(slot)) return null;
+  const end = Math.min(bh.addBusinessHours(bh.wallNow(), r.windowH), bh.subtractBusinessHours(slot, r.cutoffH));
+  return bh.wallToUtcSql(Math.max(end, bh.wallNow() + 15 * 60000));
+}
+
+// Whether pros can apply for detailing yet (second switch, also off by default).
+function detailingSignupOpen() { return getSetting('detailing_signup', '0') === '1'; }
 
 // What the pro is paid for the return trip. proRateCents is the pro's own rate per km; a pro
 // who never chose one (null) gets FreshAF's maximum, and no pro can exceed it, including one
@@ -82,7 +151,8 @@ function demoPros(request) {
     JOIN users u ON u.id = s.user_id
     WHERE s.status = 'approved' AND u.is_demo = 1
       AND instr(',' || s.services || ',', ',' || ? || ',') > 0
-  `).all(request.service, request.package, request.service).map((r) => ({
+      AND (? != 'detailing' OR s.detailing_status = 'approved')
+  `).all(request.service, request.package, request.service, request.service).map((r) => ({
     ...r,
     distance: r.lat == null ? 0 : dispatch.haversineKm(request.lat, request.lng, r.lat, r.lng),
   }));
@@ -91,10 +161,11 @@ function demoPros(request) {
 function eligiblePros(request) {
   if (isDemoUser(request.customer_id)) return demoPros(request);
   const { maxRadius } = settings();
+  // Busy = on a job right now. An accepted booking for Saturday does not make a pro busy today.
   const busyClause = request.scheduled_for ? '' : `
       AND s.user_id NOT IN (
         SELECT supplier_id FROM orders
-        WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))`;
+        WHERE supplier_id IS NOT NULL AND (status IN ('en_route','in_progress') OR (status = 'accepted' AND scheduled_for IS NULL)))`;
   const rows = db.prepare(`
     SELECT s.user_id, s.business_name, s.lat, s.lng, s.radius_km, s.rating_sum, s.rating_count,
            u.name AS pro_name, u.phone, u.phone_verified_at, s.alert_whatsapp,
@@ -102,10 +173,11 @@ function eligiblePros(request) {
              WHERE sp.user_id = s.user_id AND sp.service = ? AND sp.package = ?) AS listed_price_cents
     FROM suppliers s
     JOIN users u ON u.id = s.user_id
-    WHERE s.status = 'approved' AND s.online = 1 AND s.lat IS NOT NULL
+    WHERE s.status = 'approved' AND (s.online = 1 OR ?) AND s.lat IS NOT NULL
       AND instr(',' || s.services || ',', ',' || ? || ',') > 0
+      AND (? != 'detailing' OR s.detailing_status = 'approved')
       AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)${busyClause}
-  `).all(request.service, request.package, request.service, request.customer_id);
+  `).all(request.service, request.package, needsAcceptance(request) ? 1 : 0, request.service, request.service, request.customer_id);
 
   // A pro sitting on too much of our cash stops being offered work until they settle.
   const blocked = balance.blockedSupplierIds();
@@ -156,7 +228,8 @@ function listQuotes(requestId) {
 // applies to it the same way, so the customer still sees one all-in total.
 function insertQuote({ requestId, supplierId, supplierPrice, distanceKm, returnDistanceKm = null,
   availability, note, source }) {
-  const { feePct } = settings();
+  const service = db.prepare('SELECT service FROM quote_requests WHERE id = ?').get(requestId)?.service;
+  const feePct = feePctFor(service);
   const callout = calloutFor(distanceKm);
   const returnLeg = returnLegFor(returnDistanceKm, proReturnRate(supplierId));
   const fee = platformFee(supplierPrice + callout + returnLeg, feePct);
@@ -199,7 +272,6 @@ function notifyCustomer(request) {
   });
 }
 
-function serviceLabel(service) { return service === 'laundry' ? 'Laundry' : 'Car wash'; }
 
 // "2026-08-22 09:00" -> "Sat 22 Aug, 09:00". Null means as soon as possible.
 function whenLabel(scheduledFor) {
@@ -218,13 +290,18 @@ function openRequest(request) {
   let auto = 0;
   const asked = [];
 
+  // Some packages (paint correction, ceramic) are always priced per car by the pro.
+  // Like Uber (Evert, 21 Nov 2026): every job waits for a pro to accept it. Nothing is
+  // answered for a pro, now or booked; their published price only pre-fills their answer.
+  // Demo accounts keep instant answers, so a payment reviewer is never left waiting on a person.
+  const quoteOnly = !!SERVICES[request.service]?.packages[request.package]?.quoteOnly || !demo;
   for (const pro of pros) {
-    let listed = pro.listed_price_cents != null
+    let listed = !quoteOnly && pro.listed_price_cents != null
       ? priceFor(request.service, request.package, request.vehicle, pro.listed_price_cents)
       : null;
     // A demo pro with no price for this package answers at FreshAF's published price, so a
     // demo request always gets a bookable quote straight away.
-    if (listed == null && demo) listed = publishedPrice(request.service, request.package, request.vehicle);
+    if (listed == null && demo && !quoteOnly) listed = publishedPrice(request.service, request.package, request.vehicle);
     if (listed != null) {
       insertQuote({
         requestId: request.id, supplierId: pro.user_id, supplierPrice: listed,
@@ -256,9 +333,31 @@ function openRequest(request) {
   }
 
   // Only nudge phones for pros who actually have to do something.
+  const ahead = needsAcceptance(request);
+  const pkgName = SERVICES[request.service]?.packages[request.package]?.name || request.package;
+  const answerBy = ahead ? whenLabel(utcToWall(request.expires_at)) : null;
   for (const pro of asked) {
+    if (ahead) {
+      const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(pro.user_id);
+      if (u?.email) {
+        mailer.send({
+          to: u.email,
+          subject: `${serviceLabel(request.service)} booking request: ${pkgName}, ${whenLabel(request.scheduled_for)}`,
+          heading: 'A customer wants to book you',
+          paragraphs: [
+            `<b>${pkgName}</b> on <b>${whenLabel(request.scheduled_for)}</b>, ${pro.distance.toFixed(1)} km from you.`,
+            `Accept it with your price, or decline it, in FreshAF Pro before <b>${answerBy}</b>.`,
+            'Once you accept, the customer can choose you. The job is only yours when they book you'
+              + (cardOnly(request.service) ? ' and have paid by card.' : '.'),
+          ],
+          cta: { label: 'Open FreshAF Pro', url: `${process.env.BASE_URL || 'https://freshaf.io'}/supplier` },
+        }).catch(() => {});
+      }
+    }
     push.sendToUser(pro.user_id, {
-      title: `New ${serviceLabel(request.service).toLowerCase()} request — send your price`,
+      title: ahead
+        ? `${serviceLabel(request.service)} booking request — accept or decline by ${answerBy}`
+        : `New ${serviceLabel(request.service).toLowerCase()} request near you — accept or decline`,
       body: `${whenLabel(request.scheduled_for)} · ${pro.distance.toFixed(1)} km away\n${request.address}`
         + `${request.return_address ? `\nReturn to: ${request.return_address}` : ''}\nOpen FreshAF Pro to quote.`,
       url: '/supplier',
@@ -274,7 +373,7 @@ function openRequest(request) {
         earnsRand: 'your price',
         distanceKm: pro.distance.toFixed(1),
         address: request.address,
-        expiresMin: settings().windowMin,
+        expiresMin: ahead ? Math.max(1, Math.round((Date.parse(`${request.expires_at.replace(' ', 'T')}Z`) - Date.now()) / 60000)) : settings().windowMin,
         offerId: request.id,
       }).catch(() => {});
     }
@@ -282,6 +381,38 @@ function openRequest(request) {
 
   notifyCustomer(request);
   return { asked: pros.length, auto };
+}
+
+// A stored UTC datetime ("2026-11-21 14:00:00") as South African wall time, for labels.
+function utcToWall(utc) {
+  const ms = Date.parse(`${String(utc).replace(' ', 'T')}Z`);
+  if (Number.isNaN(ms)) return utc;
+  return new Date(ms + 2 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+}
+
+const SITE = () => process.env.BASE_URL || 'https://freshaf.io';
+
+// A pro accepted. This is the only thing the customer is notified about (Evert, 21 Nov 2026):
+// by push and email, with a link straight to their booking requests.
+function tellCustomerAccepted(request, supplierId, totalCents) {
+  const cust = db.prepare('SELECT name, email FROM users WHERE id = ?').get(request.customer_id);
+  const pro = db.prepare('SELECT business_name FROM suppliers WHERE user_id = ?').get(supplierId);
+  const pkgName = SERVICES[request.service]?.packages[request.package]?.name || request.package;
+  const price = `R${(totalCents / 100).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`;
+  const noun = SERVICES[request.service]?.providerNoun || 'pro';
+  const who = pro?.business_name || `A ${noun}`;
+  const line = `${who} can do your ${pkgName} on ${whenLabel(request.scheduled_for)} for ${price}.`;
+  push.sendToUser(request.customer_id, {
+    title: `${who} accepted your booking`, body: `${line} Tap to book.`, url: '/?requests=1', tag: `req-${request.id}`,
+  }).catch(() => {});
+  if (cust?.email) {
+    mailer.send({
+      to: cust.email, subject: `${who} accepted your booking`,
+      heading: 'Your booking was accepted',
+      paragraphs: [line, `Book in FreshAF before ${whenLabel(utcToWall(request.expires_at))}${cardOnly(request.service) ? ', paying by card' : ''}. Other ${noun}s may still accept, and you can choose.`],
+      cta: { label: 'See and book', url: `${SITE()}/?requests=1` },
+    }).catch(() => {});
+  }
 }
 
 function getRequest(id) {
@@ -303,6 +434,9 @@ staleTimer.unref?.();
 
 module.exports = {
   returnLegFor, proReturnRate, returnLegPublic, isDemoUser,
+  feePctFor, serviceOpen, openServiceKeys, detailingSignupOpen, cardOnly, bookAhead,
+  needsAcceptance, bookedRules, bookedSlotError, bookedExpiry, earliestBooking, BOOKED_RULES,
+  tellCustomerAccepted, utcToWall,
   openRequest, listQuotes, insertQuote, notifyCustomer, getRequest,
   eligiblePros, calloutFor, settings, expireStale, quotePublic, serviceLabel, whenLabel,
 };

@@ -1,9 +1,9 @@
 {
   "_comment": "App-store status shown in the admin readiness panel. Claude updates this file whenever a release step changes; push status is read live from the server's settings instead.",
-  "updated": "2026-11-17",
+  "updated": "2026-11-21",
   "android_apk": {
-    "version": 12,
-    "date": "2026-11-09",
+    "version": 13,
+    "date": "2026-11-21",
     "url": "/download/freshaf.apk"
   },
   "store_pack": {
@@ -16,7 +16,7 @@
   },
   "google_play": {
     "ok": false,
-    "detail": "Organisation account FreshAF, ID 5459039805433028598, all four verifications complete. App created: io.freshaf.app, app ID 4972841896331123851, en-ZA, free, Draft. Store listing saved as draft on 18 Nov 2026 and complete: app icon, feature graphic and five phone screenshots in order 1-5 (dropping all five at once scrambled them; they were re-added one at a time from the asset library to fix the order). Video, foldable, tablet, desktop and Android XR left empty on purpose - phone-only release. App content: privacy policy https://freshaf.io/privacy saved; Ads declared as none (verified against the code - no ad SDK anywhere). Sign in details set to 'restricted', customer set filled in except the password, which only Evert enters. Target audience will not open until Sign in details is complete, and Content rating is behind that, so the reviewer logins are the critical path. Still to do after that: content rating questionnaire, data safety, target audience, government apps, financial features, health, app-level trader status, then the versionCode 13 bundle and the Play app-signing SHA-256 into assetlinks.json."
+    "detail": "Organisation account FreshAF, ID 5459039805433028598, all four verifications complete. App created: io.freshaf.app, app ID 4972841896331123851, en-ZA, free, Draft. Store listing saved as draft on 18 Nov 2026 and complete: app icon, feature graphic and five phone screenshots in order 1-5 (dropping all five at once scrambled them; they were re-added one at a time from the asset library to fix the order). Video, foldable, tablet, desktop and Android XR left empty on purpose - phone-only release. App content: privacy policy https://freshaf.io/privacy saved; Ads declared as none (verified against the code - no ad SDK anywhere). Sign in details set to 'restricted', customer set filled in except the password, which only Evert enters. Target audience will not open until Sign in details is complete, and Content rating is behind that, so the reviewer logins are the critical path. Still to do after that: content rating questionnaire, data safety, target audience, government apps, financial features, health, app-level trader status, then upload the versionCode 13 bundle (built 21 Nov 2026: Desktop/FreshAF-release/freshaf-1.0-vc13.aab, detailing + booked jobs release) and the Play app-signing SHA-256 into assetlinks.json."
   },
   "app_store": {
     "ok": false,

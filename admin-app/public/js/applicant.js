@@ -174,6 +174,8 @@ function render() {
         : '<p class="muted">Nothing uploaded.</p>'}
     </div>
 
+    ${detailingHtml(s)}
+
     <div class="card">
       <h2>Message this applicant</h2>
       ${mailWarning}
@@ -203,6 +205,47 @@ function render() {
       ${messagesHtml(history)}
     </div>`;
 }
+
+// The detailing application, when there is one: photos of past work, their link, and the
+// decision. Separate from approving the pro: approving here only adds detailing jobs.
+function detailingHtml(s) {
+  const d = s.detailing;
+  if (!d) return '';
+  const pill = `<span class="pill ${d.status === 'approved' ? 'ok' : d.status === 'pending' ? 'warn' : 'bad'}">${d.status}</span>`;
+  const link = d.link ? `<a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(d.link)}</a>` : 'none';
+  return `
+    <div class="card">
+      <h2>Detailing application ${pill}</h2>
+      <p class="muted small-text">Applied ${String(d.applied_at || '').slice(0, 16)}${d.decided_at ? ` &middot; decided ${String(d.decided_at).slice(0, 16)}` : ''}</p>
+      <div class="appl-field"><div class="k muted small-text">Reviews / website</div><div class="v">${link}</div></div>
+      ${d.reason ? fieldRow('Reason given', d.reason) : ''}
+      <p class="muted small-text" style="margin-top:10px">Approve only if the photos look like their own work (same car
+        park, same equipment, before-and-after pairs) and the link shows real detailing reviews.</p>
+      <div class="row" style="flex-wrap:wrap;gap:8px;margin:10px 0">${(d.photos || []).map((p, i) => `
+        <a href="/api/admin/detailing-photos/${p.id}" target="_blank" rel="noopener" title="${escapeHtml(p.original_name || '')}">
+          <img src="/api/admin/detailing-photos/${p.id}" alt="Photo ${i + 1}" loading="lazy"
+            style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border-soft)"></a>`).join('')}</div>
+      <div class="row" style="flex-wrap:wrap">
+        ${d.status !== 'approved' ? `<button class="small" onclick="detailingDecision(${s.user_id},'approve')">Approve for detailing</button>` : ''}
+        ${d.status === 'pending' ? `<button class="danger small" onclick="detailingDecision(${s.user_id},'decline')">Decline</button>` : ''}
+        ${d.status === 'approved' ? `<button class="danger small" onclick="detailingDecision(${s.user_id},'decline')">Take detailing away</button>` : ''}
+      </div>
+    </div>`;
+}
+
+window.detailingDecision = async (userId, decision) => {
+  let reason = null;
+  if (decision === 'decline') {
+    reason = prompt('Why? The pro sees this, so say what they can fix.');
+    if (reason === null) return;
+    if (!reason.trim()) return toast('Give a reason', 'error');
+  } else if (!confirm('Approve this pro for detailing jobs?')) return;
+  try {
+    await api(`/api/admin/suppliers/${userId}/detailing`, { method: 'POST', body: { decision, reason } });
+    toast(decision === 'approve' ? 'Approved for detailing' : 'Detailing declined', 'ok');
+    await load();
+  } catch (e) { toast(e.message, 'error'); }
+};
 
 window.sendMessage = async (userId) => {
   const subject = el('msg-subject').value.trim();

@@ -1,4 +1,4 @@
-// FreshAF customer app — home, auth, booking (car wash + laundry), tracking, account.
+// FreshAF customer app — home, auth, booking (car wash, detailing, laundry), tracking, account.
 let me = null;
 let pricing = null;
 let pricingFor = null; // whose answer `pricing` is: an account id, or null for signed out
@@ -15,18 +15,22 @@ const STEPS = ['searching', 'accepted', 'en_route', 'in_progress', 'completed'];
 // Laundry has a drop-off of its own between laundering and delivered.
 const STEPS_BY_SERVICE = {
   carwash: STEPS,
+  detailing: STEPS,
   laundry: ['searching', 'accepted', 'en_route', 'in_progress', 'out_for_delivery', 'completed'],
 };
 const STEP_LABELS = {
   carwash: { searching: 'Searching', accepted: 'Accepted', en_route: 'En route', in_progress: 'Washing', completed: 'Done' },
+  detailing: { searching: 'Searching', accepted: 'Accepted', en_route: 'En route', in_progress: 'Detailing', completed: 'Done' },
   laundry: { searching: 'Searching', accepted: 'Accepted', en_route: 'Collecting', in_progress: 'Laundering', out_for_delivery: 'Out for delivery', completed: 'Delivered' },
 };
 const PKG_ICONS = {
   express: 'droplet', wash_vac: 'spark', full_valet: 'shield',
+  interior_detail: 'eye', exterior_detail: 'spark', full_detail: 'star', paint_ceramic: 'shield',
   wash_fold: 'shirt', wash_iron: 'spark', bedding: 'home',
 };
 const SVC_COPY = {
   carwash: { book: 'Book a wash', where: 'Where is the car?', notesPh: 'e.g. White Hilux, keys with security' },
+  detailing: { book: 'Book a detail', where: 'Where is the car?', notesPh: 'e.g. Black Ranger, swirl marks on the bonnet, dog hair on the back seat' },
   laundry: { book: 'Book a laundry collection', where: 'Where do we collect?', notesPh: 'e.g. Bag at reception, gate code 4321' },
 };
 
@@ -93,7 +97,7 @@ async function boot() {
         return;
       }
       const want = new URLSearchParams(window.location.search).get('service');
-      if (want === 'carwash' || want === 'laundry') {
+      if (bookable(want)) {
         history.replaceState({}, '', '/');
         chooseService(want);
       }
@@ -158,6 +162,7 @@ async function enterApp() {
   if (disconnectSse) disconnectSse();
   disconnectSse = connectEvents({
     quotes_update: (data) => {
+      refreshBookingRequests().catch(() => {});
       if (data.request_id !== quoteRequestId) return;
       quotesList = data.quotes || [];
       el('quote-status').textContent = quotesList.length
@@ -192,7 +197,11 @@ async function enterApp() {
     if (cancelledId) {
       showError('order-error', 'That payment was not completed. You can pay again, or switch to cash.');
     }
-  } else if (params.get('service') && ['carwash', 'laundry'].includes(params.get('service'))) {
+  } else if (params.get('requests')) {
+    history.replaceState({}, '', '/');
+    await refreshBookingRequests().catch(() => {});
+    setTimeout(() => el('requests-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+  } else if (params.get('service') && bookable(params.get('service'))) {
     // Home-screen shortcuts from the manifest land here. A shortcut that opens the
     // generic home screen is worse than no shortcut at all.
     const want = params.get('service');
@@ -207,12 +216,19 @@ async function enterApp() {
 }
 
 /* ---------- service tabs ---------- */
+// A service the customer can book right now. Detailing only exists in the catalogue while
+// the owner has it switched on, so this is false for it otherwise.
+function bookable(key) { return !!(key && pricing?.services?.[key]); }
+
 function setService(key) {
+  if (!bookable(key)) key = 'carwash';
   svc = key;
   sel.package = null; sel.unit = null;
   callout = null;
   const copy = SVC_COPY[key];
-  el('h-book').innerHTML = `${icon(key === 'laundry' ? 'shirt' : 'droplet')} ${copy.book}`;
+  el('h-book').innerHTML = `${icon(key === 'laundry' ? 'shirt' : key === 'detailing' ? 'spark' : 'droplet')} ${copy.book}`;
+  applyBookAhead();
+  refreshPaymentMethods();
   el('unit-heading').textContent = pricing.services[key].unitLabel;
   el('where-heading').textContent = copy.where;
   el('order-notes').placeholder = copy.notesPh;
@@ -227,10 +243,10 @@ function setService(key) {
 // and the choice is remembered only to preselect the booking form afterwards.
 const SVC_KEY = 'freshaf_pending_svc';
 function pendingService() {
-  try { const v = localStorage.getItem(SVC_KEY); return v === 'laundry' || v === 'carwash' ? v : null; } catch { return null; }
+  try { const v = localStorage.getItem(SVC_KEY); return ['carwash', 'laundry', 'detailing'].includes(v) ? v : null; } catch { return null; }
 }
 function chooseService(key) {
-  if (key !== 'carwash' && key !== 'laundry') return;
+  if (!bookable(key)) return;
   if (!me) {
     try { localStorage.setItem(SVC_KEY, key); } catch {}
     show('view-register');
@@ -252,6 +268,7 @@ function renderCategoryCards() {
   const bullets = {
     carwash: ['Washed where it stands', 'Vetted, rated washers', pay],
     laundry: ['Collected and delivered back', 'Wash, iron, duvets & bedding', pay],
+    detailing: ['Approved detailers only', 'Interior, exterior, full detail, ceramic', 'Booked ahead at a time you choose'],
   };
   // The same two cards appear on the logged-out home and on the in-app chooser.
   const fill = (icoId, listId, key, ico) => {
@@ -262,6 +279,17 @@ function renderCategoryCards() {
   fill('cat-ico-laundry', 'cat-list-laundry', 'laundry', 'shirt');
   fill('home-ico-wash', 'home-list-wash', 'carwash', 'car');
   fill('home-ico-laundry', 'home-list-laundry', 'laundry', 'shirt');
+  fill('cat-ico-detailing', 'cat-list-detailing', 'detailing', 'spark');
+  fill('home-ico-detailing', 'home-list-detailing', 'detailing', 'spark');
+  // The card only shows while customers can actually book detailing.
+  // It was display:none when the scroll-reveal observer first looked, so it would stay at
+  // opacity 0 forever; mark it revealed as it appears.
+  ['cat-detailing', 'home-cat-detailing'].forEach((id) => {
+    const card = el(id);
+    if (!card) return;
+    card.classList.toggle('hidden', !bookable('detailing'));
+    if (bookable('detailing')) card.classList.add('is-in');
+  });
 }
 
 function renderPickers() {
@@ -273,7 +301,7 @@ function renderPickers() {
       <div class="pkg-icon">${icon(PKG_ICONS[p.key] || 'droplet', 'lg')}</div>
       <div class="name">${p.name}</div>
       <div class="price"><small>from</small> ${rand(p.base)}</div>
-      <div class="desc">${p.desc} · ${p.eta}</div>
+      <div class="desc">${p.desc} · ${p.eta}${p.quote_only ? ' · priced by the detailer per car' : ''}</div>
     </div>`).join('');
   const vg = el('veh-grid');
   vg.innerHTML = cat.units.map((u) => `
@@ -301,6 +329,9 @@ function refreshSel() {
    customer OUR price for each of them. FreshAF sells the job; the pro performs it.
    Published prices answer automatically, so there is usually something bookable at once. */
 let quoteRequestId = null;
+// A booked request lives on after the form changes (it is in "Your booking requests"), so the
+// customer can book a second car or another day without cancelling the first.
+let quoteRequestBooked = false;
 let quotesList = [];
 let chosenQuote = null;
 
@@ -441,6 +472,45 @@ function whenLabel(scheduledFor) {
   });
 }
 
+// Booked-ahead services (detailing) have no "as soon as possible": the slot picker is the
+// only choice. Switching back to car wash or laundry gives the choice back.
+function applyBookAhead() {
+  const ahead = !!pricing?.services?.[svc]?.book_ahead;
+  const asap = document.querySelector('input[name=when][value=asap]');
+  const later = document.querySelector('input[name=when][value=scheduled]');
+  if (!asap || !later) return;
+  asap.closest('label').classList.toggle('hidden', ahead);
+  asap.disabled = ahead;
+  if (ahead && !later.checked) {
+    later.checked = true;
+    el('when-picker').classList.remove('hidden');
+    refreshWhenBounds();
+  }
+  el('when-hint').textContent = bookingHint();
+  refreshQuotesIntro();
+  // Each service has its own earliest slot, so re-check a time already picked.
+  if (later.checked) refreshWhenBounds();
+}
+
+// Step 5's explanation depends on the choice: instant prices now, or pros accepting a time.
+function refreshQuotesIntro() {
+  const intro = el('quotes-intro');
+  if (!intro) return;
+  const noun = pricing?.services?.[svc]?.providerNoun || 'pro';
+  intro.textContent = scheduledValue() || pricing?.services?.[svc]?.book_ahead
+    ? `Your time goes to ${noun}s near you. Each one accepts with their price or declines, and we let you know as soon as one accepts.`
+    : `Your request goes to ${noun}s who are online near you. Each one accepts with their price or declines, and you choose from those who accept.`;
+}
+
+// What the customer needs to know about booking a time.
+function bookingHint() {
+  const b = pricing?.booking;
+  const hours = b ? `Booked times are between ${b.open} and ${b.close}. ` : '';
+  const lead = svc === 'detailing' ? 'A detail takes a few hours, so it is always booked ahead. ' : '';
+  const noun = pricing?.services?.[svc]?.providerNoun || 'pro';
+  return `${lead}${hours}Each ${noun} accepts or declines your time, and we let you know as soon as one accepts. You can book up to 30 days ahead.`;
+}
+
 function scheduledValue() {
   const mode = document.querySelector('input[name=when]:checked')?.value;
   return mode === 'scheduled' ? (el('scheduled-for').value || null) : null;
@@ -456,7 +526,10 @@ function refreshWhenBounds() {
   const input = el('scheduled-for');
   const soonest = new Date(Date.now() + 30 * 60 * 1000);
   soonest.setMinutes(Math.ceil(soonest.getMinutes() / 15) * 15, 0, 0);
-  input.min = localStamp(soonest);
+  // Booked times follow business hours; the server says the earliest slot per service.
+  const earliest = pricing?.booking?.earliest?.[svc];
+  input.min = earliest || localStamp(soonest);
+  if (input.value && input.value < input.min) input.value = '';
   input.max = localStamp(new Date(Date.now() + 30 * 24 * 3600 * 1000));
   if (!input.value) input.value = input.min;
 }
@@ -464,6 +537,7 @@ document.querySelectorAll('input[name=when]').forEach((r) => r.onchange = () => 
   const scheduled = r.value === 'scheduled' && r.checked;
   el('when-picker').classList.toggle('hidden', !scheduled);
   if (scheduled) refreshWhenBounds();
+  refreshQuotesIntro();
   refreshReturnWindow();
   invalidateQuotes(); // a different time is a different job — old prices no longer apply
 });
@@ -492,14 +566,29 @@ el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros
       },
     });
     quoteRequestId = r.request_id;
+    quoteRequestBooked = !!r.book_ahead;
     quotesList = r.quotes || [];
-    el('quote-status').textContent = r.asked
-      ? `${r.asked} pro${r.asked === 1 ? '' : 's'} asked · ${r.auto_quoted} answered instantly`
-      : 'No pros are online near you right now.';
+    const noun = pricing?.services?.[svc]?.providerNoun || 'pro';
+    el('quote-status').textContent = r.book_ahead
+      ? (r.asked ? `Sent to ${r.asked} ${noun}${r.asked === 1 ? '' : 's'}. They have until ${r.answer_by} to accept. We will let you know as soon as one does, so you can close this page.`
+        : `No ${noun}s cover your area yet.`)
+      : r.asked
+        ? (r.auto_quoted
+          ? `${r.asked} ${noun}${r.asked === 1 ? '' : 's'} asked · ${r.auto_quoted} answered instantly`
+          : `Sent to ${r.asked} ${noun}${r.asked === 1 ? '' : 's'} near you. Waiting for one to accept…`)
+        : `No ${noun}s are online near you right now.`;
     renderQuotes();
     // Nobody was asked, so nobody can answer. The list used to say "Waiting for pros to send
     // their prices" under "No pros are online", a wait that could never end. Say what is
     // true and what the customer can do about it.
+    if (!r.book_ahead && r.asked && !quotesList.length) {
+      el('quote-list').innerHTML = `<p class="empty">Waiting for a ${noun} to accept. Each one who does appears here `
+        + 'with their price, and you choose. We will also let you know if you leave this page.</p>';
+    }
+    if (r.book_ahead && r.asked && !quotesList.length) {
+      el('quote-list').innerHTML = `<p class="empty">Waiting for ${noun}s to accept. You will find this request, `
+        + `and every ${noun} who accepts it, under <strong>Your booking requests</strong> on the main screen.</p>`;
+    }
     if (!r.asked && !quotesList.length) {
       el('quote-list').innerHTML = '<p class="empty">We are signing up pros across South Africa and none is '
         + 'online in your area at the moment. Try again a little later, or choose '
@@ -511,6 +600,13 @@ el('btn-get-quotes').onclick = () => withBusy(el('btn-get-quotes'), 'Asking pros
 // Anything that changes the job invalidates the prices pros gave for it.
 function invalidateQuotes() {
   if (!quoteRequestId) return;
+  if (quoteRequestBooked) {
+    // The booking request stays open for pros; the form is free for the next one.
+    quoteRequestBooked = false;
+    resetQuotes('Your booking request is still open under Your booking requests. Change the details and ask again to book another.');
+    refreshBookingRequests().catch(() => {});
+    return;
+  }
   api(`/api/quote-requests/${quoteRequestId}/cancel`, { method: 'POST' }).catch(() => {});
   resetQuotes('The job changed — ask for prices again.');
 }
@@ -522,7 +618,19 @@ function refreshPaymentMethods() {
   const live = !!pricing?.payments_live;
   const cardInput = document.querySelector('#pay-seg input[name=pay][value="card"]');
   const cardLabel = cardInput?.closest('label');
+  const cashInput = document.querySelector('#pay-seg input[name=pay][value="cash"]');
   if (cardLabel) cardLabel.classList.toggle('hidden', !live);
+  // Detailing is paid by card only. It is only offered when card is open to this customer,
+  // so here card is always there.
+  const cardOnly = !!pricing?.services?.[svc]?.card_only;
+  cashInput?.closest('label')?.classList.toggle('hidden', cardOnly);
+  if (cashInput) cashInput.disabled = cardOnly;
+  if (cardOnly && cardInput) {
+    cardInput.checked = true;
+    el('pay-note')?.remove();
+    el('pay-seg').insertAdjacentHTML('afterend', '<p class="muted small-text mt" id="pay-note">Detailing is paid by card when you book.</p>');
+    return;
+  }
   if (!live) {
     const cash = document.querySelector('#pay-seg input[name=pay][value="cash"]');
     if (cash) cash.checked = true;
@@ -729,7 +837,63 @@ el('btn-place-order').onclick = async () => {
   } catch (e) { showError('order-error', e.message); }
 };
 
+// Booked-ahead requests (detailing) waiting on detailers, or waiting on the customer to pick
+// one. Detailers answer over hours, so this is where the customer comes back to book.
+async function refreshBookingRequests() {
+  const card = el('requests-card');
+  if (!card) return;
+  let requests = [];
+  try { ({ requests } = await api('/api/quote-requests')); } catch { requests = []; }
+  card.classList.toggle('hidden', !requests.length);
+  if (!requests.length) { el('requests-list').innerHTML = ''; return; }
+  // How this customer can pay: card-only services by card; others by card when it is live,
+  // or cash on completion.
+  const payButtons = (r, q) => {
+    if (r.card_only) return `<button class="small" data-book-quote="${q.id}" data-pay="card">Book &amp; pay</button>`;
+    return (pricing?.payments_live ? `<button class="small" data-book-quote="${q.id}" data-pay="card">Book, pay by card</button>` : '')
+      + `<button class="${pricing?.payments_live ? 'secondary ' : ''}small" data-book-quote="${q.id}" data-pay="cash">${pricing?.payments_live ? 'Book, pay cash' : 'Book (pay cash when done)'}</button>`;
+  };
+  el('requests-list').innerHTML = requests.map((r) => `
+    <div class="offer-card" style="margin-bottom:12px">
+      <strong>${escapeHtml(r.service_name)}: ${escapeHtml(r.package_name)}</strong>
+      <div class="small-text" style="color:var(--accent-dim);font-weight:700">${icon('clock')} ${escapeHtml(r.when_label)}</div>
+      <div class="muted small-text">${escapeHtml(r.unit_name)} · ${escapeHtml(r.address)}</div>
+      ${r.quotes.length ? r.quotes.map((q) => `
+        <div class="row spread" style="padding:10px 0;border-top:1px solid var(--border-soft);margin-top:8px;gap:10px">
+          <div style="min-width:0">
+            <strong>${escapeHtml(q.business_name || q.name || 'Detailer')}</strong>
+            ${q.rating ? `<span class="muted small-text"> ${icon('star')} ${q.rating} (${q.rating_count})</span>` : ''}
+            ${q.availability ? `<div class="muted small-text">${escapeHtml(q.availability)}</div>` : ''}
+            ${q.note ? `<div class="muted small-text">${escapeHtml(q.note)}</div>` : ''}
+          </div>
+          <div class="row" style="flex-wrap:wrap;gap:8px;justify-content:flex-end">
+            <strong>${rand(q.total_cents)}</strong>
+            ${payButtons(r, q)}
+          </div>
+        </div>`).join('')
+      : r.status === 'unanswered'
+        ? `<p class="muted small-text mt">No ${escapeHtml(r.provider_noun || 'pro')} could take this time. Nothing was charged. Try another day or time.</p>`
+        : `<p class="muted small-text mt">Waiting for ${escapeHtml(r.provider_noun || 'pro')}s to accept. They have until ${escapeHtml(r.answer_by)}.</p>`}
+      <div class="row mt"><button class="ghost small" data-cancel-request="${r.id}" data-unanswered="${r.status === 'unanswered' ? 1 : 0}">${r.status === 'unanswered' ? 'Dismiss' : 'Cancel this request'}</button></div>
+    </div>`).join('');
+  el('requests-list').querySelectorAll('[data-book-quote]').forEach((b) => b.onclick = () => withBusy(b, 'Opening payment…', async () => {
+    try {
+      const data = await api(`/api/quotes/${b.dataset.bookQuote}/accept`, { method: 'POST', body: { payment_method: b.dataset.pay || 'card', use_points: false } });
+      if (data.payment_url) { window.location.href = data.payment_url; return; }
+      openTrackOrder(data.order);
+    } catch (e) { showError('requests-error', e.message); }
+  }));
+  el('requests-list').querySelectorAll('[data-cancel-request]').forEach((b) => b.onclick = async () => {
+    if (b.dataset.unanswered !== '1' && !confirm('Cancel this booking request? Pros who accepted will be told.')) return;
+    try {
+      await api(`/api/quote-requests/${b.dataset.cancelRequest}/cancel`, { method: 'POST' });
+      refreshBookingRequests();
+    } catch (e) { showError('requests-error', e.message); }
+  });
+}
+
 async function refreshOrders() {
+  refreshBookingRequests().catch(() => {});
   const { orders } = await api('/api/orders');
   if (!orders.length) {
     el('orders-list').innerHTML = '<p class="empty">No orders yet.</p>';

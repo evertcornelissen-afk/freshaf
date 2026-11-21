@@ -239,6 +239,11 @@ router.get('/suppliers', (req, res) => {
         return v && { ...v, ...vetting.summarise(v) };
       })(),
       status: r.status, status_reason: r.status_reason, online: !!r.online, is_demo: !!r.is_demo,
+      detailing: r.detailing_status ? {
+        status: r.detailing_status, link: r.detailing_link, reason: r.detailing_reason,
+        applied_at: r.detailing_applied_at, decided_at: r.detailing_decided_at,
+        photos: db.prepare('SELECT id, original_name, uploaded_at FROM detailing_photos WHERE user_id = ? ORDER BY id').all(r.user_id),
+      } : null,
       ...balance.status(r.user_id),
       rating: r.rating_count ? +(r.rating_sum / r.rating_count).toFixed(1) : null,
       rating_count: r.rating_count, created_at: r.created_at,
@@ -276,6 +281,61 @@ router.get('/docs/:docId', (req, res) => {
   const doc = db.prepare('SELECT * FROM supplier_docs WHERE id = ?').get(req.params.docId);
   if (!doc) return res.status(404).json({ error: 'Document not found' });
   res.sendFile(path.join(DATA_DIR, 'uploads', doc.stored_name));
+});
+
+// A detailing applicant's photo of past work, for the reviewing admin.
+router.get('/detailing-photos/:photoId', (req, res) => {
+  const ph = db.prepare('SELECT * FROM detailing_photos WHERE id = ?').get(req.params.photoId);
+  if (!ph) return res.status(404).json({ error: 'Photo not found' });
+  res.sendFile(path.join(DATA_DIR, 'uploads', ph.stored_name));
+});
+
+// Approve or decline a pro for detailing. Separate from approving the pro: approving adds
+// 'detailing' to their services (the only thing that sends them detailing requests);
+// declining, or taking it away later, removes it again. They hear on every channel.
+router.post('/suppliers/:id/detailing', (req, res) => {
+  const s = db.prepare('SELECT * FROM suppliers WHERE user_id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Supplier not found' });
+  const decision = req.body?.decision;
+  if (!['approve', 'decline'].includes(decision)) return res.status(400).json({ error: 'Choose approve or decline' });
+  if (!s.detailing_status) return res.status(409).json({ error: 'This pro has not applied for detailing' });
+  const reason = String(req.body?.reason || '').trim().slice(0, 500) || null;
+  if (decision === 'decline' && !reason) return res.status(400).json({ error: 'Say why, so the pro knows what to fix' });
+  const set = new Set((s.services || 'carwash').split(',').filter(Boolean));
+  if (decision === 'approve') set.add('detailing');
+  else {
+    set.delete('detailing');
+    // A detailer who had switched car wash off still needs one service on the account.
+    if (!set.size) set.add('carwash');
+  }
+  const services = ['carwash', 'detailing', 'laundry'].filter((k) => set.has(k)).join(',');
+  const status = decision === 'approve' ? 'approved' : 'declined';
+  db.prepare(`UPDATE suppliers SET detailing_status = ?, detailing_reason = ?, detailing_decided_at = datetime('now'),
+    services = ? WHERE user_id = ?`).run(status, reason, services, s.user_id);
+  realtime.send(s.user_id, 'account_update', { detailing: status });
+  const u = db.prepare('SELECT name, email FROM users WHERE id = ?').get(s.user_id);
+  const fee = require('../quotes').feePctFor('detailing');
+  const msg = decision === 'approve'
+    ? {
+      title: 'You are approved for detailing on FreshAF',
+      subject: 'You are approved for detailing on FreshAF',
+      body: 'Good news: you are approved to take detailing jobs on FreshAF.\n\n'
+        + `Open FreshAF Pro and set your detailing prices. FreshAF adds ${fee}% on top for customers, and you are paid your full price.\n\n`
+        + 'Detailing jobs are always booked ahead, so you will get each request with its date and time.',
+    }
+    : {
+      title: 'Update on your FreshAF detailing application',
+      subject: 'Your FreshAF detailing application',
+      body: `We could not approve you for detailing yet.\n\nReason: ${reason}\n\n`
+        + 'You can update your photos and link in FreshAF Pro and apply again.',
+    };
+  push.sendToUser(s.user_id, { title: msg.title, body: decision === 'approve' ? 'Set your detailing prices in FreshAF Pro.' : reason, url: '/supplier', tag: 'detailing' }).catch(() => {});
+  if (u) mailer.proMessage({ to: u.email, name: u.name, subject: msg.subject, body: msg.body }).catch(() => {});
+  logMessage(s.user_id, {
+    kind: 'decision', subject: `Detailing ${status}`,
+    body: reason || 'Approved for detailing.', sentBy: req.user?.name, delivery: u ? 'sent' : 'skipped',
+  });
+  res.json({ ok: true, status, services: services.split(',') });
 });
 
 // Record that a pro has paid in the cash they were holding. Clears the balance that
@@ -831,13 +891,23 @@ router.get('/settings', (req, res) => {
     return_leg_per_km_cents: Number(getSetting('return_leg_per_km_cents', '1000')),
     return_leg_cap_cents: Number(getSetting('return_leg_cap_cents', '15000')),
     return_leg_price_set: getSetting('return_leg_price_set', '0') === '1',
+    // Detailing: its own margin, and two switches that are off until the owner opens them.
+    detailing_fee_pct: Number(getSetting('detailing_fee_pct', '10')),
+    detailing_signup: getSetting('detailing_signup', '0') === '1',
+    detailing_booking: getSetting('detailing_booking', '0') === '1',
+    // Detailing is card only, so real customers only see it once card payments are live.
+    card_live: require('../payments').LIVE,
+    // Business hours: booked jobs must start inside them, and their timings count only them.
+    business_open: getSetting('business_open', '07:00'),
+    business_close: getSetting('business_close', '18:00'),
   });
 });
 
 router.post('/settings', (req, res) => {
   const { platform_fee_pct, dispatch_radius_km, offer_timeout_sec,
     points_earn_pct, callout_free_km, callout_per_km_cents, callout_cap_cents,
-    return_leg_free_km, return_leg_per_km_cents, return_leg_cap_cents } = req.body || {};
+    return_leg_free_km, return_leg_per_km_cents, return_leg_cap_cents, detailing_fee_pct,
+    detailing_signup, detailing_booking, business_open, business_close } = req.body || {};
   const checks = [
     ['platform_fee_pct', platform_fee_pct, 0, 50],
     ['dispatch_radius_km', dispatch_radius_km, 1, 200],
@@ -849,7 +919,21 @@ router.post('/settings', (req, res) => {
     ['return_leg_free_km', return_leg_free_km, 0, 100],
     ['return_leg_per_km_cents', return_leg_per_km_cents, 0, 10000],
     ['return_leg_cap_cents', return_leg_cap_cents, 0, 100000],
+    ['detailing_fee_pct', detailing_fee_pct, 0, 50],
   ];
+  // Checked before anything is written, so a bad value never leaves a half-saved form.
+  const switches = [['detailing_signup', detailing_signup], ['detailing_booking', detailing_booking]]
+    .filter(([, v]) => v !== undefined);
+  for (const [key, val] of switches) {
+    if (typeof val !== 'boolean') return res.status(400).json({ error: `${key} must be true or false` });
+  }
+  const clock = (v) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null);
+  if (business_open !== undefined || business_close !== undefined) {
+    const o = clock(business_open ?? getSetting('business_open', '07:00'));
+    const c = clock(business_close ?? getSetting('business_close', '18:00'));
+    if (!o || !c) return res.status(400).json({ error: 'Business hours must be times like 07:00' });
+    if (c <= o) return res.status(400).json({ error: 'Closing time must be after opening time' });
+  }
   for (const [key, val, min, max] of checks) {
     if (val === undefined) continue;
     const n = Number(val);
@@ -858,6 +942,9 @@ router.post('/settings', (req, res) => {
     }
     setSetting(key, n);
   }
+  for (const [key, val] of switches) setSetting(key, val ? '1' : '0');
+  if (business_open !== undefined) setSetting('business_open', business_open);
+  if (business_close !== undefined) setSetting('business_close', business_close);
   // Saving any return-trip figure is the owner deciding that price.
   if ([return_leg_free_km, return_leg_per_km_cents, return_leg_cap_cents].some((v) => v !== undefined)) {
     setSetting('return_leg_price_set', '1');

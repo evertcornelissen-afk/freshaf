@@ -96,7 +96,7 @@ async function send({ to, subject, heading, paragraphs, cta }) {
   }
 }
 
-const SERVICE_LABEL = { carwash: 'Car wash', laundry: 'Laundry' };
+const SERVICE_LABEL = require('./pricing').SERVICE_LABELS;
 
 function proApplicationReceived({ to, name }) {
   return send({

@@ -89,7 +89,7 @@ function requireApproved(req, res, next) {
 }
 
 /* ---------- pro-set pricing ---------- */
-const { SERVICES, SERVICE_KEYS, quote } = require('../pricing');
+const { SERVICES, SERVICE_KEYS, quote, priceFor: priceForUnit } = require('../pricing');
 
 // The pro's own return-trip rate (laundry), with the limits FreshAF sets around it.
 function returnTripFor(s) {
@@ -114,11 +114,14 @@ router.get('/prices', (req, res) => {
       packages: Object.values(svc.packages).map((p) => ({
         key: p.key, name: p.name, desc: p.desc, eta: p.eta,
         suggested_cents: p.base,
-        price_cents: set[`${svcKey}:${p.key}`] ?? null,
+        quote_only: !!p.quoteOnly,
+        price_cents: p.quoteOnly ? null : (set[`${svcKey}:${p.key}`] ?? null),
       })),
     };
   }
-  res.json({ services: out, return_trip: returnTripFor(s), fee_pct: Number(getSetting('platform_fee_pct', '20')) });
+  const q = require('../quotes');
+  res.json({ services: out, return_trip: returnTripFor(s), fee_pct: q.feePctFor('carwash'),
+    fee_pct_by_service: Object.fromEntries(Object.keys(out).map((k) => [k, q.feePctFor(k)])) });
 });
 
 router.post('/prices', (req, res) => {
@@ -147,6 +150,9 @@ router.post('/prices', (req, res) => {
       return res.status(400).json({ error: 'You do not offer that service' });
     }
     if (!SERVICES[p.service].packages[p.package]) return res.status(400).json({ error: 'Unknown package' });
+    if (SERVICES[p.service].packages[p.package].quoteOnly) {
+      return res.status(400).json({ error: `${SERVICES[p.service].packages[p.package].name} is always quoted per car` });
+    }
     const cents = Math.round(Number(p.price_cents));
     if (!Number.isFinite(cents) || cents < 2000 || cents > 2000000) {
       return res.status(400).json({ error: 'Prices must be between R20 and R20 000' });
@@ -159,6 +165,127 @@ router.post('/prices', (req, res) => {
     db.prepare('UPDATE suppliers SET return_per_km_cents = ? WHERE user_id = ?').run(returnRate, req.user.id);
   }
   res.json({ ok: true });
+});
+
+/* ---------- detailing: a second approval on top of the normal one ----------
+   A pro applies with photos of past work and a link to their reviews or website. Only an
+   approved detailer gets 'detailing' added to their services, which is the one thing that
+   puts detailing requests in front of them (see quotes.eligiblePros). Pending pros may
+   apply too, alongside their normal application. Closed until the owner switches pro
+   applications on in the admin app. */
+const DETAILING_MIN_PHOTOS = 5;
+const DETAILING_MAX_PHOTOS = 12;
+const PHOTO_EXT = ['.jpg', '.jpeg', '.png'];
+const detailingUpload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${req.user.id}-detailing-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, PHOTO_EXT.includes(path.extname(file.originalname).toLowerCase())),
+});
+
+function detailingState(userId) {
+  const q = require('../quotes');
+  const s = db.prepare(`SELECT services, detailing_status, detailing_link, detailing_reason,
+    detailing_applied_at, detailing_decided_at FROM suppliers WHERE user_id = ?`).get(userId);
+  const photos = db.prepare('SELECT id, original_name, uploaded_at FROM detailing_photos WHERE user_id = ? ORDER BY id').all(userId);
+  const services = (s?.services || 'carwash').split(',');
+  return {
+    signup_open: q.detailingSignupOpen(),
+    booking_open: q.serviceOpen('detailing'),
+    status: s?.detailing_status || null,
+    link: s?.detailing_link || null,
+    reason: s?.detailing_reason || null,
+    applied_at: s?.detailing_applied_at || null,
+    decided_at: s?.detailing_decided_at || null,
+    photos,
+    min_photos: DETAILING_MIN_PHOTOS,
+    max_photos: DETAILING_MAX_PHOTOS,
+    fee_pct: q.feePctFor('detailing'),
+    // An approved detailer chooses whether they also want everyday car wash requests.
+    carwash: services.includes('carwash'),
+    other_services: services.filter((x) => x !== 'detailing'),
+  };
+}
+
+const detailingStatusOf = (userId) =>
+  db.prepare('SELECT detailing_status FROM suppliers WHERE user_id = ?').get(userId)?.detailing_status || null;
+
+// A pro who has never applied cannot start while applications are closed; anyone already
+// in the process (or decided) keeps seeing their own state.
+function detailingClosedFor(userId) {
+  return !detailingStatusOf(userId) && !require('../quotes').detailingSignupOpen();
+}
+
+router.get('/detailing', (req, res) => res.json(detailingState(req.user.id)));
+
+router.post('/detailing/photos', (req, res, next) => {
+  if (detailingClosedFor(req.user.id)) return res.status(403).json({ error: 'Detailing applications are not open yet' });
+  if (detailingStatusOf(req.user.id) === 'pending') {
+    return res.status(409).json({ error: 'Your detailing application is being reviewed. You can change your photos once it is decided' });
+  }
+  const n = db.prepare('SELECT COUNT(*) c FROM detailing_photos WHERE user_id = ?').get(req.user.id).c;
+  if (n >= DETAILING_MAX_PHOTOS) return res.status(400).json({ error: `You can add up to ${DETAILING_MAX_PHOTOS} photos. Remove one first` });
+  next();
+}, detailingUpload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Attach a JPG or PNG photo up to 5 MB' });
+  db.prepare('INSERT INTO detailing_photos (user_id, original_name, stored_name) VALUES (?, ?, ?)')
+    .run(req.user.id, String(req.file.originalname).slice(0, 120), req.file.filename);
+  res.json(detailingState(req.user.id));
+});
+
+router.post('/detailing/photos/:id/remove', (req, res) => {
+  if (detailingStatusOf(req.user.id) === 'pending') {
+    return res.status(409).json({ error: 'Your detailing application is being reviewed' });
+  }
+  const ph = db.prepare('SELECT * FROM detailing_photos WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!ph) return res.status(404).json({ error: 'Photo not found' });
+  try { fs.unlinkSync(path.join(UPLOAD_DIR, ph.stored_name)); } catch {}
+  db.prepare('DELETE FROM detailing_photos WHERE id = ?').run(ph.id);
+  res.json(detailingState(req.user.id));
+});
+
+router.post('/detailing/apply', (req, res) => {
+  if (detailingClosedFor(req.user.id)) return res.status(403).json({ error: 'Detailing applications are not open yet' });
+  const cur = detailingState(req.user.id);
+  if (cur.status === 'pending') return res.status(409).json({ error: 'Your detailing application is already being reviewed' });
+  if (cur.status === 'approved') return res.status(409).json({ error: 'You are already approved for detailing' });
+  if (cur.photos.length < DETAILING_MIN_PHOTOS) {
+    return res.status(400).json({ error: `Add at least ${DETAILING_MIN_PHOTOS} photos of detailing work you have done (you have ${cur.photos.length})` });
+  }
+  let link = String(req.body?.link || '').trim();
+  if (link && !/^https?:\/\//i.test(link)) link = `https://${link}`;
+  let ok = false;
+  try { const u = new URL(link); ok = /^https?:$/.test(u.protocol) && u.hostname.includes('.'); } catch { ok = false; }
+  if (!ok) return res.status(400).json({ error: 'Add a link to your Google reviews, website or Instagram so we can see your work' });
+  db.prepare(`UPDATE suppliers SET detailing_status = 'pending', detailing_link = ?, detailing_reason = NULL,
+    detailing_applied_at = datetime('now'), detailing_decided_at = NULL WHERE user_id = ?`).run(link.slice(0, 300), req.user.id);
+  const u = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
+  const biz = db.prepare('SELECT business_name FROM suppliers WHERE user_id = ?').get(req.user.id)?.business_name;
+  mailer.adminAlert({
+    subject: `Detailing application: ${biz || u?.name || 'a pro'}`,
+    lines: [`${biz || ''} (${u?.name || ''}) applied to do detailing jobs.`,
+      `${cur.photos.length} photos of past work. Link: ${link}`,
+      'Review it on their application page in the admin app.'],
+  }).catch(() => {});
+  res.json(detailingState(req.user.id));
+});
+
+// An approved detailer can turn everyday car wash requests off (or back on). At least one
+// service always stays on the account.
+router.post('/detailing/carwash', (req, res) => {
+  const s = db.prepare('SELECT services, detailing_status FROM suppliers WHERE user_id = ?').get(req.user.id);
+  if (s?.detailing_status !== 'approved') return res.status(403).json({ error: 'This is for approved detailers' });
+  const set = new Set((s.services || 'carwash').split(',').filter(Boolean));
+  if (req.body?.enabled) set.add('carwash'); else set.delete('carwash');
+  if (!set.size) return res.status(400).json({ error: 'Keep at least one service on your account' });
+  const ordered = ['carwash', 'detailing', 'laundry'].filter((k) => set.has(k));
+  db.prepare('UPDATE suppliers SET services = ? WHERE user_id = ?').run(ordered.join(','), req.user.id);
+  res.json(detailingState(req.user.id));
 });
 
 router.post('/online', requireApproved, (req, res) => {
@@ -340,7 +467,10 @@ function proContext(userId) {
 
 router.get('/quote-requests', requireApproved, (req, res) => {
   const me = proContext(req.user.id);
-  if (!me || !me.online || me.lat == null) return res.json({ requests: [] });
+  if (!me || me.lat == null) return res.json({ requests: [] });
+  // Offline pros still see booked requests (a later time, and all detailing): those wait for
+  // the pro to accept or decline, so they can answer whenever they open the app.
+  const offline = !me.online;
   if (balance.isBlocked(req.user.id)) {
     return res.json({ requests: [], ...balance.status(req.user.id) });
   }
@@ -357,7 +487,11 @@ router.get('/quote-requests', requireApproved, (req, res) => {
       AND (SELECT is_demo FROM users WHERE id = r.customer_id) = (SELECT is_demo FROM users WHERE id = ?)
     ORDER BY r.id DESC LIMIT 40`).all(req.user.id, req.user.id);
 
-  const requests = rows.filter((r) => mine.includes(r.service)).map((r) => {
+  const listed = {};
+  for (const x of db.prepare('SELECT service, package, price_cents FROM supplier_prices WHERE user_id = ?').all(req.user.id)) {
+    listed[`${x.service}:${x.package}`] = x.price_cents;
+  }
+  const requests = rows.filter((r) => mine.includes(r.service) && (!offline || quotes.needsAcceptance(r))).map((r) => {
     const distance = dispatch.haversineKm(r.lat, r.lng, me.lat, me.lng);
     if (distance > limit) return null;
     const svc = SERVICES[r.service];
@@ -383,6 +517,12 @@ router.get('/quote-requests', requireApproved, (req, res) => {
       distance_km: +distance.toFixed(1),
       callout_fee_cents: quotes.calloutFor(distance),
       suggested_cents: svc?.packages[r.package]?.base ?? null,
+      fee_pct: quotes.feePctFor(r.service),
+      // Booked: the pro accepts or declines the slot; their own list price pre-fills it.
+      book_ahead: quotes.needsAcceptance(r),
+      my_listed_cents: listed[`${r.service}:${r.package}`] != null
+        ? priceForUnit(r.service, r.package, r.vehicle, listed[`${r.service}:${r.package}`]) : null,
+      answer_by: quotes.needsAcceptance(r) ? quotes.whenLabel(quotes.utcToWall(r.expires_at)) : null,
       created_at: r.created_at,
       expires_at: r.expires_at,
       my_quote: r.my_quote_id ? {
@@ -392,13 +532,13 @@ router.get('/quote-requests', requireApproved, (req, res) => {
     };
   }).filter(Boolean);
 
-  res.json({ requests, fee_pct: Number(getSetting('platform_fee_pct', '20')) });
+  res.json({ requests, fee_pct: quotes.feePctFor('carwash') });
 });
 
 // Send (or replace) my price and availability for one request.
 router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
   const me = proContext(req.user.id);
-  if (!me || !me.online || me.lat == null) return res.status(400).json({ error: 'Go online before quoting' });
+  if (!me || me.lat == null) return res.status(400).json({ error: 'Set your location before quoting' });
   if (balance.isBlocked(req.user.id)) return res.status(402).json({ error: balance.blockedMessage(req.user.id) });
 
   // Same demo rule as the list: a request id typed by hand does not cross the line.
@@ -406,6 +546,8 @@ router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
     AND (SELECT is_demo FROM users WHERE id = r.customer_id) = (SELECT is_demo FROM users WHERE id = ?)`)
     .get(req.params.id, req.user.id);
   if (!request) return res.status(409).json({ error: 'That request is no longer open' });
+  // Booked requests can be answered offline; "as soon as possible" ones need the pro online.
+  if (!me.online && !quotes.needsAcceptance(request)) return res.status(400).json({ error: 'Go online before quoting' });
   const expired = db.prepare("SELECT datetime('now') > ? AS x").get(request.expires_at).x;
   if (expired) return res.status(409).json({ error: 'That request has expired' });
   if (!(me.services || 'carwash').split(',').includes(request.service)) {
@@ -423,6 +565,7 @@ router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
 
   const returnKm = request.return_lat != null
     ? dispatch.haversineKm(request.return_lat, request.return_lng, me.lat, me.lng) : null;
+  const priorQuote = db.prepare('SELECT status FROM quotes WHERE request_id = ? AND supplier_id = ?').get(request.id, req.user.id);
   const total = quotes.insertQuote({
     requestId: request.id,
     supplierId: req.user.id,
@@ -434,6 +577,8 @@ router.post('/quote-requests/:id/quote', requireApproved, (req, res) => {
     source: 'manual',
   });
   quotes.notifyCustomer(request);
+  // Booked: the customer hears only when a pro accepts, and only once per pro, not on every edit.
+  if (!priorQuote || priorQuote.status !== 'open') quotes.tellCustomerAccepted(request, req.user.id, total);
   res.json({ ok: true, total_cents: total,
     you_earn_cents: cents + quotes.calloutFor(distance) + quotes.returnLegFor(returnKm, me.return_per_km_cents) });
 });
@@ -546,7 +691,7 @@ router.get('/earnings', (req, res) => {
     earned_cents: row.earned,
     fees_cents: row.fees,
     fee_owed_cents: owed,
-    fee_pct: Number(getSetting('platform_fee_pct', '20')),
+    fee_pct: quotes.feePctFor('carwash'),
     ...balance.status(req.user.id),
   });
 });

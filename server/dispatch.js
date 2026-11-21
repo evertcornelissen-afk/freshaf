@@ -119,7 +119,7 @@ function offerToNext(orderId) {
       AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)
       AND s.user_id NOT IN (
         SELECT supplier_id FROM orders
-        WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
+        WHERE supplier_id IS NOT NULL AND (status IN ('en_route','in_progress') OR (status = 'accepted' AND scheduled_for IS NULL)))
   `).all(order.requested_supplier_id, orderId, order.customer_id)
     .map((s) => ({ ...s, distance: haversineKm(order.lat, order.lng, s.lat, s.lng) }))
     .filter((s) => s.distance <= radiusKm)
@@ -144,7 +144,7 @@ function offerToNext(orderId) {
   });
 
   const timeoutSec = Number(getSetting('offer_timeout_sec', '60'));
-  const serviceLabel = order.service === 'laundry' ? 'Laundry' : 'Car wash';
+  const serviceLabel = require('./pricing').serviceLabel(order.service);
   const earnsRand = Math.round((order.supplier_price_cents + order.callout_fee_cents) / 100);
 
   // Reach the provider even when the app is closed.
@@ -240,7 +240,7 @@ function cancelOrder(orderId, { by = 'customer', reason = null } = {}) {
     try {
       const pro = db.prepare(`SELECT u.name, u.email, u.phone, u.phone_verified_at, s.alert_whatsapp
         FROM users u LEFT JOIN suppliers s ON s.user_id = u.id WHERE u.id = ?`).get(order.supplier_id);
-      const service = order.service === 'laundry' ? 'Laundry' : 'Car wash';
+      const service = require('./pricing').serviceLabel(order.service);
       if (pro?.email && !pro.email.endsWith('@freshaf.invalid')) {
         require('./mailer').proJobCancelled({ to: pro.email, name: pro.name, orderId: order.id, service,
           address: order.address, by, reason }).catch(() => {});

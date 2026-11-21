@@ -524,7 +524,7 @@ function statusLabel(s, service = 'carwash') {
 }
 
 function serviceName(service) {
-  return service === 'laundry' ? 'Laundry' : 'Car Wash';
+  return service === 'laundry' ? 'Laundry' : service === 'detailing' ? 'Detailing' : 'Car Wash';
 }
 
 function statusPillClass(s) {

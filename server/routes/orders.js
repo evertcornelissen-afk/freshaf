@@ -9,10 +9,11 @@ const maps = require('../maps');
 const realtime = require('../realtime');
 
 const router = express.Router();
+const SERVICES_ALL = require('../pricing').SERVICES;
 
 router.get('/pricing', (req, res) => {
   res.json({
-    services: catalog(), payments_live: payments.cardAvailableFor(viewer(req)),
+    services: catalog(require('../quotes').openServiceKeys(viewer(req))), payments_live: payments.cardAvailableFor(viewer(req)),
     points_earn_pct: Number(getSetting('points_earn_pct', '5')),
     callout: {
       free_km: Number(getSetting('callout_free_km', '5')),
@@ -21,6 +22,17 @@ router.get('/pricing', (req, res) => {
     },
     // Laundry returned to a different address: the most the return trip can add, all in.
     return_leg: require('../quotes').returnLegPublic(),
+    // Booked jobs: business hours, and the earliest slot per service right now.
+    booking: (() => {
+      const q = require('../quotes');
+      const bh = require('../business-hours');
+      const { open, close } = bh.hours();
+      return {
+        open: bh.hhmm(open), close: bh.hhmm(close),
+        earliest: Object.fromEntries(Object.keys(q.BOOKED_RULES).filter((k) => k !== 'default')
+          .concat(['carwash', 'laundry']).map((k) => [k, q.earliestBooking(k).replace(' ', 'T')])),
+      };
+    })(),
   });
 });
 
@@ -68,10 +80,12 @@ async function computeCallout(lat, lng, service, customerId) {
 router.get('/quote/providers', authRequired('customer'), (req, res) => {
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   const { service, package: pkg, vehicle: unit } = req.query;
-  if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
+  if (!require('../quotes').serviceOpen(service)) return res.status(400).json({ error: 'Choose a service' });
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: 'Pick a location first' });
+  // Booked-ahead services (detailing) are quoted per job, never picked from a live list.
+  if (SERVICES_ALL[service]?.bookAhead) return res.json({ providers: [], fee_pct: require('../quotes').feePctFor(service) });
 
-  const feePct = Number(getSetting('platform_fee_pct', '20'));
+  const feePct = require('../quotes').feePctFor(service);
   const maxRadius = Number(getSetting('dispatch_radius_km', '25'));
   const freeKm = Number(getSetting('callout_free_km', '5'));
   const perKm = Number(getSetting('callout_per_km_cents', '1000'));
@@ -88,7 +102,7 @@ router.get('/quote/providers', authRequired('customer'), (req, res) => {
       AND (SELECT is_demo FROM users WHERE id = s.user_id) = (SELECT is_demo FROM users WHERE id = ?)
       AND s.user_id NOT IN (
         SELECT supplier_id FROM orders
-        WHERE supplier_id IS NOT NULL AND status IN ('accepted','en_route','in_progress'))
+        WHERE supplier_id IS NOT NULL AND (status IN ('en_route','in_progress') OR (status = 'accepted' AND scheduled_for IS NULL)))
   `).all(service, pkg, service, req.user.id);
 
   const providers = rows.map((r) => {
@@ -208,29 +222,52 @@ function parseReturn(body, service, pkg, scheduledFor) {
 router.post('/quote-requests', authRequired('customer'), (req, res) => {
   const { service, package: pkg, vehicle, address, lat, lng, notes, scheduled_for } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
+  const customerRow = db.prepare('SELECT id, is_demo FROM users WHERE id = ?').get(req.user.id);
+  if (!quotes.serviceOpen(service, customerRow)) {
+    return res.status(400).json({ error: `${SERVICES[service].name} is not open for bookings yet` });
+  }
   if (!catalogHas(service, pkg, vehicle)) return res.status(400).json({ error: 'Choose a package and size' });
+  // A detail takes hours, so it is always a booked slot, never "as soon as possible".
+  if (SERVICES[service].bookAhead && !scheduled_for) {
+    return res.status(400).json({ error: `${SERVICES[service].name} is booked ahead. Choose Schedule a time and pick a slot` });
+  }
   if (!address?.trim() || typeof lat !== 'number' || typeof lng !== 'number') {
     return res.status(400).json({ error: 'Pick your location on the map and enter an address' });
   }
   const sched = parseScheduledFor(scheduled_for);
   if (sched.error) return res.status(400).json({ error: sched.error });
+  // A booked time is accepted or declined by the pro, so it must be in business hours and
+  // far enough away for them to answer (quotes.BOOKED_RULES, counted in business hours).
+  if (sched.value) {
+    const slotError = quotes.bookedSlotError(service, sched.value);
+    if (slotError) return res.status(400).json({ error: slotError });
+  }
   const ret = parseReturn(req.body, service, pkg, sched.value);
   if (ret.error) return res.status(400).json({ error: ret.error });
 
-  // One open request per service — otherwise pros get the same job twice.
-  const existing = db.prepare(`SELECT id FROM quote_requests
-    WHERE customer_id = ? AND service = ? AND status = 'open'`).get(req.user.id, service);
-  if (existing) {
-    db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE id = ?").run(existing.id);
-    db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE request_id = ? AND status = 'open'").run(existing.id);
+  // Pros must never get the same job twice. "As soon as possible": one open request per
+  // service, so asking again replaces the last one. Booked: a customer may book several (two
+  // cars, Saturday and Sunday), so only an identical booking is replaced.
+  const existing = sched.value
+    ? db.prepare(`SELECT id FROM quote_requests WHERE customer_id = ? AND service = ? AND status = 'open'
+        AND scheduled_for = ? AND package = ? AND vehicle = ? AND address = ?`)
+      .all(req.user.id, service, sched.value, pkg, vehicle, address.trim())
+    : db.prepare(`SELECT id FROM quote_requests WHERE customer_id = ? AND service = ? AND status = 'open'
+        AND scheduled_for IS NULL`).all(req.user.id, service);
+  for (const ex of existing) {
+    db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE id = ?").run(ex.id);
+    db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE request_id = ? AND status = 'open'").run(ex.id);
   }
 
   const windowMin = quotes.settings().windowMin;
+  // A booked request stays open while pros answer (quotes.bookedExpiry, business hours); an
+  // "as soon as possible" one for the normal quote window.
+  const aheadExpiry = sched.value ? quotes.bookedExpiry(service, sched.value) : null;
   const info = db.prepare(`
     INSERT INTO quote_requests (customer_id, service, package, vehicle, address, lat, lng, notes, scheduled_for, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+' || ? || ' minutes'))`)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now', '+' || ? || ' minutes')))`)
     .run(req.user.id, service, pkg, vehicle, address.trim(), lat, lng,
-      (notes || '').slice(0, 300) || null, sched.value, windowMin);
+      (notes || '').slice(0, 300) || null, sched.value, aheadExpiry, windowMin);
 
   if (ret.value) {
     db.prepare(`UPDATE quote_requests SET return_address = ?, return_lat = ?, return_lng = ?,
@@ -244,8 +281,41 @@ router.post('/quote-requests', authRequired('customer'), (req, res) => {
     request_id: request.id,
     scheduled_for: request.scheduled_for,
     asked, auto_quoted: auto,
-    expires_in_min: windowMin,
+    expires_in_min: aheadExpiry
+      ? Math.round((Date.parse(`${request.expires_at.replace(' ', 'T')}Z`) - Date.now()) / 60000) : windowMin,
+    book_ahead: !!aheadExpiry,
+    answer_by: aheadExpiry ? quotes.whenLabel(quotes.utcToWall(request.expires_at)) : null,
     quotes: quotes.listQuotes(request.id),
+  });
+});
+
+// The customer's open requests, with every pro who has accepted. Pros answer in their own
+// time (hours, for a booking), so the customer comes back to this list to choose and book.
+router.get('/quote-requests', authRequired('customer'), (req, res) => {
+  // Open ones, and ones that closed in the last day with nobody accepting. The customer is
+  // only NOTIFIED when a pro accepts (Evert, 21 Nov 2026); an unanswered one is just shown
+  // here, quietly, so it never looks like someone is still coming.
+  const rows = db.prepare(`SELECT r.*, (SELECT COUNT(*) FROM quotes q WHERE q.request_id = r.id AND q.status = 'open') AS answered
+    FROM quote_requests r WHERE r.customer_id = ?
+      AND ((r.status = 'open' AND datetime('now') <= r.expires_at)
+        OR (r.status = 'expired' AND r.expires_at > datetime('now', '-1 day')))
+    ORDER BY r.id DESC LIMIT 10`).all(req.user.id)
+    .filter((r) => r.status === 'open' || !r.answered);
+  res.json({
+    requests: rows.map((r) => {
+      const svc = SERVICES[r.service];
+      return {
+        id: r.id, service: r.service, service_name: svc.name, provider_noun: svc.providerNoun,
+        card_only: !!svc.cardOnly,
+        status: r.status === 'open' ? 'open' : 'unanswered',
+        package_name: svc.packages[r.package]?.name || r.package,
+        unit_name: svc.units[r.vehicle]?.name || r.vehicle,
+        address: r.address,
+        when_label: quotes.whenLabel(r.scheduled_for),
+        answer_by: quotes.whenLabel(quotes.utcToWall(r.expires_at)),
+        quotes: quotes.listQuotes(r.id),
+      };
+    }),
   });
 });
 
@@ -266,6 +336,12 @@ router.post('/quote-requests/:id/cancel', authRequired('customer'), (req, res) =
   if (request.status === 'open') {
     db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE id = ?").run(request.id);
     db.prepare("UPDATE quotes SET status = 'withdrawn' WHERE request_id = ? AND status = 'open'").run(request.id);
+    // Pros who accepted are told it is off, so nobody keeps the slot free for nothing.
+    for (const qq of db.prepare('SELECT supplier_id FROM quotes WHERE request_id = ?').all(request.id)) {
+      realtime.send(qq.supplier_id, 'quote_result', { request_id: request.id, won: false, cancelled: true });
+    }
+  } else if (request.status === 'expired') {
+    db.prepare("UPDATE quote_requests SET status = 'cancelled' WHERE id = ?").run(request.id); // dismissed
   }
   res.json({ ok: true });
 });
@@ -290,14 +366,28 @@ router.post('/quotes/:id/accept', authRequired('customer'), async (req, res) => 
   if (!q) return res.status(404).json({ error: 'Quote not found' });
   if (q.status !== 'open') return res.status(409).json({ error: 'That quote is no longer available' });
   if (q.request_status !== 'open') return res.status(409).json({ error: 'This request is closed' });
+  // Detailing is paid by card only (Evert, 21 Nov 2026): a detail is R900 and up, too much
+  // to have a pro carry in cash and owe us our share.
+  if (quotes.cardOnly(q.service) && payment_method !== 'card') {
+    return res.status(400).json({ error: `${SERVICES[q.service].name} is paid by card` });
+  }
 
   // A demo customer (the payment reviewer) may book again and again, and the demo pro may
   // hold any number of demo jobs: a reviewer who abandons a checkout and starts over must
   // not hit "you already have an active order". Real accounts keep both rules.
   const demo = quotes.isDemoUser(req.user.id);
-  const active = demo ? null : db.prepare(`SELECT id FROM orders WHERE customer_id = ? AND service = ?
-    AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, q.service);
-  if (active) return res.status(409).json({ error: 'You already have an active order for this service. Complete or cancel it first.' });
+  // One "as soon as possible" job per service at a time. Booked jobs can sit side by side
+  // (and next to a job happening now); only the same booking twice is refused.
+  const active = demo ? null : (q.scheduled_for
+    ? db.prepare(`SELECT id FROM orders WHERE customer_id = ? AND service = ? AND scheduled_for = ? AND address = ?
+        AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, q.service, q.scheduled_for, q.address)
+    : db.prepare(`SELECT id FROM orders WHERE customer_id = ? AND service = ? AND scheduled_for IS NULL
+        AND status IN ('pending_payment','searching','accepted','en_route','in_progress')`).get(req.user.id, q.service));
+  if (active) {
+    return res.status(409).json({ error: q.scheduled_for
+      ? 'You already have this booking. Open it from My orders.'
+      : 'You already have a job on the way for this service. Complete or cancel it first.' });
+  }
 
   // For work happening now the pro must still be free. A booking for a future date is
   // fine even if they are mid-job today.
@@ -375,6 +465,11 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
   const { service, package: pkg, vehicle, address, lat, lng, notes, payment_method, use_points,
     supplier_id } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
+  // Detailing only goes through quotes (a booked slot, priced by the detailer); this
+  // direct route has no time on it. A closed service cannot be ordered at all.
+  if (!quotes.serviceOpen(service) || SERVICES[service].bookAhead) {
+    return res.status(400).json({ error: 'Ask for quotes to book this service' });
+  }
   if (!address?.trim() || typeof lat !== 'number' || typeof lng !== 'number') {
     return res.status(400).json({ error: 'Pick your location on the map and enter an address' });
   }
@@ -400,7 +495,7 @@ router.post('/orders', authRequired('customer'), async (req, res) => {
   if (supplierPrice == null) return res.status(400).json({ error: 'Invalid package or size selection' });
 
   const callout = await computeCallout(lat, lng, service, req.user.id);
-  const feePct = Number(getSetting('platform_fee_pct', '20'));
+  const feePct = quotes.feePctFor(service);
   const fee = platformFee(supplierPrice + callout.fee_cents, feePct);
   // Customer pays the pro's price + callout + our fee on top. The pro keeps their price + callout.
   const price = supplierPrice + callout.fee_cents + fee;
@@ -459,7 +554,9 @@ async function startPayment(order, customer, res) {
   } catch (e) {
     console.error('[FreshAF] Payment setup failed for order', order.id, e);
     res.status(502).json({
-      error: 'We could not reach our payment provider. Your order is saved — try again in a moment, or choose cash.',
+      error: quotes.cardOnly(order.service)
+        ? 'We could not reach our payment provider. Your booking is saved — try paying again in a moment.'
+        : 'We could not reach our payment provider. Your order is saved — try again in a moment, or choose cash.',
     });
     return null;
   }

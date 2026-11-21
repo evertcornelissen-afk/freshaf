@@ -2,7 +2,7 @@
 
 One page: what is ready, where it is, and exactly what Evert does, in order. Details behind
 each step: `APP-STORE-SUBMISSION.md` (sections A–F) and `APP-STORE-LISTING.md` (copy).
-The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/freshaf-test.apk redirects) stays until the app is on Google Play. APK v12 (9 Nov, adds the pro return-trip rate) is signed with the upload key and installs over v11; phones with the pre-v11 APK uninstall it once first.
+The Android APK link (freshaf.io footer + /download/freshaf.apk, old /download/freshaf-test.apk redirects) stays until the app is on Google Play. APK v13 (21 Nov: detailing, booked jobs in business hours, every job accepted by a pro) is signed with the upload key and installs over v12; Play bundle vc13 is at DesktopFreshAF-releasereshaf-1.0-vc13.aab; phones with the pre-v11 APK uninstall it once first.
 
 ## Ready (done by Claude)
 

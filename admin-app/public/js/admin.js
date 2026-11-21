@@ -280,6 +280,7 @@ async function refreshSuppliers() {
       <td><span class="pill ${s.status === 'approved' ? 'ok' : s.status === 'pending' ? 'warn' : 'bad'}">${s.status}</span>
         ${s.cash_blocked ? '<br><span class="pill bad" style="margin-top:5px">cash limit</span>' : ''}
         ${s.online ? '<br><span class="pill ok live" style="margin-top:5px">online</span>' : ''}
+        ${s.detailing ? `<br><span class="pill ${s.detailing.status === 'approved' ? 'ok' : s.detailing.status === 'pending' ? 'warn' : 'bad'}" style="margin-top:5px">detailing ${s.detailing.status}</span>` : ''}
         ${s.cash_owed_cents > 0 ? `<br><span class="muted small-text">holds ${rand(s.cash_owed_cents)} cash</span>` : ''}
         ${s.rating ? `<br><span class="muted small-text">${starInline} ${s.rating} (${s.rating_count})</span>` : ''}</td>
       <td>
@@ -583,7 +584,40 @@ async function loadSettings() {
   el('set-return-rate').value = s.return_leg_per_km_cents / 100;
   el('set-return-cap').value = s.return_leg_cap_cents / 100;
   el('return-price-flag').classList.toggle('hidden', !!s.return_leg_price_set);
+  el('set-detailing-fee').value = s.detailing_fee_pct ?? 10;
+  el('set-detailing-signup').checked = !!s.detailing_signup;
+  el('set-detailing-booking').checked = !!s.detailing_booking;
+  el('detailing-card-note').classList.toggle('hidden', !!s.card_live);
+  el('set-bh-open').value = s.business_open || '07:00';
+  el('set-bh-close').value = s.business_close || '18:00';
 }
+
+el('btn-save-hours').onclick = async () => {
+  try {
+    await api('/api/admin/settings', { method: 'POST', body: { business_open: el('set-bh-open').value, business_close: el('set-bh-close').value } });
+    toast('Business hours saved', 'ok');
+    await loadSettings();
+  } catch (e) { toast(e.message, 'error'); }
+};
+
+// Detailing has two switches. Pro applications can open first so detailers are approved
+// and priced before a single customer sees the service.
+el('btn-save-detailing').onclick = async () => {
+  const booking = el('set-detailing-booking').checked;
+  if (booking && !confirm('Open detailing to customers? They will see it on freshaf.io and in the app straight away.')) return;
+  try {
+    await api('/api/admin/settings', {
+      method: 'POST',
+      body: {
+        detailing_fee_pct: el('set-detailing-fee').value,
+        detailing_signup: el('set-detailing-signup').checked,
+        detailing_booking: booking,
+      },
+    });
+    toast('Detailing settings saved', 'ok');
+    await loadSettings();
+  } catch (e) { toast(e.message, 'error'); }
+};
 
 el('btn-save-return').onclick = async () => {
   try {

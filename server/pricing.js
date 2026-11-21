@@ -16,6 +16,32 @@ const SERVICES = {
       minibus: { key: 'minibus', name: 'Minibus / Van',     mult: 1.5 },
     },
   },
+  // Detailing (added 21 Nov 2026): high-value, multi-hour work, so it is its own service
+  // rather than more car wash packages. Only pros FreshAF has approved for detailing carry
+  // 'detailing' in their services, which is what keeps these requests away from car wash
+  // pros. bookAhead: no "as soon as possible", every job is a booked slot. quoteOnly: the
+  // price depends on the car, so a published price never answers automatically.
+  // base = suggested starting price for the pro's price form, and the "from" price shown.
+  detailing: {
+    key: 'detailing',
+    name: 'Detailing',
+    providerNoun: 'detailer',
+    unitLabel: 'Vehicle type',
+    bookAhead: true,
+    // Paid by card only (Evert, 21 Nov 2026): R900+ is too much for a pro to carry in cash.
+    cardOnly: true,
+    packages: {
+      interior_detail: { key: 'interior_detail', name: 'Interior Detail', desc: 'Seats, carpets, roof lining and trim deep cleaned and protected', base: 90000, eta: 'about 3 h' },
+      exterior_detail: { key: 'exterior_detail', name: 'Exterior Detail', desc: 'Decontamination wash, clay bar, machine polish and wax',           base: 90000, eta: 'about 3 h' },
+      full_detail:     { key: 'full_detail',     name: 'Full Detail',     desc: 'Interior and exterior detail in one visit',                        base: 150000, eta: 'about 5 h' },
+      paint_ceramic:   { key: 'paint_ceramic',   name: 'Paint Correction / Ceramic', desc: 'Paint correction and ceramic coating, priced once the detailer has seen the car', base: 300000, eta: 'a full day', quoteOnly: true },
+    },
+    units: {
+      sedan:   { key: 'sedan',   name: 'Sedan / Hatchback', mult: 1.0 },
+      suv:     { key: 'suv',     name: 'SUV / Bakkie',      mult: 1.25 },
+      minibus: { key: 'minibus', name: 'Minibus / Van',     mult: 1.5 },
+    },
+  },
   laundry: {
     key: 'laundry',
     name: 'Laundry',
@@ -61,17 +87,26 @@ function platformFee(supplierPriceCents, pct) {
   return Math.round(supplierPriceCents * pct / 100 / 100) * 100;
 }
 
-// Public catalog shape for the frontend.
-function catalog() {
+// Public catalog shape for the frontend. openKeys: the services customers can book right
+// now (a service switched off in the admin app is left out entirely, so no app version,
+// old or new, can show it).
+function catalog(openKeys = SERVICE_KEYS) {
   const out = {};
   for (const [key, svc] of Object.entries(SERVICES)) {
+    if (!openKeys.includes(key)) continue;
     out[key] = {
       key, name: svc.name, providerNoun: svc.providerNoun, unitLabel: svc.unitLabel,
-      packages: Object.values(svc.packages),
+      book_ahead: !!svc.bookAhead,
+      card_only: !!svc.cardOnly,
+      packages: Object.values(svc.packages).map((p) => ({ ...p, quote_only: !!p.quoteOnly })),
       units: Object.values(svc.units),
     };
   }
   return out;
 }
 
-module.exports = { SERVICES, SERVICE_KEYS, quote, catalog, priceFor, platformFee };
+// What a service is called in messages, emails and alerts.
+const SERVICE_LABELS = { carwash: 'Car wash', laundry: 'Laundry', detailing: 'Detailing' };
+function serviceLabel(key) { return SERVICE_LABELS[key] || 'Car wash'; }
+
+module.exports = { SERVICES, SERVICE_KEYS, quote, catalog, priceFor, platformFee, serviceLabel, SERVICE_LABELS };

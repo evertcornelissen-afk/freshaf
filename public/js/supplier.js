@@ -407,13 +407,14 @@ async function renderPrices() {
           <strong style="font-size:.92rem">${p.name}</strong>
           <div class="muted small-text">${p.desc}</div>
         </div>
+        ${p.quote_only ? '<span class="muted small-text" style="max-width:150px;text-align:right">Quoted per car: you price each request</span>' : `
         <div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">
           <span class="muted small-text">R</span>
           <input type="number" min="20" max="20000" step="10" style="width:110px"
                  data-svc="${k}" data-pkg="${p.key}"
                  value="${p.price_cents != null ? Math.round(p.price_cents / 100) : ''}"
                  placeholder="${Math.round(p.suggested_cents / 100)}">
-        </div>
+        </div>`}
       </div>`).join('')}
     <p class="muted small-text mt">${s.unitLabel} adjusts this automatically:
       ${s.units.map((u) => `${u.name} ×${u.mult}`).join(' · ')}</p>`;
@@ -445,6 +446,110 @@ el('btn-save-prices').onclick = () => withBusy(el('btn-save-prices'), 'Saving…
     renderPrices();
   } catch (e) { showError('prices-error', e.message); }
 });
+
+/* ---------- detailing: apply, see the decision, choose car wash or not ----------
+   A second approval on top of the normal one. The card lives on the dashboard for
+   approved pros and under the documents for pros still in review, so a detailer can send
+   both at once. It stays hidden until FreshAF opens detailing applications. */
+const DETAILING_BOXES = ['detailing-card', 'detailing-card-status'];
+
+async function renderDetailing(boxId) {
+  for (const id of DETAILING_BOXES) if (id !== boxId && el(id)) { el(id).innerHTML = ''; el(id).classList.add('hidden'); }
+  const box = el(boxId);
+  if (!box) return;
+  let d;
+  try { d = await api('/api/supplier/detailing'); } catch { box.classList.add('hidden'); return; }
+  if (!d.signup_open && !d.status) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  const head = `<h2>${icon('spark')} Detailing jobs</h2>`;
+  const err = '<div class="msg error" id="detailing-error"></div>';
+
+  if (d.status === 'pending') {
+    box.innerHTML = `${head}
+      <div class="msg warn" style="display:block">${icon('clock')} Your detailing application is being reviewed.</div>
+      <p class="muted small-text">${d.photos.length} photos sent · ${escapeHtml(d.link || '')}</p>
+      <p class="muted small-text">We will let you know here and by email as soon as it is decided.</p>`;
+    return;
+  }
+
+  if (d.status === 'approved') {
+    box.innerHTML = `${head}
+      <div class="msg ok" style="display:block">${icon('check')} You are approved for detailing.</div>
+      <p class="muted small-text">Set your detailing prices under <strong>Your prices</strong>. FreshAF adds ${d.fee_pct}% on top
+        for the customer, and you are paid your full price. Detailing is always booked ahead, so every request
+        comes with its date and time. Paint correction and ceramic are always quoted per car.</p>
+      ${d.booking_open ? '' : '<p class="muted small-text"><strong>Customers cannot book detailing yet.</strong> We will tell you the day it opens.</p>'}
+      ${err}
+      <label class="row" style="gap:10px;align-items:center;margin-top:10px;font-weight:600">
+        <input type="checkbox" id="detailing-carwash" style="width:auto" ${d.carwash ? 'checked' : ''}>
+        Also send me everyday car wash requests
+      </label>`;
+    el('detailing-carwash').onchange = async (e) => {
+      try {
+        await api('/api/supplier/detailing/carwash', { method: 'POST', body: { enabled: e.target.checked } });
+        toast(e.target.checked ? 'You will get car wash requests too' : 'Detailing requests only from now on', 'ok');
+        renderPrices().catch(() => {});
+      } catch (er) { e.target.checked = !e.target.checked; showError('detailing-error', er.message); }
+    };
+    return;
+  }
+
+  // Not applied yet, or declined and free to apply again.
+  const enough = d.photos.length >= d.min_photos;
+  box.innerHTML = `${head}
+    ${d.status === 'declined' ? `<div class="msg error" style="display:block">Your last detailing application was not approved.
+      ${d.reason ? `Reason: ${escapeHtml(d.reason)}` : ''} You can update it below and apply again.</div>` : ''}
+    <p class="muted small-text">Do proper detailing: interior, machine polish, ceramic? Apply to get detailing requests.
+      They are booked ahead and you set your own price. FreshAF adds ${d.fee_pct}% on top for the customer, and you are paid your full price.</p>
+    <p class="muted small-text"><strong>We need:</strong> at least ${d.min_photos} photos of detailing work you did yourself
+      (before and after is best), and a link to your Google reviews, website or Instagram.</p>
+    ${err}
+    <div id="detailing-photos">${d.photos.length
+      ? d.photos.map((p) => `<div class="row spread" style="padding:8px 0;border-bottom:1px solid var(--border-soft)">
+          <span class="small-text">${icon('check')} ${escapeHtml(p.original_name || 'photo')}</span>
+          <button class="ghost small" data-remove-photo="${p.id}">Remove</button></div>`).join('')
+      : '<p class="empty">No photos yet.</p>'}</div>
+    <p class="muted small-text">${d.photos.length} of at least ${d.min_photos} photos · JPG or PNG, up to 5 MB each, ${d.max_photos} at most.</p>
+    <input type="file" id="detailing-file" accept=".jpg,.jpeg,.png" multiple class="hidden">
+    <div class="row mt"><button class="secondary small" id="btn-detailing-photos" ${d.photos.length >= d.max_photos ? 'disabled' : ''}>Add photos</button></div>
+    <label for="detailing-link">Link to your reviews, website or Instagram</label>
+    <input id="detailing-link" maxlength="300" placeholder="e.g. instagram.com/yourbusiness" value="${escapeHtml(d.link || '')}">
+    <div class="row mt"><button id="btn-detailing-apply" ${enough ? '' : 'disabled'}>${d.status === 'declined' ? 'Apply again' : 'Apply for detailing'}</button></div>`;
+
+  el('btn-detailing-photos').onclick = () => el('detailing-file').click();
+  el('detailing-file').onchange = async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    let added = 0;
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('photo', file);
+      try {
+        const res = await fetch(apiUrl('/api/supplier/detailing/photos'), {
+          method: 'POST', body: fd, headers: authHeaders(), credentials: API_CREDENTIALS,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        added++;
+      } catch (er) { showError('detailing-error', `${file.name}: ${er.message}`); break; }
+    }
+    if (added) toast(`${added} photo${added === 1 ? '' : 's'} added`, 'ok');
+    renderDetailing(boxId);
+  };
+  box.querySelectorAll('[data-remove-photo]').forEach((b) => b.onclick = async () => {
+    try {
+      await api(`/api/supplier/detailing/photos/${b.dataset.removePhoto}/remove`, { method: 'POST' });
+      renderDetailing(boxId);
+    } catch (er) { showError('detailing-error', er.message); }
+  });
+  el('btn-detailing-apply').onclick = () => withBusy(el('btn-detailing-apply'), 'Sending…', async () => {
+    try {
+      await api('/api/supplier/detailing/apply', { method: 'POST', body: { link: el('detailing-link').value } });
+      toast('Detailing application sent', 'ok');
+      renderDetailing(boxId);
+    } catch (er) { showError('detailing-error', er.message); }
+  });
+}
 
 el('radius-km').oninput = () => { el('radius-label').textContent = el('radius-km').value + ' km'; };
 
@@ -502,6 +607,8 @@ async function route() {
   show('view-status');
   if (s.status === 'pending') renderDocs().catch(() => {});
   else el('docs-card').classList.add('hidden');
+  if (s.status === 'pending') renderDetailing('detailing-card-status').catch(() => {});
+  else { el('detailing-card-status').classList.add('hidden'); el('detailing-card-status').innerHTML = ''; }
   const heading = el('status-heading'); const detail = el('status-detail'); const ic = el('status-icon');
   if (s.status === 'pending' && (s.info_needed || []).length) {
     // Pending, but we are waiting on them — say so here rather than leaving them to
@@ -551,6 +658,7 @@ async function enterDash() {
     el('radius-label').textContent = me.supplier.radius_km + ' km';
   }
   await renderPrices(); // the job cards name packages from this catalogue
+  renderDetailing('detailing-card').catch(() => {});
   await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), refreshAlerts(), refreshRequests()]); // content first, then reveal
   show('view-dash');
   initMap();
@@ -562,7 +670,7 @@ async function enterDash() {
       ping();
       toast(data.auto_quoted
         ? 'New request nearby — your published price was sent automatically'
-        : 'New request nearby — send your price', 'info');
+        : 'New request nearby — accept or decline it', 'info');
       refreshRequests();
     },
     job_booked: (data) => {
@@ -706,6 +814,7 @@ window.declineOffer = async (id) => {
 
 const NEXT_LABEL = {
   carwash: { accepted: 'Start driving — en route', en_route: 'Arrived — start wash', in_progress: 'Finish job' },
+  detailing: { accepted: 'Start driving — en route', en_route: 'Arrived — start detail', in_progress: 'Finish job' },
   laundry: { accepted: 'Start collection run', en_route: 'Collected — start laundering', in_progress: 'Laundered — out for delivery' },
 };
 // Turn-by-turn in the phone's own maps app.
@@ -922,13 +1031,21 @@ async function refreshRequests() {
   const box = el('requests-box');
   const list = data.requests || [];
   if (!list.length) {
-    box.innerHTML = '<p class="empty">No open requests near you right now. Stay online — they appear here the moment a customer asks.</p>';
+    box.innerHTML = '<p class="empty">No open requests near you right now. Booked jobs appear here even when you are offline; go online to get "as soon as possible" jobs too.</p>';
     return;
   }
   box.innerHTML = list.map((r) => {
     const quoted = r.my_quote && r.my_quote.status === 'open';
+    // Booked ahead (detailing): the detailer accepts the slot at their price, or declines it.
+    const ahead = !!r.book_ahead;
+    // Every job is accepted by the pro (Evert, 21 Nov 2026); their price list only pre-fills it.
+    const prefill = quoted ? Math.round(r.my_quote.price_cents / 100)
+      : (r.my_listed_cents ? Math.round(r.my_listed_cents / 100) : '');
+    const pill = quoted
+      ? `Accepted at ${rand(r.my_quote.price_cents)}`
+      : (ahead ? `Answer by ${escapeHtml(r.answer_by || '')}` : 'Waiting for you');
     return `
-    <div class="offer-card" data-req="${r.id}">
+    <div class="offer-card" data-req="${r.id}" data-ahead="${ahead ? 1 : 0}">
       <div class="row spread">
         <div>
           <strong>${escapeHtml(r.package_name)}</strong>
@@ -938,26 +1055,27 @@ async function refreshRequests() {
           ${r.notes ? `<div class="muted small-text">Note: ${escapeHtml(r.notes)}</div>` : ''}
           ${r.return_to ? `<div class="muted small-text"><strong>Return to:</strong> ${escapeHtml(r.return_to.address)} (${r.return_to.distance_km} km from you) · from ${escapeHtml(r.return_to.window_start || '')}</div>` : ''}
         </div>
-        <span class="pill ${quoted ? 'ok' : 'warn'}">${quoted ? 'You quoted ' + rand(r.my_quote.price_cents) : 'Awaiting your price'}</span>
+        <span class="pill ${quoted ? 'ok' : 'warn'}">${pill}</span>
       </div>
       <div class="row mt" style="align-items:flex-end;gap:10px">
         <div style="flex:1;min-width:120px">
           <label style="margin-bottom:4px">Your price (R)</label>
           <input type="number" class="q-price" min="20" max="20000" step="10"
-                 value="${quoted ? Math.round(r.my_quote.price_cents / 100) : ''}"
+                 value="${prefill}"
                  placeholder="${r.suggested_cents ? Math.round(r.suggested_cents / 100) : '250'}">
         </div>
         <div style="flex:1;min-width:150px">
-          <label style="margin-bottom:4px">${r.scheduled_for ? 'Can you make that time?' : 'When can you come?'}</label>
+          <label style="margin-bottom:4px">${ahead ? 'Note for the customer (optional)' : r.scheduled_for ? 'Can you make that time?' : 'When can you come?'}</label>
           <input class="q-when" maxlength="80" value="${quoted ? escapeHtml(r.my_quote.availability || '') : ''}"
-                 placeholder="${r.scheduled_for ? 'e.g. Yes, that works' : 'e.g. Today within the hour'}">
+                 placeholder="${ahead ? 'e.g. I bring my own water' : r.scheduled_for ? 'e.g. Yes, that works' : 'e.g. Today within the hour'}">
         </div>
       </div>
       ${r.callout_fee_cents ? `<p class="muted small-text mt">Plus ${rand(r.callout_fee_cents)} callout, also yours.</p>` : ''}
       ${r.return_leg_fee_cents ? `<p class="muted small-text">Plus ${rand(r.return_leg_fee_cents)} for the return trip to the second address, also yours.</p>` : ''}
+      ${ahead ? '<p class="muted small-text">This is a booked time: accept only if you can make it. The customer may hear from more than one pro and chooses. The job is yours once they book you; you get an alert straight away.</p>' : ''}
       <div class="row mt">
-        <button class="small q-send">${quoted ? 'Update my price' : 'Send my price'}</button>
-        <button class="ghost small q-skip">Not interested</button>
+        <button class="small q-send">${quoted ? 'Update my price' : ahead ? 'Accept this booking' : 'Accept this job'}</button>
+        <button class="ghost small q-skip">Decline</button>
         <span class="muted small-text q-preview"></span>
       </div>
     </div>`;
@@ -982,7 +1100,7 @@ async function refreshRequests() {
           method: 'POST',
           body: { price_cents: rands * 100, availability: card.querySelector('.q-when').value },
         });
-        toast('Price sent — the customer can book you now', 'ok');
+        toast('Accepted. The customer has been told; the job is yours once they book you.', 'ok');
         await refreshRequests();
       } catch (err) { showError('req-error', err.message); }
     });

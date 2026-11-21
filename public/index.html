@@ -116,6 +116,14 @@
         <ul id="home-list-laundry"></ul>
         <span class="cat-go">Book a collection</span>
       </div>
+      <div class="cat-card cat-wide reveal reveal-scale hidden" data-svc="detailing" id="home-cat-detailing">
+        <div class="cat-shot"><img src="/img/photos/card-drops.jpg" alt="" width="720" height="540" loading="lazy"></div>
+        <div class="cat-ico" id="home-ico-detailing"></div>
+        <h2>Detailing</h2>
+        <p>An approved detailer comes to you for a proper interior or exterior detail. Booked ahead.</p>
+        <ul id="home-list-detailing"></ul>
+        <span class="cat-go">Book a detail</span>
+      </div>
     </div>
 
     <!-- Deliberately nothing below the two service blocks. Pick a service, or sign in
@@ -189,6 +197,20 @@
         <ul id="cat-list-laundry"></ul>
         <span class="cat-go">Book a collection</span>
       </div>
+      <div class="cat-card cat-wide reveal reveal-scale hidden" data-svc="detailing" id="cat-detailing">
+        <div class="cat-shot"><img src="/img/photos/card-drops.jpg" alt="" width="720" height="540" loading="lazy"></div>
+        <div class="cat-ico" id="cat-ico-detailing"></div>
+        <h2>Detailing</h2>
+        <p>An approved detailer comes to you for a proper interior or exterior detail. Booked ahead.</p>
+        <ul id="cat-list-detailing"></ul>
+        <span class="cat-go">Book a detail</span>
+      </div>
+    </div>
+    <div class="card hidden" id="requests-card">
+      <h2 id="h-booking-requests">Your booking requests</h2>
+      <p class="muted small-text">Pros accept or decline booked times. We let you know as soon as one accepts; then pick who you want and book.</p>
+      <div class="msg error" id="requests-error"></div>
+      <div id="requests-list"></div>
     </div>
     <div class="card reveal" id="recent-card">
       <h2 id="h-orders-2">My orders</h2>
@@ -255,7 +277,7 @@
       </div>
 
       <h3><span class="step-num">5</span>Get prices</h3>
-      <p class="muted small-text" style="margin-bottom:10px">Pros near you send their price and when they can come. Pros with a published price answer instantly; the rest reply as they see it.</p>
+      <p class="muted small-text" style="margin-bottom:10px" id="quotes-intro">Your request goes to pros near you. Each one accepts with their price or declines, and you choose from those who accept.</p>
       <div class="row">
         <button class="secondary" id="btn-get-quotes">Get prices</button>
         <span id="quote-status" class="muted small-text"></span>

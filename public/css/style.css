@@ -713,6 +713,8 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
    of the app, so it must not stack into a scroll on a phone. */
 .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
 .cat-grid .cat-card { display: flex; flex-direction: column; }
+.cat-grid .cat-card.cat-wide { grid-column: 1 / -1; }
+.cat-grid .cat-card.hidden { display: none; }
 .cat-grid .cat-card .cat-go { margin-top: auto; justify-content: center; }
 @media (max-width: 700px) {
   .cat-grid { gap: 12px; }
@@ -1014,6 +1016,9 @@ button:active { transform: translateY(0) scale(.975); }
 .cat-card .cat-ico { margin-bottom: 12px; }
 .cat-card:hover .cat-shot img { transform: scale(1.04); }
 .cat-shot img { transition: transform .45s var(--ease); }
+/* The full-width detailing card: a letterbox photo, so it stays the height of its neighbours. */
+.cat-wide .cat-shot { aspect-ratio: 32 / 9; }
+@media (max-width: 640px) { .cat-wide .cat-shot { aspect-ratio: 16 / 7; } }
 
 /* Selected state, in coral. Border plus a ring rather than a fill, so the card's own
    content keeps its contrast. */
