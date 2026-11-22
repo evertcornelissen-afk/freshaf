@@ -250,6 +250,14 @@
         var close = openModal.querySelector('[data-close], .modal-close');
         if (close) { close.click(); return; }
       }
+      // Screens inside a page switch without browser history, so without this every
+      // back press on a sub-screen (sign in, booking, tracking) quit the app (found on the
+      // Android 16 emulator, 22 Nov 2026). The page says whether it handled it.
+      if (typeof window.FRESHAF_BACK === 'function') {
+        var handled = false;
+        try { handled = window.FRESHAF_BACK(); } catch (e) { handled = false; }
+        if (handled) return;
+      }
       if (ev && ev.canGoBack) { window.history.back(); return; }
       try { App.exitApp(); } catch (e) {}
     });

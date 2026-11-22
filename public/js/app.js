@@ -132,6 +132,15 @@ el('brand-home').onclick = (e) => {
   show('view-service');
   refreshOrders();
 };
+// Android back button (native.js): from any sub-screen go to the main screen, the same
+// place the wordmark leads; on the main screen let Android close the app as usual.
+window.FRESHAF_BACK = () => {
+  const current = VIEWS.find((v) => !el(v).classList.contains('hidden'));
+  const main = me ? 'view-service' : 'view-home';
+  if (!current || current === main) return false;
+  el('brand-home').click();
+  return true;
+};
 el('link-to-register').onclick = (e) => { e.preventDefault(); show('view-register'); };
 el('link-to-login').onclick = (e) => { e.preventDefault(); show('view-login'); };
 el('link-back-home').onclick = (e) => { e.preventDefault(); show('view-home'); };

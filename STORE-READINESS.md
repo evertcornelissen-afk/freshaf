@@ -839,5 +839,13 @@ the background are re-fetched on resume; 44 px tap targets on phones; long pro n
 iOS); camera wording covers laundry handover photos; tap-to-call the pro. New **update control**:
 `/api/app-version` + admin settings `app_latest_build` (gentle "new version" bar) and
 `app_min_build` (full "update now" wall). Leave both at 0 until v17 is on Play.
+**Android 16 emulator test (Pixel 7, 22 Nov):** three fresh-install cold starts open in 1.3-3 s;
+one "isn't responding" on the emulator's very first boot came from Android's own WebView still
+being set up (stack in WebViewChromium.onWindowFocusChanged), not reproducible after. Found and
+fixed on it: (1) with the phone in light mode the status bar strip was white with white icons,
+now the strip is FreshAF dark (`res/values/colors.xml` + windowBackground); (2) the back button
+quit the app from every sub-screen because screens switch without history, now back goes to the
+main screen (`window.FRESHAF_BACK` in app.js, called by native.js) and exits only from there.
+Swipe, keyboard and the menu checked. Release 13 went LIVE on Google Play 19 Nov.
 Website APK = v17. Bundle: `Desktop/FreshAF-release/freshaf-1.0-vc17.aab` (vc16 deleted, never
 uploaded). Play: replace release 13 with **17**. Next build = 18.

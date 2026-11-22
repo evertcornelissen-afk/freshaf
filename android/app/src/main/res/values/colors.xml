@@ -1,0 +1,5 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same as the dark-mode page background (public/css/style.css). -->
+    <color name="freshaf_bars">#0c151b</color>
+</resources>

@@ -13,6 +13,11 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Android 15+ draws the status and navigation bars edge to edge and fills the strip
+             behind them with the window background. The app keeps light status-bar icons
+             (native.js), so that strip must stay dark or the clock and battery vanish when
+             the phone is in light mode. -->
+        <item name="android:windowBackground">@color/freshaf_bars</item>
     </style>
 
 
