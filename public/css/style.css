@@ -200,8 +200,9 @@ a:hover { color: var(--accent); }
 
 /* ---------- layout ---------- */
 .wrap { max-width: 1080px; margin: 0 auto; padding: 16px 22px 90px; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-@media (max-width: 840px) { .grid2 { grid-template-columns: 1fr; } }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+.grid2 > * { min-width: 0; }
+@media (max-width: 840px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
 
 /* view transitions */
 .view-anim { animation: viewIn .5s var(--ease) both; }
@@ -563,7 +564,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 /* ---------- rating stars ---------- */
 .stars { display: flex; gap: 6px; margin: 6px 0 4px; }
 .stars button {
-  background: none; border: none; box-shadow: none; padding: 3px; cursor: pointer;
+  background: none; border: none; box-shadow: none; padding: 3px; cursor: pointer; min-width: 44px; min-height: 44px;
   color: var(--border); transition: color .15s, transform .18s var(--ease);
 }
 .stars button:hover { transform: scale(1.18) translateY(0); box-shadow: none; }
@@ -588,7 +589,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 
 /* ---------- service tabs ---------- */
 .service-tabs {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-bottom: 22px;
 }
 .service-tab {
   display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -606,7 +607,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 }
 
 /* ---------- hero ---------- */
-.hero { text-align: center; padding: 26px 16px 34px; position: relative; }
+.hero { text-align: center; padding: 26px 16px 34px; position: relative; overflow-x: clip; } /* the aurora glow bleeds sideways; never wider than the phone */
 .hero .glow {
   position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
   width: min(560px, 88vw); height: 300px; border-radius: 50%;
@@ -711,7 +712,7 @@ tbody tr:hover { background: rgba(23, 153, 194, .035); }
 /* ---------- category cards ----------
    Car Wash and Laundry stay side by side at every width — this is the front door
    of the app, so it must not stack into a scroll on a phone. */
-.cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+.cat-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .cat-grid .cat-card { display: flex; flex-direction: column; }
 .cat-grid .cat-card.cat-wide { grid-column: 1 / -1; }
 .cat-grid .cat-card.hidden { display: none; }
@@ -1186,3 +1187,65 @@ body.drawer-open { overflow: hidden; }
 [data-theme="dark"] .role-seg .seg-on { color: var(--text); }
 /* The narrowest phones: the wordmark and the controls come first. */
 @media (max-width: 340px) { .topbar .brand .tag { display: none; } }
+
+/* Total due: a long pro name must never squeeze "Book now" off the card. The text side
+   shrinks and wraps; the amount and the button keep their size; on a phone the button
+   takes its own full-width row. */
+.total-bar { flex-wrap: wrap; }
+.total-bar > div:first-child { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+.total-bar .amount, .total-bar button { flex: none; white-space: nowrap; }
+@media (max-width: 520px) { .total-bar button { flex: 1 1 100%; } }
+
+.nowrap { white-space: nowrap; }
+
+/* Call the pro: a real tap target, not a grey number. */
+.tel-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 4px;
+  color: var(--accent-dim); font-weight: 700; text-decoration: none; }
+.tel-link svg { width: 16px; height: 16px; }
+
+/* Order timeline on phones: every label at a readable size does not fit five or six steps
+   across a phone, and 9.6px labels ran together ("SearchingAccepted") at 320px. Up to 420px
+   only the current step is labelled; the dots, the line and the status pill above it carry
+   the rest. */
+@media (max-width: 420px) {
+  .timeline .step:not(.current) { color: transparent; }
+  .timeline .step.current, .timeline.six .step.current { font-size: .72rem; overflow-wrap: normal; }
+  .timeline .step.current:first-child { text-align: left; }
+  .timeline .step.current:last-child { text-align: right; }
+}
+
+/* Touch screens: every control at least 44px tall (Apple) / close to 48dp (Google), so a
+   thumb hits what it aims at. Desktop mice keep the compact sizes. */
+@media (pointer: coarse) {
+  button, .btn { min-height: 44px; }
+  button.small, .topbar button.small { min-height: 40px; }
+  .pw-eye { min-width: 44px; min-height: 44px; }
+  .site-footer a:not(.app-download) { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; }
+  .brand-home { min-height: 44px; display: inline-flex; align-items: center; }
+  .role-seg .seg-off, .role-seg .seg-on { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .area-opt, .area-group > label { min-height: 44px; display: flex; align-items: center; gap: 8px; }
+  input[type=range] { min-height: 44px; }
+  .topbar .brand .tag { font-size: .7rem; }
+  label.row, .area-prov { min-height: 44px; }
+  .topbar a.stack, a.small-text, td a, a[href^="tel:"], a[href^="mailto:"] { display: inline-flex; align-items: center; min-height: 44px; }
+  input[type=checkbox] { min-width: 20px; min-height: 20px; }
+}
+
+/* App update prompts (phone apps only, see checkAppVersion in common.js). */
+.app-update-wall { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 24px;
+  background: var(--bg, #0b1418); }
+.app-update-card { max-width: 360px; text-align: center; }
+.app-update-card h2 { margin: 16px 0 8px; }
+.app-update-card p { color: var(--muted); margin-bottom: 22px; }
+.app-update-card button { width: 100%; }
+.app-update-bar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 9000;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--border); box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .45); }
+.app-update-bar span { flex: 1 1 160px; font-weight: 600; font-size: .9rem; }
+
+/* Nothing readable under 11px (Apple's smallest text size). */
+small { font-size: max(80%, 11px); }
+
+/* A checkbox stays on the same line as what it switches on. */
+label.row:has(> input[type=checkbox]) { flex-wrap: nowrap; align-items: center; }
+label.row > input[type=checkbox] + span { flex: 1 1 auto; min-width: 0; }

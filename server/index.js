@@ -284,6 +284,19 @@ app.get('/api/backup', (req, res) => {
   res.download(file, `freshaf-backup-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.db`, cleanup);
 });
 
+// Which phone-app builds are still allowed. A store app carries its own copy of the
+// screens, so without this an old install can never be told to update.
+app.get('/api/app-version', (req, res) => {
+  const { getSetting } = require('./db');
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    min_build: Number(getSetting('app_min_build', '0')) || 0,
+    latest_build: Number(getSetting('app_latest_build', '0')) || 0,
+    android_url: 'https://play.google.com/store/apps/details?id=io.freshaf.app',
+    ios_url: getSetting('app_ios_url', '') || null,
+  });
+});
+
 app.get('/api/health', (req, res) => {
   const { persistence, DATA_DIR } = require('./db');
   // data_dir and the file list are here to answer one question that cannot be answered

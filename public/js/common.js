@@ -150,6 +150,7 @@ const ICONS = {
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   navigate: '<path d="M3 11l19-9-9 19-2-8-8-2Z"/>',
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.9 2Z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
@@ -450,7 +451,7 @@ function toast(message, type = 'info') {
   t.className = `toast ${type}`;
   t.setAttribute('role', type === 'error' ? 'alert' : 'status');
   const ic = type === 'ok' ? 'check' : type === 'error' ? 'alert' : 'signal';
-  t.innerHTML = `${icon(ic)}<span>${message}</span>`;
+  t.innerHTML = `${icon(ic)}<span>${escapeHtml(message)}</span>`; // server and user text: never HTML
   root.appendChild(t);
   let gone = false;
   const dismiss = () => {
@@ -540,15 +541,33 @@ function statusPillClass(s) {
 // token. A sixty-second ticket is fetched instead — short enough that a URL appearing in
 // a proxy log is worthless by the time anyone reads it. The ticket is re-fetched on every
 // reconnect, since by then the previous one has certainly expired.
-function connectEvents(handlers) {
+//
+// Events sent while the stream was down are gone for good (a phone locks the screen, the
+// app goes to the background, the server restarts on a deploy). So `resync`, when given,
+// re-reads the screen's data: on every reconnect, and whenever the app comes back into
+// view. Without it a pro returns to the app and does not see the job that came in.
+function connectEvents(handlers, resync) {
   let es;
   let closed = false;
+  let dropped = false;
+  let lastSync = 0;
+  const sync = () => {
+    if (closed || typeof resync !== 'function' || Date.now() - lastSync < 1500) return;
+    lastSync = Date.now();
+    try { Promise.resolve(resync()).catch(() => {}); } catch {}
+  };
 
   function attach(url) {
     es = new EventSource(url);
     for (const [event, fn] of Object.entries(handlers)) es.addEventListener(event, (e) => fn(JSON.parse(e.data || '{}')));
-    es.onerror = () => { es.close(); if (!closed) setTimeout(open, 3000); };
+    es.onopen = () => { if (dropped) { dropped = false; sync(); } };
+    es.onerror = () => { es.close(); dropped = true; if (!closed) setTimeout(open, 3000); };
   }
+  const onVisible = () => {
+    if (closed) { document.removeEventListener('visibilitychange', onVisible); return; }
+    if (!document.hidden) sync();
+  };
+  document.addEventListener('visibilitychange', onVisible);
 
   async function open() {
     if (closed) return;
@@ -564,7 +583,7 @@ function connectEvents(handlers) {
   }
 
   open();
-  return () => { closed = true; if (es) es.close(); };
+  return () => { closed = true; document.removeEventListener('visibilitychange', onVisible); if (es) es.close(); };
 }
 
 // Light / dark theme slider (theme is applied pre-paint by the inline head script).
@@ -1021,4 +1040,57 @@ document.addEventListener('DOMContentLoaded', () => {
     b.onclick = openAppMenu;
     bar.insertBefore(b, bar.firstChild);
   }
+});
+
+
+/* ---------- app updates (phone apps only) ----------
+   A store app carries its own copy of these screens, so an old install keeps running old
+   code until its owner updates. The server says which builds are still allowed: below
+   min_build the app shows only an "update" screen (used when an old build would do harm,
+   e.g. after a payment or security change); below latest_build it asks once a day. */
+async function checkAppVersion() {
+  if (!window.FRESHAF_NATIVE) return;
+  const App = window.Capacitor?.Plugins?.App;
+  if (!App?.getInfo) return;
+  let build = 0, v;
+  try { build = Number((await App.getInfo()).build) || 0; } catch { return; }
+  try { v = await api('/api/app-version'); } catch { return; } // offline: never block on this
+  if (!build) return;
+  const platform = window.Capacitor.getPlatform?.() || '';
+  const storeUrl = platform === 'ios' ? (v.ios_url || 'https://apps.apple.com/za/search?term=FreshAF') : v.android_url;
+  // Capacitor hands any address outside the app to the phone: market:// opens the Play
+  // Store app, an apps.apple.com link opens the App Store.
+  const openStore = () => { window.location.href = platform === 'android' ? 'market://details?id=io.freshaf.app' : storeUrl; };
+  document.querySelectorAll('.app-update').forEach((n) => n.remove());
+  if (v.min_build && build < v.min_build) {
+    const wall = document.createElement('div');
+    wall.className = 'app-update app-update-wall';
+    wall.setAttribute('role', 'alertdialog');
+    wall.innerHTML = `<div class="app-update-card">
+        <img src="img/logo-mark.svg" alt="" width="56" height="56">
+        <h2>Update FreshAF</h2>
+        <p>This version of the app is no longer supported. Update to keep booking and receiving jobs. Your account and history stay as they are.</p>
+        <button type="button" data-store>Update now</button>
+      </div>`;
+    wall.querySelector('[data-store]').onclick = openStore;
+    document.body.appendChild(wall);
+    return;
+  }
+  if (v.latest_build && build < v.latest_build) {
+    const key = 'freshaf_update_asked';
+    try { if (Date.now() - Number(localStorage.getItem(key) || 0) < 86400e3) return; localStorage.setItem(key, String(Date.now())); } catch {}
+    const bar = document.createElement('div');
+    bar.className = 'app-update app-update-bar';
+    bar.innerHTML = `<span>A new version of FreshAF is available.</span>
+      <button type="button" class="small" data-store>Update</button>
+      <button type="button" class="ghost small" data-close aria-label="Not now">Later</button>`;
+    bar.querySelector('[data-store]').onclick = openStore;
+    bar.querySelector('[data-close]').onclick = () => bar.remove();
+    document.body.appendChild(bar);
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.FRESHAF_NATIVE) return;
+  checkAppVersion();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkAppVersion(); });
 });

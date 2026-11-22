@@ -1,4 +1,5 @@
 const express = require('express');
+const { capFields } = require('../clean');
 const { db, getSetting } = require('../db');
 const { authRequired } = require('../auth');
 const { SERVICE_KEYS, quote, catalog, priceFor, platformFee } = require('../pricing');
@@ -227,6 +228,7 @@ function parseReturn(body, service, pkg, scheduledFor) {
 }
 
 router.post('/quote-requests', authRequired('customer'), requestLimit, (req, res) => {
+  capFields(req.body, { address: 200, notes: 300 });
   const { service, package: pkg, vehicle, address, lat, lng, notes, scheduled_for } = req.body || {};
   if (!SERVICE_KEYS.includes(service)) return res.status(400).json({ error: 'Choose a service' });
   const customerRow = db.prepare('SELECT id, is_demo FROM users WHERE id = ?').get(req.user.id);

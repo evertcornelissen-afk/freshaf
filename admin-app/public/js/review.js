@@ -58,13 +58,13 @@ function vettingHtml(s) {
         <button class="danger small" onclick="setCipc(${s.user_id},'not_found')">Not found</button>
         <button class="ghost small" onclick="setCipc(${s.user_id},'not_a_company')">Sole trader</button>
       </span>
-      ${v.cipc_note ? `<br><span class="muted small-text">Note: ${v.cipc_note}</span>` : ''}
+      ${v.cipc_note ? `<br><span class="muted small-text">Note: ${escapeHtml(v.cipc_note)}</span>` : ''}
     </div>
     <div>${dot(g.ok)} <strong>Google</strong> —
-      ${g.ok ? `${stars}${g.address ? `<br><span class="muted small-text">${g.address}</span>` : ''}
+      ${g.ok ? `${stars}${g.address ? `<br><span class="muted small-text">${escapeHtml(g.address)}</span>` : ''}
         ${g.maps_url ? `<br><a href="${g.maps_url}" target="_blank" rel="noopener">open on Google Maps</a>` : ''}`
         : (g.reason || 'not checked')}
-      ${g.note ? `<br><span class="muted small-text">${g.note}</span>` : ''}
+      ${g.note ? `<br><span class="muted small-text">${escapeHtml(g.note)}</span>` : ''}
     </div>
     ${(v.flags || []).length
       ? `<div style="margin-top:5px;color:var(--warn)"><strong>Flagged:</strong> ${v.flags.join(' &middot; ')}</div>`
@@ -153,7 +153,7 @@ function checklistHtml(s) {
           : '<span style="color:var(--ok,#1799c2)">All required items in</span>'}
       </strong>
       ${rows}
-      ${asked ? `<div class="muted small-text" style="margin-top:5px">Requested ${s.info_requested_at ? `on ${String(s.info_requested_at).slice(0, 10)}` : ''}${s.info_note ? ` — note: ${s.info_note}` : ''}</div>` : ''}
+      ${asked ? `<div class="muted small-text" style="margin-top:5px">Requested ${s.info_requested_at ? `on ${String(s.info_requested_at).slice(0, 10)}` : ''}${s.info_note ? ` — note: ${escapeHtml(s.info_note)}` : ''}</div>` : ''}
     </div>`;
 }
 
@@ -169,7 +169,7 @@ window.requestInfo = async (userId) => {
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
       <div class="modal" style="max-width:520px">
-        <h3>What do you still need from ${s.business_name}?</h3>
+        <h3>What do you still need from ${escapeHtml(s.business_name)}?</h3>
         <p class="muted small-text">They stay pending — this is not a rejection. Required items that have
           not arrived are ticked for you.</p>
         <div style="max-height:46vh;overflow:auto;margin:12px 0">

@@ -904,6 +904,10 @@ router.get('/settings', (req, res) => {
     // Business hours: booked jobs must start inside them, and their timings count only them.
     business_open: getSetting('business_open', '07:00'),
     business_close: getSetting('business_close', '18:00'),
+    // Phone apps: builds below app_min_build must update before they can be used; below
+    // app_latest_build they are asked to, once a day. 0 = no prompt.
+    app_min_build: Number(getSetting('app_min_build', '0')),
+    app_latest_build: Number(getSetting('app_latest_build', '0')),
   });
 });
 
@@ -911,7 +915,7 @@ router.post('/settings', (req, res) => {
   const { platform_fee_pct, dispatch_radius_km, offer_timeout_sec,
     points_earn_pct, callout_free_km, callout_per_km_cents, callout_cap_cents,
     return_leg_free_km, return_leg_per_km_cents, return_leg_cap_cents, detailing_fee_pct,
-    detailing_signup, detailing_booking, business_open, business_close } = req.body || {};
+    detailing_signup, detailing_booking, business_open, business_close, app_min_build, app_latest_build } = req.body || {};
   const checks = [
     ['platform_fee_pct', platform_fee_pct, 0, 50],
     ['dispatch_radius_km', dispatch_radius_km, 1, 200],
@@ -924,6 +928,8 @@ router.post('/settings', (req, res) => {
     ['return_leg_per_km_cents', return_leg_per_km_cents, 0, 10000],
     ['return_leg_cap_cents', return_leg_cap_cents, 0, 100000],
     ['detailing_fee_pct', detailing_fee_pct, 0, 50],
+    ['app_min_build', app_min_build, 0, 100000],
+    ['app_latest_build', app_latest_build, 0, 100000],
   ];
   // Checked before anything is written, so a bad value never leaves a half-saved form.
   const switches = [['detailing_signup', detailing_signup], ['detailing_booking', detailing_booking]]

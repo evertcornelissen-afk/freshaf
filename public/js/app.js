@@ -64,7 +64,7 @@ function setTopbar() {
   el('btn-account').classList.toggle('hidden', !me);
   el('btn-logout').classList.toggle('hidden', !me);
   el('btn-go-login').classList.toggle('hidden', !!me);
-  if (me) el('btn-account').innerHTML = `${icon('user')}<span class="acct-name">${me.name.split(' ')[0]}</span>`;
+  if (me) el('btn-account').innerHTML = `${icon('user')}<span class="acct-name">${escapeHtml(me.name.split(' ')[0])}</span>`;
 }
 
 async function boot() {
@@ -180,6 +180,25 @@ async function enterApp() {
         updateTotal();
       }
     },
+  }, async () => {
+    // Back in the app after the stream was down: prices and order updates sent meanwhile
+    // were never delivered, so read them again.
+    refreshBookingRequests().catch(() => {});
+    refreshOrders().catch(() => {});
+    if (quoteRequestId) {
+      const r = await api(`/api/quote-requests/${quoteRequestId}`).catch(() => null);
+      if (r && Array.isArray(r.quotes)) {
+        quotesList = r.quotes;
+        el('quote-status').textContent = quotesList.length
+          ? `${quotesList.length} price${quotesList.length === 1 ? '' : 's'} in`
+          : 'Waiting for pros…';
+        renderQuotes();
+      }
+    }
+    if (currentOrder && !el('view-track').classList.contains('hidden')) {
+      const o = await api(`/api/orders/${currentOrder.id}`).catch(() => null);
+      if (o) renderTrack(o.order || o);
+    }
   });
   const params = new URLSearchParams(window.location.search);
   // Coming back from the payment page. Confirmation arrives by webhook, not from this
@@ -907,7 +926,7 @@ async function refreshOrders() {
     <div class="order-item">
       <div>
         <div class="title">${serviceName(o.service)} #${o.id} — ${pkgName}</div>
-        <div class="sub">${o.address}</div>
+        <div class="sub">${escapeHtml(o.address)}</div>
       </div>
       <div class="row" style="flex-wrap:nowrap">
         <span class="pill ${statusPillClass(o.status)}">${statusLabel(o.status, o.service)}</span>
@@ -973,7 +992,7 @@ function renderTrack(order) {
       body += `<img src="${apiUrl(`/api/orders/${order.id}/handover-photo`)}" alt="Photo taken at the handover" style="max-width:260px;width:100%;border-radius:12px;margin-top:8px;border:1px solid var(--border)">`;
     }
   }
-  body += `<p class="muted"${order.return_to ? ' hidden' : ''}>${icon('pin')} ${order.address}</p>
+  body += `<p class="muted"${order.return_to ? ' hidden' : ''}>${icon('pin')} ${escapeHtml(order.address)}</p>
     <p class="mt"><strong>${rand(order.amount_due_cents)}</strong> <span class="muted">· ${order.payment_method === 'cash' ? 'Cash on completion' : 'Paid by card'}${breakdown.length ? ' · ' + breakdown.join(' · ') : ''}</span></p>`;
   if (order.status === 'completed' && order.points_earned_cents > 0) {
     body += `<p class="mt" style="color:var(--accent-dim);font-weight:600">${icon('wallet')} You earned ${rand(order.points_earned_cents)} back in rewards.</p>`;
@@ -982,9 +1001,9 @@ function renderTrack(order) {
     body += `<div class="provider-box">
       <span class="avatar">${icon('user', 'lg')}</span>
       <div>
-        <strong>${order.supplier.business_name}</strong> — ${order.supplier.name}
+        <strong>${escapeHtml(order.supplier.business_name)}</strong> — ${escapeHtml(order.supplier.name)}
         ${order.supplier.rating ? `<span class="star-inline"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span> ${order.supplier.rating}` : '<span class="muted small-text">· New pro</span>'}
-        <div class="muted small-text">${order.supplier.phone || ''}</div>
+        ${order.supplier.phone ? `<a class="tel-link" href="tel:${escapeHtml(String(order.supplier.phone).replace(/[^+\d]/g, ''))}">${icon('phone')} Call ${escapeHtml(order.supplier.phone)}</a>` : ''}
       </div>
     </div>`;
   }

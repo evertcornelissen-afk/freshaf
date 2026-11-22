@@ -48,9 +48,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>FreshAF uses your location to drop the pin where your car is parked or your laundry is collected, so your Pro finds you and the call-out fee is quoted correctly. Pros share it to receive nearby jobs.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>FreshAF Pros use the camera to photograph their ID and proof of address for vetting.</string>
+	<string>FreshAF Pros use the camera to photograph their ID and proof of address for vetting, and to photograph laundry at collection and delivery as proof of handover.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>FreshAF Pros choose a photo of their ID and proof of address from their library for vetting.</string>
+	<string>FreshAF Pros choose a photo of their ID and proof of address from their library for vetting, or a handover photo of the laundry.</string>
 	<!-- Only standard HTTPS. Answers the export-compliance question on every upload. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
@@ -65,8 +65,6 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>

@@ -829,3 +829,15 @@ fixed and covered by tests: a pro's Decline left the job on their screen; a book
 "Booked for …"); the "accepted" email for a job now read "on As soon as possible".
 Website APK = v16. Bundle: `Desktop/FreshAF-release/freshaf-1.0-vc16.aab` (vc15 deleted, never
 uploaded). Play: replace release 13 with **16**. Next build = 17.
+
+### v17 (22 Nov 2026): store-polish pass
+A screen check of every customer, pro and website screen (6 phone widths, day and night,
+`scripts/layout-audit.js`) plus fixes: stored-script holes closed in the customer, pro and admin
+screens; name/address length caps (`server/clean.js`); jobs and prices missed while the app was in
+the background are re-fetched on resume; 44 px tap targets on phones; long pro names no longer push
+"Book now" off screen; pro earnings/job history fit small phones; phone portrait lock (Android +
+iOS); camera wording covers laundry handover photos; tap-to-call the pro. New **update control**:
+`/api/app-version` + admin settings `app_latest_build` (gentle "new version" bar) and
+`app_min_build` (full "update now" wall). Leave both at 0 until v17 is on Play.
+Website APK = v17. Bundle: `Desktop/FreshAF-release/freshaf-1.0-vc17.aab` (vc16 deleted, never
+uploaded). Play: replace release 13 with **17**. Next build = 18.

@@ -259,18 +259,18 @@ async function refreshSuppliers() {
   el('suppliers-box').innerHTML = `<table><thead><tr>
       <th>Business</th><th>Contact</th><th>Details</th><th>Status</th><th>Actions</th>
     </tr></thead><tbody>` + suppliers.map((s) => `<tr>
-      <td><a href="/applicant.html?id=${s.user_id}" target="_blank" rel="noopener" style="font-weight:700">${s.business_name}</a>${s.is_demo ? ' <span class="pill warn">DEMO</span>' : ''}<br>
-        <span class="muted small-text">${s.service_area || ''}</span><br>
+      <td><a href="/applicant.html?id=${s.user_id}" target="_blank" rel="noopener" style="font-weight:700">${escapeHtml(s.business_name)}</a>${s.is_demo ? ' <span class="pill warn">DEMO</span>' : ''}<br>
+        <span class="muted small-text">${escapeHtml(s.service_area || '')}</span><br>
         ${(s.services || []).map((x) => `<span class="pill ${x === 'laundry' ? 'ok' : 'warn'}" style="margin-top:4px">${serviceName(x)}</span>`).join(' ')}</td>
-      <td>${s.name}<br><span class="muted small-text">${s.email}<br>${s.phone || ''}</span></td>
-      <td class="muted small-text">ID: ${s.id_number}
+      <td>${escapeHtml(s.name)}<br><span class="muted small-text">${escapeHtml(s.email)}<br>${escapeHtml(s.phone || '')}</span></td>
+      <td class="muted small-text">ID: ${escapeHtml(s.id_number)}
         ${(s.vehicles || []).length
-          ? '<br><strong>Vehicles:</strong> ' + s.vehicles.map((v) => [v.type, v.model, v.reg].filter(Boolean).join(' ')).join(' · ')
-          : `<br>Vehicles: ${s.vehicle_reg || 'none listed'}`}
+          ? '<br><strong>Vehicles:</strong> ' + s.vehicles.map((v) => escapeHtml([v.type, v.model, v.reg].filter(Boolean).join(' '))).join(' · ')
+          : `<br>Vehicles: ${escapeHtml(s.vehicle_reg || 'none listed')}`}
         ${s.equipment?.items?.length
-          ? '<br><strong>Equipment:</strong> ' + s.equipment.items.map((i) => i.qty ? `${i.label} ×${i.qty}` : i.label).join(', ') + (s.equipment.other ? `, ${s.equipment.other}` : '')
-          : `<br>Equipment: ${s.equipment_notes || 'none listed'}`}
-        ${s.bank_name ? `<br>Bank: ${s.bank_name} · ${s.bank_account || ''} · ${s.bank_branch || ''}` : '<br>Bank: not provided'}
+          ? '<br><strong>Equipment:</strong> ' + s.equipment.items.map((i) => i.qty ? `${escapeHtml(i.label)} ×${escapeHtml(i.qty)}` : escapeHtml(i.label)).join(', ') + (s.equipment.other ? `, ${escapeHtml(s.equipment.other)}` : '')
+          : `<br>Equipment: ${escapeHtml(s.equipment_notes || 'none listed')}`}
+        ${s.bank_name ? `<br>Bank: ${escapeHtml(s.bank_name)} · ${escapeHtml(s.bank_account || '')} · ${escapeHtml(s.bank_branch || '')}` : '<br>Bank: not provided'}
         ${(s.documents || []).length
           ? '<br>' + s.documents.map((d) => `<a href="/api/admin/docs/${d.id}" target="_blank">${d.kind.replace(/_/g, ' ')}</a>`).join(' · ')
           : '<br><span style="color:var(--warn)">No documents uploaded</span>'}
@@ -557,7 +557,7 @@ async function refreshOrders() {
     </tr></thead><tbody>` + orders.map((o) => `<tr>
       <td>#${o.id}</td>
       <td><span class="pill ${o.service === 'laundry' ? 'ok' : 'warn'}">${serviceName(o.service)}</span></td>
-      <td>${o.customer_name}${o.return_address ? `<div class="muted small-text">Return: ${escapeHtml(o.return_address)} · to ${escapeHtml(o.return_receiver || '')}</div>` : ''}${o.handover_receiver ? `<div class="muted small-text">Handed to ${escapeHtml(o.handover_receiver)}${o.handover_photo ? ` · <a href="/api/admin/orders/${o.id}/handover-photo" target="_blank">photo</a>` : ''}</div>` : ''}</td><td>${o.supplier_name || '—'}</td>
+      <td>${escapeHtml(o.customer_name)}${o.return_address ? `<div class="muted small-text">Return: ${escapeHtml(o.return_address)} · to ${escapeHtml(o.return_receiver || '')}</div>` : ''}${o.handover_receiver ? `<div class="muted small-text">Handed to ${escapeHtml(o.handover_receiver)}${o.handover_photo ? ` · <a href="/api/admin/orders/${o.id}/handover-photo" target="_blank">photo</a>` : ''}</div>` : ''}</td><td>${escapeHtml(o.supplier_name || '—')}</td>
       <td>${o.package.replace(/_/g, ' ')} / ${o.vehicle}</td>
       <td>${rand(o.price_cents)}</td><td>${o.commission_cents ? rand(o.commission_cents) : '—'}</td>
       <td class="muted small-text">${o.payment_method} · ${o.payment_status.replace(/_/g, ' ')}</td>

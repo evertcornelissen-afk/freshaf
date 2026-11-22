@@ -1,4 +1,5 @@
 const express = require('express');
+const { capFields, PERSON } = require('../clean');
 const bcrypt = require('bcryptjs');
 const { db, getSetting } = require('../db');
 const crypto = require('crypto');
@@ -149,6 +150,7 @@ router.post('/phone-code', signupCodeLimit, async (req, res) => {
 });
 
 router.post('/register', registerLimit, (req, res) => {
+  capFields(req.body, PERSON);
   const { role, name, email, phone, password, home_address, home_lat, home_lng, accept_terms,
     business_name, id_number, reg_number, vat_number, vehicle_reg, service_area, equipment_notes, services,
     bank_name, bank_account, bank_branch, vehicles, equipment, phone_code } = req.body || {};
@@ -412,6 +414,7 @@ router.post('/reset', resetLimit, (req, res) => {
 
 // Update profile details (name, phone, preferred address).
 router.post('/profile', authRequired('customer', 'supplier'), (req, res) => {
+  capFields(req.body, { name: PERSON.name, phone: PERSON.phone, home_address: PERSON.home_address });
   const { name, phone, home_address } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);

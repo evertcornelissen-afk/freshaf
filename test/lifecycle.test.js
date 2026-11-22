@@ -97,6 +97,14 @@ const dayOut = (d, hhmm) => `${new Date(Date.now() + d * 86400e3).toLocaleString
     check('the same email in other capitals cannot sign up twice', r.status >= 400 && r.status < 500, true);
     r = await call(null, '/api/auth/login', 'POST', { email, password: 'wrong-password' });
     check('a wrong password is refused', r.status, 401);
+    // Free text is capped: a 5,000-character name must not reach the screens that show it.
+    r = await call(null, '/api/auth/register', 'POST', { role: 'customer', name: 'N'.repeat(5000), email: `long-${stamp}@example.com`,
+      password: 'longenough1', home_address: 'A'.repeat(5000), home_lat: -33.84, home_lng: 18.65, accept_terms: true });
+    const longRow = db.prepare('SELECT name, home_address FROM users WHERE email = ?').get(`long-${stamp}@example.com`);
+    check('a huge name and address are cut to 80 / 200 characters', [r.status, longRow?.name.length, longRow?.home_address.length], [200, 80, 200]);
+    r = await call(null, '/api/auth/register', 'POST', { role: 'customer', name: { x: 1 }, email: `obj-${stamp}@example.com`,
+      password: 'longenough1', home_address: '1 Test Rd', accept_terms: true });
+    check('a name that is not text is refused, not a crash', r.status, 400);
     const known = await call(null, '/api/auth/forgot', 'POST', { email });
     const unknown = await call(null, '/api/auth/forgot', 'POST', { email: `nobody-${stamp}@example.com` });
     // The message repeats the address typed, so compare with that taken out.

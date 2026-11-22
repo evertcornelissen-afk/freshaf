@@ -645,6 +645,12 @@ function listenAccountUpdates() {
       if (me.supplier?.status === 'approved') toast('Your account has been approved — welcome aboard', 'ok');
       route();
     },
+  }, async () => {
+    // Approved (or asked for a document) while the app was closed: show it on return.
+    const before = `${me?.supplier?.status}|${me?.supplier?.info_needed || ''}`;
+    const { user } = await api('/api/auth/me');
+    me = user;
+    if (`${me?.supplier?.status}|${me?.supplier?.info_needed || ''}` !== before) route();
   });
 }
 
@@ -716,7 +722,7 @@ async function enterDash() {
     job_cancelled: () => { toast('A job was cancelled by the customer', 'error'); refreshJobs(); refreshOffers(); },
     account_update: async () => { const { user } = await api('/api/auth/me'); me = user; route(); },
     order_update: () => refreshJobs(),
-  });
+  }, () => Promise.all([refreshRequests(), refreshJobs(), refreshOffers(), refreshEarnings()]));
 }
 
 function ping() {
@@ -787,12 +793,12 @@ async function refreshOffers() {
   el('offers-box').innerHTML = offers.map((o) => `
     <div class="offer-card">
       <div class="row spread">
-        <strong>${svcBadge(o.order.service)} Order #${o.order.id} — ${rand(o.order.price_cents)}</strong>
+        <strong>${svcBadge(o.order.service)} <span class="nowrap">Order #${o.order.id} — ${rand(o.order.price_cents)}</span></strong>
         <span class="pill warn">${o.distance_km} km away</span>
       </div>
-      <p class="muted small-text" style="margin-top:8px">${icon('pin')} ${o.order.address}</p>
+      <p class="muted small-text" style="margin-top:8px">${icon('pin')} ${escapeHtml(o.order.address)}</p>
       <p class="small-text" style="margin-top:5px">${jobWhat(o.order)} · ${o.order.payment_method === 'cash' ? `Collect ${rand(o.order.amount_due_cents)} cash` : 'Paid online'}${o.order.callout_fee_cents > 0 ? ` · incl. ${rand(o.order.callout_fee_cents)} callout` : ''}</p>
-      ${o.order.notes ? `<p class="muted small-text">Note: ${o.order.notes}</p>` : ''}
+      ${o.order.notes ? `<p class="muted small-text">Note: ${escapeHtml(o.order.notes)}</p>` : ''}
       <div class="row mt">
         <button class="small" data-action="acceptOffer" data-arg="${o.offer_id}">Accept job</button>
         <button class="ghost small" data-action="declineOffer" data-arg="${o.offer_id}">Decline</button>
@@ -900,7 +906,7 @@ async function refreshJobs() {
     el('active-box').innerHTML = active.map((o) => `
       <div data-job="${o.id}">
         <div class="row spread">
-          <strong>${svcBadge(o.service)} Order #${o.id} — ${rand(o.price_cents)}</strong>
+          <strong>${svcBadge(o.service)} <span class="nowrap">Order #${o.id} — ${rand(o.price_cents)}</span></strong>
           <span class="pill ${upcoming(o) ? 'ok' : 'warn live'}">${upcoming(o) ? 'Booked' : statusLabel(o.status, o.service)}</span>
         </div>
         ${o.scheduled_for ? `<p class="small-text" style="margin-top:6px;color:var(--accent-dim);font-weight:700">${icon('clock')} Booked for ${wallLabel(bookedWall(o.scheduled_for))}</p>` : ''}
@@ -999,7 +1005,7 @@ function renderWaEntry(phone) {
   if (waState && !waState.codes_enabled) {
     el('wa-box').innerHTML = `
       <label>Your WhatsApp number</label>
-      <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${phone}" autocomplete="tel">
+      <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${escAttr(phone || '')}" autocomplete="tel">
       <div class="row mt"><button class="small" id="wa-save">Save number</button></div>`;
     el('wa-save').onclick = () => withBusy(el('wa-save'), 'Saving…', async () => {
       try {
@@ -1012,7 +1018,7 @@ function renderWaEntry(phone) {
   }
   el('wa-box').innerHTML = `
     <label>Your WhatsApp number</label>
-    <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${phone}" autocomplete="tel">
+    <input id="wa-phone" placeholder="e.g. 082 555 1234" value="${escAttr(phone || '')}" autocomplete="tel">
     <div class="row mt"><button class="small" id="wa-send">Send me a code</button></div>`;
   el('wa-send').onclick = () => withBusy(el('wa-send'), 'Sending…', async () => {
     try {
