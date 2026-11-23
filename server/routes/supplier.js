@@ -306,6 +306,21 @@ router.post('/detailing/carwash', (req, res) => {
   res.json(detailingState(req.user.id));
 });
 
+// Where the pro works from. Open to a pro whose application is still in review: dispatch
+// goes by distance from this pin, so taking it before approval means approving a pro is
+// the only thing standing between them and their first job (23 Nov 2026).
+router.post('/base', (req, res) => {
+  const { lat, lng, radius_km } = req.body || {};
+  if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90
+    || typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    return res.status(400).json({ error: 'Tap the map to drop your pin first' });
+  }
+  const radius = typeof radius_km === 'number' && radius_km > 0
+    ? Math.min(200, Math.max(1, radius_km)) : null;
+  db.prepare(`UPDATE suppliers SET lat = ?, lng = ?, radius_km = COALESCE(?, radius_km)
+    WHERE user_id = ?`).run(lat, lng, radius, req.user.id);
+  res.json({ ok: true });
+});
 router.post('/online', requireApproved, (req, res) => {
   const { online, lat, lng, radius_km } = req.body || {};
   if (online && balance.isBlocked(req.user.id)) {

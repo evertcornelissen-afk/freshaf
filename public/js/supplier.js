@@ -693,8 +693,8 @@ async function route() {
   else { el('detailing-card-status').classList.add('hidden'); el('detailing-card-status').innerHTML = ''; }
   // A pro waiting on approval can already set their prices (detailing included, once they
   // have applied for it), so nothing is left to do on the day they are approved.
-  if (s.status === 'pending') { movePricesCard('prices-slot'); renderPrices().catch(() => {}); }
-  else movePricesCard(null);
+  if (s.status === 'pending') { movePricesCard('prices-slot'); renderPrices().catch(() => {}); renderBaseCard(); }
+  else { movePricesCard(null); el('base-card')?.classList.add('hidden'); }
   const heading = el('status-heading'); const detail = el('status-detail'); const ic = el('status-icon');
   if (s.status === 'pending' && (s.info_needed || []).length) {
     // Pending, but we are waiting on them — say so here rather than leaving them to
@@ -864,6 +864,62 @@ function ensureRegMap() {
     regLoc.lat != null ? 15 : 5, setRegPin); // the whole of SA until they pick a spot
   if (regLoc.lat != null) setRegPin(regLoc.lat, regLoc.lng);
 }
+
+/* ---------- work area while the application is still in review ---------- */
+let baseMap = null;
+let baseLoc = { lat: null, lng: null };
+
+function setBasePin(lat, lng) {
+  baseLoc = { lat, lng };
+  baseMap?.pin(lat, lng);
+  const box = el('base-pin-status');
+  if (box) box.innerHTML = `${icon('pin')} Pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
+function renderBaseCard() {
+  const card = el('base-card');
+  if (!card) return;
+  card.classList.remove('hidden');
+  const s = me?.supplier;
+  if (s?.lat != null) baseLoc = { lat: s.lat, lng: s.lng };
+  if (s?.radius_km) {
+    el('base-radius').value = s.radius_km;
+    el('base-radius-label').textContent = s.radius_km + ' km';
+  }
+  if (!baseMap) {
+    baseMap = FreshMap.create('base-map', [baseLoc.lat ?? -29.0, baseLoc.lng ?? 24.5],
+      baseLoc.lat != null ? 15 : 5, setBasePin);
+  } else baseMap.invalidateSize?.();
+  if (baseLoc.lat != null) setBasePin(baseLoc.lat, baseLoc.lng);
+}
+
+el('base-radius').oninput = () => { el('base-radius-label').textContent = el('base-radius').value + ' km'; };
+
+el('btn-base-geolocate').onclick = () => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      baseMap?.showMe(lat, lng, accuracy);
+      setBasePin(lat, lng);
+      baseMap?.flyTo(lat, lng, 16);
+    },
+    () => showError('base-error', 'Could not get your location — tap the map instead.'),
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+  );
+};
+
+el('btn-base-save').onclick = () => withBusy(el('btn-base-save'), 'Saving…', async () => {
+  try {
+    if (baseLoc.lat == null) throw new Error('Tap the map to drop your pin first');
+    await api('/api/supplier/base', { method: 'POST', body: {
+      lat: baseLoc.lat, lng: baseLoc.lng, radius_km: Number(el('base-radius').value) } });
+    if (me.supplier) { me.supplier.lat = baseLoc.lat; me.supplier.lng = baseLoc.lng; me.supplier.radius_km = Number(el('base-radius').value); }
+    el('base-error').textContent = '';
+    const ok = el('base-ok');
+    ok.textContent = 'Saved. Jobs near this pin will reach you as soon as you are approved.';
+    ok.style.display = 'block';
+  } catch (e) { showError('base-error', e.message); }
+});
 function setPin(lat, lng) {
   loc = { lat, lng };
   map.pin(lat, lng);

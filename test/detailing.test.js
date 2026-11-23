@@ -378,6 +378,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     check('an application with no pin is still accepted', reg.status, 200);
     check('but no home base is invented for them', baseOf(noBase).lat, null);
 
+
     const stranded = db.prepare('SELECT * FROM users WHERE email = ?').get(noBase);
     db.prepare("UPDATE suppliers SET status = 'approved', online = 1 WHERE user_id = ?").run(stranded.id);
     r = await call(admin, '/api/admin/suppliers');
@@ -394,6 +395,19 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     r = await call(admin, '/api/admin/suppliers');
     check('while the one who gave a pin is ready for work',
       r.json.suppliers.find((x) => x.user_id === planted.id).has_base, true);
+
+    // A pro still in review can set where they work from, so approval is the only step left.
+    const lateBase = `dt-latebase-${stamp}@test.invalid`;
+    provedPhone('27780000000', '123456');
+    await signUp(lateBase, { phone_code: '123456' });
+    const inReview = db.prepare('SELECT * FROM users WHERE email = ?').get(lateBase);
+    TOKENS.set(inReview.id, auth.signUser(inReview));
+    r = await call(inReview, '/api/supplier/base', 'POST', { lat: 200, lng: 18.6 });
+    check('a pin outside the world is refused', r.status, 400);
+    r = await call(inReview, '/api/supplier/base', 'POST', { lat: -26.21, lng: 28.04, radius_km: 18 });
+    check('a pro waiting on approval can set their work area', r.status, 200);
+    check('and it is stored against them',
+      [baseOf(lateBase).lat, baseOf(lateBase).radius_km], [-26.21, 18]);
     // ---- prices can be loaded while the detailing application is in review ----
     // (Evert, 22 Nov 2026: "let the ones who do detailing put their pricing in for detailing solong")
     const waiting = mkUser('supplier', 'DT Waiting Detailer', 'carwash');

@@ -166,6 +166,22 @@
       <div class="msg error" id="docs-error"></div>
       <div id="docs-rows"></div>
     </div>
+    <!-- Applied before 23 Nov 2026, so no pin was ever taken. Set it here and the day they
+         are approved they are already reachable, instead of being approved and still unseen. -->
+    <div class="card hidden" id="base-card" style="max-width:520px;margin:18px auto 0">
+      <h2 id="h-base">Where you work from</h2>
+      <p class="muted small-text">Jobs are offered by distance from this pin. Set it now and work can reach you the moment you are approved.</p>
+      <div class="map mt" id="base-map"></div>
+      <div class="row mt">
+        <button class="secondary small" id="btn-base-geolocate">Use my location</button>
+        <span id="base-pin-status" class="muted small-text">No pin set</span>
+      </div>
+      <label for="base-radius">How far will you travel? <strong id="base-radius-label">15 km</strong></label>
+      <input type="range" id="base-radius" min="1" max="50" step="1" value="15" style="padding:0">
+      <div class="msg error" id="base-error"></div>
+      <div class="msg ok" id="base-ok" style="display:none"></div>
+      <div class="mt"><button id="btn-base-save">Save my work area</button></div>
+    </div>
     <div class="card hidden" id="detailing-card-status" style="max-width:520px;margin:18px auto 0"></div>
     <!-- While an application is in review the price card is moved in here, so a pro (and a
          detailer waiting on the detailing decision) can set prices before approval. -->
