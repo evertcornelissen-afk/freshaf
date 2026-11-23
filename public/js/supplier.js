@@ -391,6 +391,26 @@ function returnTripHtml(t) {
     </div>`;
 }
 
+/* The price card lives in the dashboard, but a pro whose application is still in review
+   needs it too. There is only one card (one set of field ids), so it is moved between the
+   two views: slotId to put it on the status page, null to put it back in the dashboard. */
+function movePricesCard(slotId) {
+  const card = el('prices-card');
+  if (!card) return;
+  if (slotId) {
+    const slot = el(slotId);
+    if (!slot) return;
+    if (card.parentElement !== slot) slot.appendChild(card);
+    card.style.maxWidth = '520px';
+    card.style.margin = '18px auto 0';
+  } else {
+    const home = el('prices-home');
+    if (home && card.previousElementSibling !== home) home.insertAdjacentElement('afterend', card);
+    card.style.maxWidth = '';
+    card.style.margin = '';
+  }
+}
+
 async function renderPrices() {
   const data = await api('/api/supplier/prices');
   priceCat = data.services;
@@ -401,6 +421,8 @@ async function renderPrices() {
     const s = priceCat[k];
     return `
     <h3 style="margin-top:14px">${s.name}</h3>
+    ${s.pending_approval ? `<p class="muted small-text">Set these now. They are saved straight away and
+      start earning the day FreshAF approves you for ${s.name.toLowerCase()} and opens it to customers.</p>` : ''}
     ${s.packages.map((p) => `
       <div class="row spread" style="padding:10px 0;border-bottom:1px solid var(--border-soft);gap:14px">
         <div style="flex:1;min-width:150px">
@@ -467,6 +489,8 @@ async function renderDetailing(boxId) {
   if (d.status === 'pending') {
     box.innerHTML = `${head}
       <div class="msg warn" style="display:block">${icon('clock')} Your detailing application is being reviewed.</div>
+      <p class="muted small-text">You can set your detailing prices under <strong>Your prices</strong> while you wait.
+        FreshAF adds ${d.fee_pct}% on top for the customer, and you are paid your full price.</p>
       <p class="muted small-text">${d.photos.length} photos sent · ${escapeHtml(d.link || '')}</p>
       <p class="muted small-text">We will let you know here and by email as soon as it is decided.</p>`;
     return;
@@ -609,6 +633,10 @@ async function route() {
   else el('docs-card').classList.add('hidden');
   if (s.status === 'pending') renderDetailing('detailing-card-status').catch(() => {});
   else { el('detailing-card-status').classList.add('hidden'); el('detailing-card-status').innerHTML = ''; }
+  // A pro waiting on approval can already set their prices (detailing included, once they
+  // have applied for it), so nothing is left to do on the day they are approved.
+  if (s.status === 'pending') { movePricesCard('prices-slot'); renderPrices().catch(() => {}); }
+  else movePricesCard(null);
   const heading = el('status-heading'); const detail = el('status-detail'); const ic = el('status-icon');
   if (s.status === 'pending' && (s.info_needed || []).length) {
     // Pending, but we are waiting on them — say so here rather than leaving them to
@@ -663,6 +691,7 @@ async function enterDash() {
     el('radius-km').value = me.supplier.radius_km;
     el('radius-label').textContent = me.supplier.radius_km + ' km';
   }
+  movePricesCard(null); // back in the dashboard if a review page borrowed it
   await renderPrices(); // the job cards name packages from this catalogue
   renderDetailing('detailing-card').catch(() => {});
   await Promise.all([refreshOffers(), refreshJobs(), refreshEarnings(), refreshAlerts(), refreshRequests()]); // content first, then reveal

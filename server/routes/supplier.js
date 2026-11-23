@@ -101,18 +101,32 @@ function returnTripFor(s) {
   return { rate_cents: s.return_per_km_cents ?? null, max_cents: q.returnPerKm, free_km: q.returnFreeKm, cap_cents: q.returnCap };
 }
 
+// Which services a pro may put prices against. A pro who has applied for detailing (or
+// been approved for it) can load their detailing prices straight away, while the
+// application is still in review and while customers cannot book detailing yet. Those
+// prices just sit there until detailing is approved and opened (Evert, 22 Nov 2026).
+function priceableServices(s) {
+  const keys = (s?.services || 'carwash').split(',').filter(Boolean);
+  const d = s?.detailing_status;
+  if ((d === 'pending' || d === 'approved') && !keys.includes('detailing')) keys.push('detailing');
+  return keys;
+}
+
 router.get('/prices', (req, res) => {
-  const s = db.prepare('SELECT services, return_per_km_cents FROM suppliers WHERE user_id = ?').get(req.user.id);
+  const s = db.prepare('SELECT services, detailing_status, return_per_km_cents FROM suppliers WHERE user_id = ?').get(req.user.id);
   const mine = db.prepare('SELECT service, package, price_cents FROM supplier_prices WHERE user_id = ?').all(req.user.id);
   const set = {};
   for (const r of mine) set[`${r.service}:${r.package}`] = r.price_cents;
   const out = {};
-  for (const svcKey of (s?.services || 'carwash').split(',')) {
+  const live = (s?.services || 'carwash').split(',').filter(Boolean);
+  for (const svcKey of priceableServices(s)) {
     const svc = SERVICES[svcKey];
     if (!svc) continue;
     out[svcKey] = {
       name: svc.name,
       unitLabel: svc.unitLabel,
+      // true = they can price it now, but no job can reach them on it yet
+      pending_approval: !live.includes(svcKey),
       units: Object.values(svc.units),
       packages: Object.values(svc.packages).map((p) => ({
         key: p.key, name: p.name, desc: p.desc, eta: p.eta,
@@ -130,8 +144,8 @@ router.get('/prices', (req, res) => {
 router.post('/prices', (req, res) => {
   const prices = req.body?.prices;
   if (!Array.isArray(prices)) return res.status(400).json({ error: 'Send a prices array' });
-  const me = db.prepare('SELECT services, return_per_km_cents FROM suppliers WHERE user_id = ?').get(req.user.id);
-  const allowed = (me?.services || 'carwash').split(',');
+  const me = db.prepare('SELECT services, detailing_status, return_per_km_cents FROM suppliers WHERE user_id = ?').get(req.user.id);
+  const allowed = priceableServices(me);
   // Return-trip rate (laundry pros): a number up to FreshAF's maximum, or null to clear it.
   // Validated before any price is written, so a bad rate never leaves a half-saved list.
   let returnRate;

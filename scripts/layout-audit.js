@@ -72,7 +72,13 @@ const p1 = pro('Sipho Bongani Ndlovu' + XSS, "Sipho's Professional Mobile Valet 
 const p2 = pro('Kagiso Molefe', 'Jozi Shine', -0.011, 0.007);
 const p3 = pro('Ayesha Patel', 'Bubbles on Wheels Mobile Car Wash', 0.015, -0.012);
 const pending = pro('Thabo Nkosi', 'Thabo Shine Pending Applicant Mobile Wash', 0.02, 0.02, 'pending');
-const TOKENS = new Map([cust, cust2, cust3, p1, p2, p3, pending].map((u) => [u.id, auth.signUser(u)]));
+// In review for the pro account AND for detailing: the longest version of the status page,
+// where the price card carries the detailing block as well.
+const pendingDet = pro('Mandla Sibusiso Khumalo-Ferreira', 'Khumalo Premium Mobile Detailing & Valet Specialists', 0.03, 0.03, 'pending');
+db.prepare("UPDATE suppliers SET detailing_status = 'pending', detailing_applied_at = datetime('now') WHERE user_id = ?").run(pendingDet.id);
+const detPro = pro('Rethabile Mokoena', 'Mokoena Detailing', -0.004, 0.005, 'approved', 'carwash,detailing');
+db.prepare("UPDATE suppliers SET detailing_status = 'approved' WHERE user_id = ?").run(detPro.id);
+const TOKENS = new Map([cust, cust2, cust3, p1, p2, p3, pending, pendingDet, detPro].map((u) => [u.id, auth.signUser(u)]));
 const dayOut = (d, hhmm) => `${new Date(Date.now() + d * 86400e3).toLocaleString('sv-SE', { timeZone: 'Africa/Johannesburg' }).slice(0, 10)}T${hhmm}`;
 
 async function api(u, p, method = 'GET', body) {
@@ -246,6 +252,8 @@ async function main() {
       { key: 'p-apply-open', who: null, path: '/supplier#apply', run: "el('area-pick').open = true; el('btn-add-vehicle').click(); el('btn-add-vehicle').click(); await new Promise((r) => setTimeout(r, 300));" },
       { key: 'p-menu', who: p1, path: '/supplier', run: "document.querySelector('.menu-btn').click(); await new Promise((r) => setTimeout(r, 500));" },
       { key: 'p-pending', who: pending, path: '/supplier', wait: 800 },
+      { key: 'p-pending-detailing', who: pendingDet, path: '/supplier', wait: 1200 },
+      { key: 'p-dash-detailing', who: detPro, path: '/supplier', wait: 1500 },
       { key: 'p-dash', who: p1, path: '/supplier', wait: 1500 },
       { key: 'p-dash-p2', who: p2, path: '/supplier', wait: 1500 },
       { key: 'p-settings', who: p1, path: '/supplier', run: "openAppSettings(); await new Promise((r) => setTimeout(r, 600));" },

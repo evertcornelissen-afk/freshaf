@@ -149,6 +149,9 @@
       <div id="docs-rows"></div>
     </div>
     <div class="card hidden" id="detailing-card-status" style="max-width:520px;margin:18px auto 0"></div>
+    <!-- While an application is in review the price card is moved in here, so a pro (and a
+         detailer waiting on the detailing decision) can set prices before approval. -->
+    <div id="prices-slot"></div>
   </div>
 
   <!-- DASHBOARD -->
@@ -184,7 +187,8 @@
       <div id="wa-box"><p class="empty">Loading…</p></div>
     </div>
 
-    <div class="card">
+    <div id="prices-home"></div>
+    <div class="card" id="prices-card">
       <h2 id="h-prices">Your prices</h2>
       <p class="muted small-text">You set what you charge — this is exactly what FreshAF pays you
         for the job. Nothing is deducted from it, and you can change these prices whenever you like.</p>

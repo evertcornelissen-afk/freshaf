@@ -314,6 +314,37 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     r = await call(demoCust, '/api/quote-requests', 'POST', { service: 'carwash', package: 'express', vehicle: 'sedan', address: 'Demo', lat: -33.84, lng: 18.65 });
     check('demo accounts keep instant answers', r.json.auto_quoted >= 1, true);
 
+    // ---- prices can be loaded while the detailing application is in review ----
+    // (Evert, 22 Nov 2026: "let the ones who do detailing put their pricing in for detailing solong")
+    const waiting = mkUser('supplier', 'DT Waiting Detailer', 'carwash');
+    TOKENS.set(waiting.id, auth.signUser(waiting));
+    // parked in Johannesburg so this extra pro never joins the Cape Town request counts above
+    db.prepare('UPDATE suppliers SET lat = -26.2, lng = 28.04 WHERE user_id = ?').run(waiting.id);
+    r = await call(waiting, '/api/supplier/prices');
+    check('a pro who has not applied for detailing sees no detailing prices', Object.keys(r.json.services), ['carwash']);
+    r = await call(waiting, '/api/supplier/prices', 'POST', { prices: [{ service: 'detailing', package: 'full_detail', price_cents: 150000 }] });
+    check('and cannot save a detailing price', r.status, 400);
+
+    db.prepare("UPDATE suppliers SET detailing_status = 'pending' WHERE user_id = ?").run(waiting.id);
+    r = await call(waiting, '/api/supplier/prices');
+    check('once the application is in, detailing is on the price list',
+      [Object.keys(r.json.services), r.json.services.detailing.pending_approval], [['carwash', 'detailing'], true]);
+    r = await call(waiting, '/api/supplier/prices', 'POST', { prices: [{ service: 'detailing', package: 'full_detail', price_cents: 150000 }] });
+    check('and the detailing price saves', r.status, 200);
+    check('it is stored against detailing',
+      db.prepare("SELECT price_cents FROM supplier_prices WHERE user_id = ? AND service = 'detailing'").get(waiting.id).price_cents, 150000);
+    r = await ask('full_detail');
+    check('but a detailing job still never reaches them while they wait',
+      quotesOn(r.json.request_id).some((q) => q.supplier_id === waiting.id), false);
+    r = await call(waiting, '/api/supplier/prices', 'POST', { prices: [{ service: 'detailing', package: 'paint_ceramic', price_cents: 300000 }] });
+    check('paint correction stays quote-only even in review', r.status, 400);
+
+    // an application still awaiting the pro's own approval may price too
+    db.prepare("UPDATE suppliers SET status = 'pending' WHERE user_id = ?").run(waiting.id);
+    r = await call(waiting, '/api/supplier/prices', 'POST', { prices: [{ service: 'detailing', package: 'interior_detail', price_cents: 95000 }] });
+    check('a pro whose own application is in review can set prices as well', r.status, 200);
+    db.prepare("UPDATE suppliers SET status = 'approved' WHERE user_id = ?").run(waiting.id);
+
     // ---- detailer chooses detailing only ----
     r = await call(detailer, '/api/supplier/detailing/carwash', 'POST', { enabled: false });
     check('detailer turns everyday car wash off', [r.status, services(detailer)], [200, 'detailing']);
