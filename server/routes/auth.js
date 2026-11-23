@@ -153,6 +153,7 @@ router.post('/register', registerLimit, (req, res) => {
   capFields(req.body, PERSON);
   const { role, name, email, phone, password, home_address, home_lat, home_lng, accept_terms,
     business_name, id_number, reg_number, vat_number, vehicle_reg, service_area, equipment_notes, services, detailing_intent,
+    lat, lng, radius_km,
     bank_name, bank_account, bank_branch, vehicles, equipment, phone_code } = req.body || {};
 
   // Structured onboarding data: multiple vehicles + itemised equipment.
@@ -254,15 +255,21 @@ router.post('/register', registerLimit, (req, res) => {
     // application, and so an admin sees it on their application page. It adds nothing
     // to services — detailing jobs still need the separate approval.
     const wantsDetailing = detailing_intent === true && require('../quotes').detailingSignupOpen() ? 1 : 0;
+    // Where they work from, taken on the form: dispatch and quote requests go by distance
+    // from this point, so without it an approved pro can never be offered a job.
+    const baseLat = typeof lat === 'number' && Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null;
+    const baseLng = baseLat != null && typeof lng === 'number' && Number.isFinite(lng) && lng >= -180 && lng <= 180 ? lng : null;
+    const baseRadius = typeof radius_km === 'number' && radius_km > 0 ? Math.min(200, Math.max(1, radius_km)) : null;
     db.prepare(`INSERT INTO suppliers (user_id, business_name, id_number, reg_number, vat_number, vehicle_reg, service_area, equipment_notes, services,
-                bank_name, bank_account, bank_branch, vehicles_json, equipment_json, detailing_intent)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                bank_name, bank_account, bank_branch, vehicles_json, equipment_json, detailing_intent, lat, lng, radius_km)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(userId, business_name.trim(), secrets.encryptField(id_number.trim()),
         reg_number?.trim() || null, vat_number?.trim() || null, vehicleSummary,
         service_area?.trim() || null, equipmentSummary, supplierServices.join(','),
         bank_name?.trim() || null, secrets.encryptField(bank_account?.trim() || null),
         secrets.encryptField(bank_branch?.trim() || null),
-        JSON.stringify(cleanVehicles), JSON.stringify(cleanEquipment), wantsDetailing);
+        JSON.stringify(cleanVehicles), JSON.stringify(cleanEquipment), wantsDetailing,
+        baseLat == null || baseLng == null ? null : baseLat, baseLat == null ? null : baseLng, baseRadius);
     if (phoneProved) {
       db.prepare("UPDATE users SET phone_verified_at = datetime('now') WHERE id = ?").run(userId);
       db.prepare('DELETE FROM signup_phone_codes WHERE phone = ?').run(phoneProved);

@@ -358,6 +358,42 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     check('the admin list shows the intention',
       r.json.suppliers.find((x) => x.user_id === applicant.id).detailing_intent, true);
 
+
+    // ---- home base on the application form (23 Nov 2026) ----
+    // Dispatch and quote requests go by distance from a pin. An approved pro without one
+    // can never be offered a job, so the form takes it on the way in.
+    const baseOf = (addr) => db.prepare(`SELECT lat, lng, radius_km FROM suppliers
+      WHERE user_id = (SELECT id FROM users WHERE email = ?)`).get(addr);
+
+    const withBase = `dt-base-${stamp}@test.invalid`;
+    provedPhone('27780000000', '123456');
+    reg = await signUp(withBase, { phone_code: '123456', lat: -33.84, lng: 18.65, radius_km: 22 });
+    check('a pro can apply with their home base on the form', reg.status, 200);
+    check('the pin and the distance are stored',
+      [baseOf(withBase).lat, baseOf(withBase).lng, baseOf(withBase).radius_km], [-33.84, 18.65, 22]);
+
+    const noBase = `dt-nobase-${stamp}@test.invalid`;
+    provedPhone('27780000000', '123456');
+    reg = await signUp(noBase, { phone_code: '123456' });
+    check('an application with no pin is still accepted', reg.status, 200);
+    check('but no home base is invented for them', baseOf(noBase).lat, null);
+
+    const stranded = db.prepare('SELECT * FROM users WHERE email = ?').get(noBase);
+    db.prepare("UPDATE suppliers SET status = 'approved', online = 1 WHERE user_id = ?").run(stranded.id);
+    r = await call(admin, '/api/admin/suppliers');
+    check('the admin list flags an approved pro with no home base',
+      r.json.suppliers.find((x) => x.user_id === stranded.id).has_base, false);
+    r = await call(customer, '/api/quote-requests', 'POST', { service: 'carwash', package: 'express',
+      vehicle: 'sedan', address: 'Bloemfontein', lat: -29.09, lng: 26.16 });
+    check('and no request reaches them, however online they say they are',
+      db.prepare('SELECT COUNT(*) c FROM quote_requests WHERE id = ?').get(r.json.request_id).c === 1
+        && !db.prepare('SELECT 1 FROM quotes WHERE request_id = ? AND supplier_id = ?').get(r.json.request_id, stranded.id),
+      true);
+
+    const planted = db.prepare('SELECT * FROM users WHERE email = ?').get(withBase);
+    r = await call(admin, '/api/admin/suppliers');
+    check('while the one who gave a pin is ready for work',
+      r.json.suppliers.find((x) => x.user_id === planted.id).has_base, true);
     // ---- prices can be loaded while the detailing application is in review ----
     // (Evert, 22 Nov 2026: "let the ones who do detailing put their pricing in for detailing solong")
     const waiting = mkUser('supplier', 'DT Waiting Detailer', 'carwash');

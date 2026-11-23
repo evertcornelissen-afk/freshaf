@@ -280,6 +280,7 @@ async function refreshSuppliers() {
       <td><span class="pill ${s.status === 'approved' ? 'ok' : s.status === 'pending' ? 'warn' : 'bad'}">${s.status}</span>
         ${s.cash_blocked ? '<br><span class="pill bad" style="margin-top:5px">cash limit</span>' : ''}
         ${s.online ? '<br><span class="pill ok live" style="margin-top:5px">online</span>' : ''}
+        ${s.status === 'approved' && !s.has_base ? '<br><span class="pill bad" style="margin-top:5px">no home base</span>' : ''}
         ${s.detailing ? `<br><span class="pill ${s.detailing.status === 'approved' ? 'ok' : s.detailing.status === 'pending' ? 'warn' : 'bad'}" style="margin-top:5px">detailing ${s.detailing.status}</span>` : ''}
         ${s.cash_owed_cents > 0 ? `<br><span class="muted small-text">holds ${rand(s.cash_owed_cents)} cash</span>` : ''}
         ${s.rating ? `<br><span class="muted small-text">${starInline} ${s.rating} (${s.rating_count})</span>` : ''}</td>

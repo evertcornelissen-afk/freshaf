@@ -113,6 +113,16 @@
         </details>
         <div class="area-chips" id="area-chips"></div>
         <label for="reg-area-other">Other areas not listed (optional)</label><input id="reg-area-other" placeholder="e.g. Hartenbos, Groot Brakrivier" autocomplete="off">
+        <h3>Where do you work from?</h3>
+        <p class="muted small-text" style="margin-top:-2px">Drop a pin where you start your day. Jobs are offered by distance from this pin, so we cannot send you work without it.</p>
+        <div class="map mt" id="reg-map"></div>
+        <div class="row mt">
+          <button type="button" class="secondary small" id="btn-reg-geolocate">Use my location</button>
+          <span id="reg-pin-status" class="muted small-text">No pin yet &mdash; tap the map</span>
+        </div>
+        <label for="reg-radius">How far will you travel? <strong id="reg-radius-label">15 km</strong></label>
+        <input type="range" id="reg-radius" min="1" max="50" step="1" value="15" style="padding:0">
+        <p class="muted small-text">You can change your pin and this distance any time once you are approved.</p>
         <h3>Work vehicles — add every vehicle you use</h3>
         <div id="vehicles-rows"></div>
         <button type="button" class="secondary small" id="btn-add-vehicle">Add a vehicle</button>
@@ -178,6 +188,7 @@
       <label for="radius-km">How far will you travel? <strong id="radius-label">15 km</strong></label>
       <input type="range" id="radius-km" min="1" max="50" step="1" value="15" style="padding:0">
       <p class="muted small-text">You will only be shown to customers inside this radius.</p>
+      <div class="msg error" id="no-base-warn" style="display:none"></div>
       <div class="msg error" id="dash-error"></div>
       <div class="row mt">
         <button id="btn-toggle-online">Go online</button>

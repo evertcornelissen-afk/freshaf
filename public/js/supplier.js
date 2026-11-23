@@ -6,7 +6,7 @@ let online = false;
 let disconnectSse = null;
 
 const VIEWS = ['view-auth', 'view-status', 'view-dash'];
-const show = (view) => switchView(VIEWS, view);
+const show = (view) => { switchView(VIEWS, view); if (view === 'view-auth') ensureRegMap(); };
 
 /* ---------- structured boarding inputs: vehicles + equipment ---------- */
 const VEHICLE_TYPES = ['Car', 'Bakkie', 'Van / Kombi', 'Trailer rig', 'Motorbike'];
@@ -207,6 +207,21 @@ function decorate() {
   addVehicleRow();
   renderEquipmentList();
   renderAreaPicker();
+  el('btn-reg-geolocate')?.insertAdjacentHTML('afterbegin', icon('navigate'));
+  el('btn-reg-geolocate')?.addEventListener('click', () => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+        regMap?.showMe(lat, lng, accuracy);
+        setRegPin(lat, lng);
+        regMap?.flyTo(lat, lng, 16);
+      },
+      () => showRegError('Could not get your location — tap the map to drop your pin instead.', 'reg-map'),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+    );
+  });
+  const rr = el('reg-radius');
+  if (rr) rr.oninput = () => { el('reg-radius-label').textContent = rr.value + ' km'; };
   el('btn-add-vehicle').onclick = () => addVehicleRow();
   el('svc-carwash').addEventListener('change', renderEquipmentList);
   el('svc-laundry').addEventListener('change', renderEquipmentList);
@@ -728,6 +743,14 @@ function listenAccountUpdates() {
 async function enterDash() {
   online = !!me.supplier?.online;
   if (me.supplier?.lat != null) loc = { lat: me.supplier.lat, lng: me.supplier.lng };
+  const warn = el('no-base-warn');
+  if (warn) {
+    const missing = me.supplier?.lat == null;
+    warn.style.display = missing ? 'block' : 'none';
+    warn.textContent = missing
+      ? 'No jobs can reach you yet. Tap the map above to mark where you work from, set how far you travel, then go online.'
+      : '';
+  }
   renderOnline();
   refreshAlertsButton();
   if (me.supplier?.radius_km) {
@@ -819,6 +842,28 @@ function initMap() {
   if (loc.lat != null) setPin(loc.lat, loc.lng);
 }
 
+
+/* ---------- home base on the application form ----------
+   Jobs are offered by distance from a pin, so an approved pro with no pin can never be
+   sent work. Asking for it here (23 Nov 2026) means a pro is dispatchable the moment
+   they are approved, instead of waiting for them to open the app and tap the map. */
+let regMap = null;
+let regLoc = { lat: null, lng: null };
+
+function setRegPin(lat, lng) {
+  regLoc = { lat, lng };
+  regMap?.pin(lat, lng);
+  const box = el('reg-pin-status');
+  if (box) box.innerHTML = `${icon('pin')} Pin set — ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
+function ensureRegMap() {
+  if (!el('reg-map')) return;
+  if (regMap) { regMap.invalidateSize?.(); return; }
+  regMap = FreshMap.create('reg-map', [regLoc.lat ?? -29.0, regLoc.lng ?? 24.5],
+    regLoc.lat != null ? 15 : 5, setRegPin); // the whole of SA until they pick a spot
+  if (regLoc.lat != null) setRegPin(regLoc.lat, regLoc.lng);
+}
 function setPin(lat, lng) {
   loc = { lat, lng };
   map.pin(lat, lng);
@@ -1274,6 +1319,7 @@ el('btn-reg-code').onclick = () => withBusy(el('btn-reg-code'), 'Sending…', as
 const regFieldOf = (id) => ({
   services: el('svc-carwash').closest('.row'),
   area: el('area-chips'),
+  base: el('reg-pin-status')?.closest('.row'),
   terms: el('reg-terms').closest('label'),
   phone: el('reg-phone').closest('.row'),
   code: el('reg-code-row').style.display === 'none' ? el('reg-phone').closest('.row') : el('reg-code'),
@@ -1352,6 +1398,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
     if (!/^\d{13}$/.test(idNum)) throw fail('Your SA ID number is 13 digits', 'reg-idnum');
     const serviceArea = serviceAreaText();
     if (!serviceArea) throw fail('Tick at least one service area, or type it under Other areas', 'area');
+    if (regLoc.lat == null) throw fail('Drop a pin where you work from: jobs are offered by distance, so we cannot send you work without it', 'base');
     if (el('reg-password').value.length < 8) throw fail('Choose a password of at least 8 characters', 'reg-password');
     if (el('reg-password').value !== el('reg-password2').value) throw fail('The two passwords do not match. Type the same password in both boxes', 'reg-password2');
     if (!el('reg-terms').checked) throw fail('Please accept the Terms & Conditions to continue', 'terms');
@@ -1366,6 +1413,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
         business_name: el('reg-business').value, id_number: idNum,
         reg_number: el('reg-regno').value.trim(), vat_number: el('reg-vat').value.trim(),
         service_area: serviceArea,
+        lat: regLoc.lat, lng: regLoc.lng, radius_km: Number(el('reg-radius').value),
         vehicles: collectVehicles(), equipment: collectEquipment(),
         services, detailing_intent: !!el('svc-detailing')?.checked, accept_terms: true,
         phone_code: regPhone.canSkip ? undefined : el('reg-code').value.trim(),

@@ -239,6 +239,7 @@ router.get('/suppliers', (req, res) => {
         return v && { ...v, ...vetting.summarise(v) };
       })(),
       status: r.status, status_reason: r.status_reason, online: !!r.online, is_demo: !!r.is_demo,
+      has_base: r.lat != null, radius_km: r.radius_km || null,
       detailing_intent: !!r.detailing_intent,
       detailing: r.detailing_status ? {
         status: r.detailing_status, link: r.detailing_link, reason: r.detailing_reason,
