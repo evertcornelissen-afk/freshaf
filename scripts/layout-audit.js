@@ -71,12 +71,16 @@ const cust3 = user('customer', 'Pieter Botha');
 const XSS = '<img src=x onerror="window.__xss=(window.__xss||0)+1">';
 const p1 = pro('Sipho Bongani Ndlovu' + XSS, "Sipho's Professional Mobile Valet & Detailing Services (Pty) Ltd", 0.006, 0.004);
 const p2 = pro('Kagiso Molefe', 'Jozi Shine', -0.011, 0.007);
+db.prepare(`INSERT INTO supplier_docs (user_id, kind, original_name, stored_name, uploaded_at)
+  VALUES (?, 'police_clearance', 'clearance.pdf', 'audit-clearance.pdf', datetime('now'))`).run(p2.id);
 const p3 = pro('Ayesha Patel', 'Bubbles on Wheels Mobile Car Wash', 0.015, -0.012);
 const pending = pro('Thabo Nkosi', 'Thabo Shine Pending Applicant Mobile Wash', 0.02, 0.02, 'pending');
 // In review for the pro account AND for detailing: the longest version of the status page,
 // where the price card carries the detailing block as well.
 const pendingDet = pro('Mandla Sibusiso Khumalo-Ferreira', 'Khumalo Premium Mobile Detailing & Valet Specialists', 0.03, 0.03, 'pending');
 db.prepare("UPDATE suppliers SET detailing_status = 'pending', detailing_applied_at = datetime('now') WHERE user_id = ?").run(pendingDet.id);
+db.prepare(`INSERT INTO supplier_docs (user_id, kind, original_name, stored_name, uploaded_at)
+  VALUES (?, 'police_clearance', 'a-very-long-clearance-file-name-from-their-phone.pdf', 'audit-clearance-2.pdf', datetime('now'))`).run(pendingDet.id);
 const detPro = pro('Rethabile Mokoena', 'Mokoena Detailing', -0.004, 0.005, 'approved', 'carwash,detailing');
 db.prepare("UPDATE suppliers SET detailing_status = 'approved' WHERE user_id = ?").run(detPro.id);
 const TOKENS = new Map([cust, cust2, cust3, p1, p2, p3, pending, pendingDet, detPro].map((u) => [u.id, auth.signUser(u)]));

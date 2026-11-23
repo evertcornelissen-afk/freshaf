@@ -470,8 +470,9 @@ function renderQuotes() {
   box.innerHTML = quotesList.map((q) => `
     <div class="pro-opt ${q.id === chosenQuote ? 'selected' : ''}" data-id="${q.id}">
       <div>
-        <div class="who">${escapeHtml(q.business_name)}</div>
+        <div class="who">${escapeHtml(q.business_name)}${q.top_tier ? ' <span class="pill ok" style="font-size:.62rem;vertical-align:middle">TOP TIER</span>' : ''}</div>
         <div class="meta">${q.distance_km} km away${q.rating ? ` · ★ ${q.rating} (${q.rating_count})` : ' · New pro'}</div>
+        ${q.top_tier ? '<div class="meta">Police clearance on file with FreshAF</div>' : ''}
         ${q.availability ? `<div class="meta">${escapeHtml(q.availability)}</div>` : ''}
         ${q.note ? `<div class="meta">${escapeHtml(q.note)}</div>` : ''}
         <div class="verified-pro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.4 2.4 4.6-5"/></svg>Verified professional</div>
@@ -890,6 +891,7 @@ async function refreshBookingRequests() {
         <div class="row spread" style="padding:10px 0;border-top:1px solid var(--border-soft);margin-top:8px;gap:10px">
           <div style="min-width:0">
             <strong>${escapeHtml(q.business_name || q.name || 'Detailer')}</strong>
+            ${q.top_tier ? '<span class="pill ok" style="font-size:.62rem">TOP TIER</span>' : ''}
             ${q.rating ? `<span class="muted small-text"> ${icon('star')} ${q.rating} (${q.rating_count})</span>` : ''}
             ${q.availability ? `<div class="muted small-text">${escapeHtml(q.availability)}</div>` : ''}
             ${q.note ? `<div class="muted small-text">${escapeHtml(q.note)}</div>` : ''}

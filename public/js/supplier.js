@@ -350,12 +350,30 @@ async function renderDocs() {
     banner.innerHTML = '';
   }
 
+  // Top Tier, said once at the top: what it is and what it is worth to them.
+  const tier = checklist.find((c) => c.top_tier);
+  const tierBox = el('docs-tier');
+  if (tierBox && tier) {
+    tierBox.className = tier.have ? 'msg ok' : 'msg warn';
+    tierBox.style.display = 'block';
+    tierBox.innerHTML = tier.have
+      ? `${icon('check')} <strong>You are a Top Tier pro.</strong> Customers see your Top Tier badge, and your quote is
+         listed above pros without one.`
+      : `${icon('spark')} <strong>Become a Top Tier pro.</strong> Send a police clearance (under 6 months old) and
+         customers see a Top Tier badge on your quotes, listed above pros without one. It is optional — your
+         application does not wait for it.`;
+  }
+
   const docItems = checklist.filter((c) => c.kind === 'doc');
   el('docs-rows').innerHTML = docItems.map((c) => {
     const doc = (data.documents || []).find((d) => d.kind === c.key);
+    // The ID and the bank letter are the must-haves. The police clearance is the upgrade:
+    // it earns the Top Tier badge rather than holding the application up.
     const flag = c.asked && !c.have
       ? '<span class="pill warn" style="margin-left:7px;font-size:.68rem;padding:2px 9px">Requested</span>'
-      : (c.required ? '<span class="muted small-text" style="margin-left:7px">Required</span>' : '');
+      : c.required ? '<span class="muted small-text" style="margin-left:7px">Required</span>'
+      : c.top_tier ? `<span class="pill ${c.have ? 'ok' : 'warn'}" style="margin-left:7px;font-size:.68rem;padding:2px 9px">${c.have ? 'Top Tier' : 'Top Tier — optional'}</span>`
+      : '';
     return `
     <div class="row spread" style="padding:11px 0;border-bottom:1px solid var(--border-soft)">
       <div style="min-width:0">

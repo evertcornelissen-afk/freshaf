@@ -200,6 +200,9 @@ function quotePublic(q) {
     name: q.pro_name,
     rating: q.rating_count ? +(q.rating_sum / q.rating_count).toFixed(1) : null,
     rating_count: q.rating_count || 0,
+    // Police clearance on file: the badge the customer sees, and what puts this quote
+    // above an equally priced one without it.
+    top_tier: !!q.top_tier,
     distance_km: q.distance_km,
     // FreshAF sells the job to the customer at total_cents. What we pay the pro, and
     // what we keep, is our cost of sale and our margin — not the customer's business,
@@ -216,12 +219,13 @@ function quotePublic(q) {
 
 function listQuotes(requestId) {
   const rows = db.prepare(`
-    SELECT q.*, s.business_name, s.rating_sum, s.rating_count, u.name AS pro_name
+    SELECT q.*, s.business_name, s.rating_sum, s.rating_count, u.name AS pro_name,
+      EXISTS (SELECT 1 FROM supplier_docs d WHERE d.user_id = q.supplier_id AND d.kind = 'police_clearance') AS top_tier
     FROM quotes q
     JOIN suppliers s ON s.user_id = q.supplier_id
     JOIN users u ON u.id = q.supplier_id
     WHERE q.request_id = ? AND q.status = 'open'
-    ORDER BY q.total_cents ASC`).all(requestId);
+    ORDER BY top_tier DESC, q.total_cents ASC`).all(requestId);
   return rows.map(quotePublic);
 }
 

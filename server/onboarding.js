@@ -3,8 +3,12 @@
 // drift from the others.
 //
 // The required set mirrors the decision rule in SUPPLIER-ONBOARDING.md: do not approve
-// without the ID, the bank letter in the same name, and a police clearance for every
-// person who will do jobs.
+// without the ID, the bank letter in the same name, and bank details to pay into.
+//
+// Police clearance is NOT required (Evert, 23 Nov 2026). Demanding it up front cost us
+// pros who never came back, and it capped every applicant's safety score. It is now the
+// one thing that makes a pro Top Tier: a badge customers see, and a place above the
+// others on a quote list. Earned, not demanded.
 
 const { db } = require('./db');
 
@@ -18,9 +22,9 @@ const ITEMS = [
   { key: 'bank_letter', kind: 'doc', required: true,
     label: 'Bank confirmation letter',
     ask: 'A bank confirmation letter in the same name as your ID. Any bank app can generate one — it is not a statement.' },
-  { key: 'police_clearance', kind: 'doc', required: true,
-    label: 'Police clearance',
-    ask: 'A police clearance certificate less than 6 months old, for every person who will be doing jobs.' },
+  { key: 'police_clearance', kind: 'doc', required: false, topTier: true,
+    label: 'Police clearance (Top Tier)',
+    ask: 'Optional. Send a police clearance certificate less than 6 months old and your profile is marked Top Tier: customers see the badge and you are listed above pros without it.' },
   { key: 'bank_details', kind: 'field', required: true,
     label: 'Bank account details',
     ask: 'Your bank name, account number and branch, so we can pay you.' },
@@ -69,7 +73,7 @@ function checklist(supplier, docs) {
   try { asked = JSON.parse(supplier?.info_needed || '[]'); } catch { asked = []; }
   const askedSet = new Set(asked.filter(isValidKey));
   return ITEMS.map((i) => ({
-    key: i.key, label: i.label, ask: i.ask, kind: i.kind, required: i.required,
+    key: i.key, label: i.label, ask: i.ask, kind: i.kind, required: i.required, top_tier: !!i.topTier,
     have: have.has(i.key),
     asked: askedSet.has(i.key),
   }));
@@ -79,6 +83,12 @@ function checklist(supplier, docs) {
 function missingRequired(supplier, docs) {
   const have = haveFor(supplier, docs);
   return ITEMS.filter((i) => i.required && !have.has(i.key)).map((i) => i.key);
+}
+
+// Top Tier: a police clearance on file. Checked straight from the documents, so it can
+// never drift out of step with what was actually uploaded.
+function isTopTier(userId) {
+  return !!db.prepare("SELECT 1 FROM supplier_docs WHERE user_id = ? AND kind = 'police_clearance'").get(userId);
 }
 
 function labelsFor(keys) {
@@ -107,4 +117,4 @@ function settleRequest(userId) {
   return { done: true, supplied: asked };
 }
 
-module.exports = { ITEMS, BY_KEY, DOC_KINDS, isValidKey, checklist, missingRequired, labelsFor, asksFor, settleRequest };
+module.exports = { ITEMS, BY_KEY, DOC_KINDS, isValidKey, checklist, missingRequired, labelsFor, asksFor, settleRequest, isTopTier };

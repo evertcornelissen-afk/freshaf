@@ -174,6 +174,7 @@ function render() {
         : '<p class="muted">Nothing uploaded.</p>'}
     </div>
 
+    ${topTierHtml(s)}
     ${detailingHtml(s)}
 
     <div class="card">
@@ -208,6 +209,19 @@ function render() {
 
 // The detailing application, when there is one: photos of past work, their link, and the
 // decision. Separate from approving the pro: approving here only adds detailing jobs.
+// Top Tier: a police clearance on file. Not required to approve, but it is what the
+// customer sees and what lifts this pro above other quotes.
+function topTierHtml(s) {
+  const has = (s.checklist || []).some((c) => c.key === 'police_clearance' && c.have);
+  return `
+    <div class="card">
+      <h2>Top Tier <span class="pill ${has ? 'ok' : 'warn'}">${has ? 'yes' : 'not yet'}</span></h2>
+      <p class="muted small-text">${has
+        ? 'Police clearance on file. Customers see the Top Tier badge and this pro is listed above quotes without one. Check the date is under 6 months and that the name matches the ID.'
+        : 'No police clearance. They can still be approved and work — they simply get no badge and sit below Top Tier pros on a quote list.'}</p>
+    </div>`;
+}
+
 function detailingHtml(s) {
   const d = s.detailing;
   // Ticked "I also do detailing" when applying, but has not sent photos yet. Worth seeing

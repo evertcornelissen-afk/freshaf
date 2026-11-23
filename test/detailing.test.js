@@ -408,6 +408,34 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     r = await call(admin, '/api/admin/settings', 'POST', { detailing_booking: false });
     r = await ask('interior_detail');
     check('switching bookings off closes it again', r.status, 400);
+
+    // ---- Top Tier: a police clearance is a badge, not a gate (Evert, 23 Nov 2026) ----
+    // Two fresh pros, so none of the bookings above can make them busy: one with a police
+    // clearance on file and a higher price, one cheaper without.
+    const ttPro = mkUser('supplier', 'DT TopTier Washer', 'carwash');
+    const ttRival = mkUser('supplier', 'DT Cheaper Washer', 'carwash');
+    TOKENS.set(ttPro.id, auth.signUser(ttPro));
+    TOKENS.set(ttRival.id, auth.signUser(ttRival));
+    const ttQuote = () => r.json.quotes.find((q) => q.supplier_id === ttPro.id);
+
+    r = await ask('express', null, 'carwash');
+    let ttReq = r.json.request_id;
+    await call(ttPro, `/api/supplier/quote-requests/${ttReq}/quote`, 'POST', { price_cents: 19000 });
+    r = await call(customer, `/api/quote-requests/${ttReq}`);
+    check('a pro with no police clearance still quotes', !!ttQuote(), true);
+    check('and is not shown as Top Tier', ttQuote()?.top_tier, false);
+
+    await call(customer, `/api/quote-requests/${ttReq}/cancel`, 'POST');
+    db.prepare(`INSERT INTO supplier_docs (user_id, kind, original_name, stored_name, uploaded_at)
+      VALUES (?, 'police_clearance', 'clearance.pdf', 'x-clearance.pdf', datetime('now'))`).run(ttPro.id);
+    r = await ask('express', null, 'carwash');
+    ttReq = r.json.request_id;
+    await call(ttRival, `/api/supplier/quote-requests/${ttReq}/quote`, 'POST', { price_cents: 17000 });
+    await call(ttPro, `/api/supplier/quote-requests/${ttReq}/quote`, 'POST', { price_cents: 19000 });
+    r = await call(customer, `/api/quote-requests/${ttReq}`);
+    check('once the clearance is in, the customer sees Top Tier', ttQuote()?.top_tier, true);
+    check('and the Top Tier pro is listed first, above a cheaper quote without the badge',
+      [r.json.quotes.length, r.json.quotes[0].supplier_id === ttPro.id], [2, true]);
   } catch (e) {
     console.log('ERROR', e); checks.push(false);
   } finally {

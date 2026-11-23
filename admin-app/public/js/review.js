@@ -104,6 +104,33 @@ window.setCipc = async (userId, status) => {
 
 // Safety rating out of 5 (rules and weights in js/safety.js), shown first on every
 
+// Their shop and their stars, on the face of the analysis instead of hidden behind
+// "Why this score": it is the first thing the owner looks at. A listing whose name does
+// not match the business is shown as a warning, never as their rating.
+function businessHtml(b) {
+  if (!b) return '';
+  if (!b.name) {
+    return `<div class="small-text muted" style="margin-top:6px">No Google listing — ${escapeHtml(b.reason || 'not checked')}.
+      Common for a one-person operation, and not a mark against them.</div>`;
+  }
+  const stars = b.rating != null
+    ? `★ <strong>${b.rating}</strong> <span class="muted">(${b.reviews} review${b.reviews === 1 ? '' : 's'})</span>`
+    : '<span class="muted">no rating yet</span>';
+  const closed = b.status && b.status !== 'OPERATIONAL'
+    ? ` <span class="pill bad">${escapeHtml(String(b.status).replace(/_/g, ' ').toLowerCase())}</span>` : '';
+  const link = b.maps_url ? ` <a href="${b.maps_url}" target="_blank" rel="noopener noreferrer">open on Maps</a>` : '';
+  if (b.matches === false) {
+    return `<div class="small-text" style="margin-top:6px;color:var(--danger)">
+      <strong>Google found a different business:</strong> ${escapeHtml(b.name)}${closed} — ${stars}.
+      ${b.shop ? `<br><span class="muted">${escapeHtml(b.shop)}</span>` : ''}${link}
+      <br>Those reviews are not theirs. Ask the applicant for their own listing or page.</div>`;
+  }
+  return `<div class="small-text" style="margin-top:6px">
+    <strong>${escapeHtml(b.name)}</strong>${closed} — ${stars}
+    ${b.shop ? `<br><span class="muted">Shop: ${escapeHtml(b.shop)}</span>` : '<br><span class="muted">No shop address on the listing</span>'}
+    ${link}</div>`;
+}
+
 function safetyHtml(s) {
   if (!window.FreshSafety) return '';
   const r = window.FreshSafety.safetyRating(s);
@@ -119,6 +146,7 @@ function safetyHtml(s) {
         <span style="color:${color};letter-spacing:1px">${stars}</span>
         <strong style="color:${color}">${escapeHtml(r.verdict)}</strong>
       </div>
+      ${businessHtml(r.business)}
       <details style="margin-top:4px">
         <summary class="small-text" style="cursor:pointer">Why this score</summary>
         <div class="small-text" style="margin-top:5px">

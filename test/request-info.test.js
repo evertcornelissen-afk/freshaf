@@ -114,7 +114,8 @@ const ID_VALID = '9203045800084';
     const mine = (list1.suppliers || []).find((s) => s.email === email);
     check('the application is visible to the admin', !!mine, true);
     check('required items are reported missing',
-      (mine?.missing || []).slice().sort(), ['bank_details', 'bank_letter', 'id_copy', 'police_clearance']);
+      // Police clearance is the Top Tier upgrade since 23 Nov 2026, never a blocker.
+      (mine?.missing || []).slice().sort(), ['bank_details', 'bank_letter', 'id_copy']);
 
     const id = mine.user_id;
 
