@@ -19,6 +19,13 @@ const EQUIPMENT = {
     { key: 'gazebo', label: 'Gazebo / shade cover' },
     { key: 'products', label: 'Own cleaning products' },
   ],
+  detailing: [
+    { key: 'polisher', label: 'Machine polisher' },
+    { key: 'extractor', label: 'Wet / dry extractor' },
+    { key: 'steamer', label: 'Steam cleaner' },
+    { key: 'coatings', label: 'Ceramic or sealant coatings' },
+    { key: 'inspection_light', label: 'Paint inspection light' },
+  ],
   laundry: [
     { key: 'washing_machines', label: 'Washing machines', qty: 'Qty' },
     { key: 'tumble_dryers', label: 'Tumble dryers', qty: 'Qty' },
@@ -142,11 +149,25 @@ function collectVehicles() {
   })).filter((v) => v.reg || v.model);
 }
 
+/* The detailing tick is only on the form while FreshAF is taking detailing applications
+   (the admin switch). Nothing about detailing is promised to a customer by this: it is the
+   pro side only. */
+async function showDetailingTick() {
+  const wrap = el('svc-detailing-wrap'); const hint = el('svc-detailing-hint');
+  if (!wrap) return;
+  let open = false;
+  try { open = !!(await api('/api/pricing')).detailing_signup_open; } catch { open = false; }
+  wrap.style.display = open ? '' : 'none';
+  if (hint) hint.style.display = open ? '' : 'none';
+  if (!open && el('svc-detailing')) el('svc-detailing').checked = false;
+}
+
 function renderEquipmentList() {
   // Preserve current state across re-renders when services change.
   const prev = collectEquipmentState();
   const active = [];
   if (el('svc-carwash').checked) active.push(...EQUIPMENT.carwash);
+  if (el('svc-detailing')?.checked) active.push(...EQUIPMENT.detailing);
   if (el('svc-laundry').checked) active.push(...EQUIPMENT.laundry);
   el('equipment-list').innerHTML = active.map((item) => {
     const p = prev[item.key] || {};
@@ -189,6 +210,8 @@ function decorate() {
   el('btn-add-vehicle').onclick = () => addVehicleRow();
   el('svc-carwash').addEventListener('change', renderEquipmentList);
   el('svc-laundry').addEventListener('change', renderEquipmentList);
+  el('svc-detailing')?.addEventListener('change', renderEquipmentList);
+  showDetailingTick();
   el('h-docs').insertAdjacentHTML('afterbegin', icon('shield'));
   el('btn-enable-alerts').insertAdjacentHTML('afterbegin', icon('signal'));
   el('h-avail').insertAdjacentHTML('afterbegin', icon('signal'));
@@ -521,6 +544,8 @@ async function renderDetailing(boxId) {
   // Not applied yet, or declined and free to apply again.
   const enough = d.photos.length >= d.min_photos;
   box.innerHTML = `${head}
+    ${d.intent && !d.status ? `<div class="msg warn" style="display:block">${icon('alert')} You told us you also do detailing.
+      Add your photos below to apply — this is the only way detailing jobs reach you.</div>` : ''}
     ${d.status === 'declined' ? `<div class="msg error" style="display:block">Your last detailing application was not approved.
       ${d.reason ? `Reason: ${escapeHtml(d.reason)}` : ''} You can update it below and apply again.</div>` : ''}
     <p class="muted small-text">Do proper detailing: interior, machine polish, ceramic? Apply to get detailing requests.
@@ -1289,7 +1314,11 @@ const fail = (msg, field) => Object.assign(new Error(msg), { field });
 el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting application…', async () => {
   clearRegErrors();
   try {
-    if (!el('svc-carwash').checked && !el('svc-laundry').checked) throw fail('Choose at least one service you offer', 'services');
+    if (!el('svc-carwash').checked && !el('svc-laundry').checked) {
+      throw fail(el('svc-detailing')?.checked
+        ? 'Also tick car wash: detailing is approved separately, so you need an everyday service while we review it'
+        : 'Choose at least one service you offer', 'services');
+    }
     if (!el('reg-name').value.trim()) throw fail('Enter your full name', 'reg-name');
     if (!el('reg-business').value.trim()) throw fail('Enter your business or trading name. Your own name is fine if you work alone', 'reg-business');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(el('reg-email').value.trim())) throw fail('Enter a valid email address', 'reg-email');
@@ -1320,7 +1349,7 @@ el('btn-register').onclick = () => withBusy(el('btn-register'), 'Submitting appl
         reg_number: el('reg-regno').value.trim(), vat_number: el('reg-vat').value.trim(),
         service_area: serviceArea,
         vehicles: collectVehicles(), equipment: collectEquipment(),
-        services, accept_terms: true,
+        services, detailing_intent: !!el('svc-detailing')?.checked, accept_terms: true,
         phone_code: regPhone.canSkip ? undefined : el('reg-code').value.trim(),
         bank_name: el('reg-bank').value, bank_account: el('reg-account').value, bank_branch: el('reg-branch').value,
       },

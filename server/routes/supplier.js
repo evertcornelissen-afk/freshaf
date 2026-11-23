@@ -208,13 +208,14 @@ const detailingUpload = multer({
 function detailingState(userId) {
   const q = require('../quotes');
   const s = db.prepare(`SELECT services, detailing_status, detailing_link, detailing_reason,
-    detailing_applied_at, detailing_decided_at FROM suppliers WHERE user_id = ?`).get(userId);
+    detailing_applied_at, detailing_decided_at, detailing_intent FROM suppliers WHERE user_id = ?`).get(userId);
   const photos = db.prepare('SELECT id, original_name, uploaded_at FROM detailing_photos WHERE user_id = ? ORDER BY id').all(userId);
   const services = (s?.services || 'carwash').split(',');
   return {
     signup_open: q.detailingSignupOpen(),
     booking_open: q.serviceOpen('detailing'),
     status: s?.detailing_status || null,
+    intent: !!s?.detailing_intent,
     link: s?.detailing_link || null,
     reason: s?.detailing_reason || null,
     applied_at: s?.detailing_applied_at || null,

@@ -211,6 +211,9 @@ addColumn('users', 'home_lat REAL');
 addColumn('users', 'home_lng REAL');
 addColumn('suppliers', "services TEXT NOT NULL DEFAULT 'carwash'");
 addColumn('suppliers', 'vehicles_json TEXT');
+// Ticked "I also do detailing" on the application form. It is an intention, not an
+// approval: detailing only reaches a pro once an admin approves their photos.
+addColumn('suppliers', 'detailing_intent INTEGER NOT NULL DEFAULT 0');
 addColumn('suppliers', 'equipment_json TEXT');
 addColumn('suppliers', 'bank_name TEXT');
 addColumn('suppliers', 'bank_account TEXT');

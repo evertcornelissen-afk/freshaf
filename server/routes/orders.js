@@ -22,6 +22,9 @@ const SERVICES_ALL = require('../pricing').SERVICES;
 router.get('/pricing', (req, res) => {
   res.json({
     services: catalog(require('../quotes').openServiceKeys(viewer(req))), payments_live: payments.cardAvailableFor(viewer(req)),
+    // Pro side only: whether the application form offers detailing. Nothing about
+    // detailing is shown to a customer until the separate booking switch is on.
+    detailing_signup_open: require('../quotes').detailingSignupOpen(),
     points_earn_pct: Number(getSetting('points_earn_pct', '5')),
     callout: {
       free_km: Number(getSetting('callout_free_km', '5')),

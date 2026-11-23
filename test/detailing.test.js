@@ -314,6 +314,50 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     r = await call(demoCust, '/api/quote-requests', 'POST', { service: 'carwash', package: 'express', vehicle: 'sedan', address: 'Demo', lat: -33.84, lng: 18.65 });
     check('demo accounts keep instant answers', r.json.auto_quoted >= 1, true);
 
+    // ---- "I also do detailing" on the application form ----
+    // The sign-up flow proves the WhatsApp number first; stand that part in so these
+    // checks are about the detailing tick and nothing else.
+    const provedPhone = (phone, code) => db.prepare(`INSERT INTO signup_phone_codes (phone, code, attempts, send_failed, expires_at, sent_at)
+      VALUES (?, ?, 0, 0, datetime('now', '+30 minutes'), datetime('now'))
+      ON CONFLICT(phone) DO UPDATE SET code = excluded.code, attempts = 0, expires_at = excluded.expires_at`).run(phone, code);
+    const signUp = (email, body) => fetch(`${BASE}/api/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-FreshAF-Client': 'native' },
+      body: JSON.stringify({ role: 'supplier', name: 'DT Applicant', email, password: 'TestPass!2026',
+        phone: '0780000000', accept_terms: true, business_name: 'DT Applicant Detailing',
+        id_number: '9001015800085', service_area: 'Western Cape: Northern Suburbs',
+        services: ['carwash'], ...body }),
+    });
+    const intentOf = (email) => db.prepare(`SELECT detailing_intent d FROM suppliers
+      WHERE user_id = (SELECT id FROM users WHERE email = ?)`).get(email)?.d;
+
+    await call(admin, '/api/admin/settings', 'POST', { detailing_signup: false });
+    let pub = await (await fetch(`${BASE}/api/pricing`)).json();
+    check('the form is not offered detailing while applications are closed', pub.detailing_signup_open, false);
+    let email = `dt-closed-${stamp}@test.invalid`;
+    provedPhone('27780000000', '123456');
+    let reg = await signUp(email, { detailing_intent: true, phone_code: '123456' });
+    if (reg.status !== 200) console.log('REGDEBUG', await reg.clone().json());
+    check('signing up with detailing ticked still works while it is closed', reg.status, 200);
+    check('but the intention is not recorded', intentOf(email), 0);
+
+    await call(admin, '/api/admin/settings', 'POST', { detailing_signup: true });
+    pub = await (await fetch(`${BASE}/api/pricing`)).json();
+    check('with applications open the form offers detailing', pub.detailing_signup_open, true);
+    email = `dt-intent-${stamp}@test.invalid`;
+    provedPhone('27780000000', '123456');
+    reg = await signUp(email, { detailing_intent: true, phone_code: '123456' });
+    check('a detailer signs up with the tick on', reg.status, 200);
+    check('the intention is recorded', intentOf(email), 1);
+    const applicant = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    check('and detailing is NOT added to their services',
+      db.prepare('SELECT services FROM suppliers WHERE user_id = ?').get(applicant.id).services, 'carwash');
+    TOKENS.set(applicant.id, auth.signUser(applicant));
+    r = await call(applicant, '/api/supplier/detailing');
+    check('their own page knows they said yes, with no application yet', [r.json.intent, r.json.status], [true, null]);
+    r = await call(admin, '/api/admin/suppliers');
+    check('the admin list shows the intention',
+      r.json.suppliers.find((x) => x.user_id === applicant.id).detailing_intent, true);
+
     // ---- prices can be loaded while the detailing application is in review ----
     // (Evert, 22 Nov 2026: "let the ones who do detailing put their pricing in for detailing solong")
     const waiting = mkUser('supplier', 'DT Waiting Detailer', 'carwash');

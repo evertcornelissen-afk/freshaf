@@ -210,7 +210,17 @@ function render() {
 // decision. Separate from approving the pro: approving here only adds detailing jobs.
 function detailingHtml(s) {
   const d = s.detailing;
-  if (!d) return '';
+  // Ticked "I also do detailing" when applying, but has not sent photos yet. Worth seeing
+  // here: it is a detailer who has not finished the second application.
+  if (!d) {
+    if (!s.detailing_intent) return '';
+    return `
+    <div class="card">
+      <h2>Detailing <span class="pill warn">said yes, not applied</span></h2>
+      <p class="muted small-text">They ticked detailing on their application but have not sent photos of their work yet,
+        so no detailing job can reach them. Worth a nudge if the rest of the application is good.</p>
+    </div>`;
+  }
   const pill = `<span class="pill ${d.status === 'approved' ? 'ok' : d.status === 'pending' ? 'warn' : 'bad'}">${d.status}</span>`;
   const link = d.link ? `<a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(d.link)}</a>` : 'none';
   return `

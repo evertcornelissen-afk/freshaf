@@ -42,6 +42,7 @@ require(path.join(ROOT, 'node_modules', 'dotenv')).config({ path: path.join(ROOT
 const { db, setSetting } = require(path.join(ROOT, 'server', 'db'));
 const auth = require(path.join(ROOT, 'server', 'auth'));
 setSetting('detailing_booking', '0');
+setSetting('detailing_signup', '1'); // pros may apply: puts the Detailing tick on the form
 setSetting('app_min_build', '10'); setSetting('app_latest_build', '20'); // only fake 'native' scenes read these
 
 const HOME = { lat: -26.1458, lng: 28.0416, address: '1234 Jan Smuts Avenue, Craighall Park Extension 2, Randburg, Johannesburg North, Gauteng, 2196' };
@@ -250,6 +251,7 @@ async function main() {
       { key: 'c-update-bar', who: cust, path: '/', run: "window.FRESHAF_NATIVE = true; window.Capacitor = Object.assign(window.Capacitor || {}, { getPlatform: () => 'android', Plugins: { App: { getInfo: async () => ({ build: '15' }) } } }); localStorage.removeItem('freshaf_update_asked'); await checkAppVersion(); await new Promise((r) => setTimeout(r, 300));" },
       { key: 'p-auth', who: null, path: '/supplier' },
       { key: 'p-apply-open', who: null, path: '/supplier#apply', run: "el('area-pick').open = true; el('btn-add-vehicle').click(); el('btn-add-vehicle').click(); await new Promise((r) => setTimeout(r, 300));" },
+      { key: 'p-apply-detailing', who: null, path: '/supplier#apply', wait: 900, run: "await showDetailingTick(); el('svc-detailing').checked = true; el('svc-detailing').dispatchEvent(new Event('change')); el('svc-laundry').checked = true; el('svc-laundry').dispatchEvent(new Event('change')); await new Promise((r) => setTimeout(r, 300));" },
       { key: 'p-menu', who: p1, path: '/supplier', run: "document.querySelector('.menu-btn').click(); await new Promise((r) => setTimeout(r, 500));" },
       { key: 'p-pending', who: pending, path: '/supplier', wait: 800 },
       { key: 'p-pending-detailing', who: pendingDet, path: '/supplier', wait: 1200 },
