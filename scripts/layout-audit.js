@@ -71,9 +71,13 @@ const cust3 = user('customer', 'Pieter Botha');
 const XSS = '<img src=x onerror="window.__xss=(window.__xss||0)+1">';
 const p1 = pro('Sipho Bongani Ndlovu' + XSS, "Sipho's Professional Mobile Valet & Detailing Services (Pty) Ltd", 0.006, 0.004);
 const p2 = pro('Kagiso Molefe', 'Jozi Shine', -0.011, 0.007);
-db.prepare(`INSERT INTO supplier_docs (user_id, kind, original_name, stored_name, uploaded_at)
-  VALUES (?, 'police_clearance', 'clearance.pdf', 'audit-clearance.pdf', datetime('now'))`).run(p2.id);
 const p3 = pro('Ayesha Patel', 'Bubbles on Wheels Mobile Car Wash', 0.015, -0.012);
+// Top Tier pros: a police clearance on file, so the customer's badge and the pro's own
+// Top Tier banner are both measured.
+for (const who of [p1, p2]) {
+  db.prepare(`INSERT INTO supplier_docs (user_id, kind, original_name, stored_name, uploaded_at)
+    VALUES (?, 'police_clearance', 'clearance.pdf', 'audit-clearance-' || ? || '.pdf', datetime('now'))`).run(who.id, who.id);
+}
 const pending = pro('Thabo Nkosi', 'Thabo Shine Pending Applicant Mobile Wash', 0.02, 0.02, 'pending');
 // In review for the pro account AND for detailing: the longest version of the status page,
 // where the price card carries the detailing block as well.
