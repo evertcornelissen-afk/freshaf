@@ -25,7 +25,15 @@ const PAYFAST_READY = Boolean(MERCHANT_ID && MERCHANT_KEY);
 // test card numbers would get a "paid" booking for free. So test keys never count as live.
 // They still work for demo accounts, which is how the real card checkout gets tested.
 const STITCH_TEST = PROVIDER === 'stitch' && stitch.isConfigured() && stitch.isTestMode();
-const LIVE = ENABLED && (PROVIDER === 'stitch' ? stitch.isConfigured() && !STITCH_TEST : PAYFAST_READY);
+// Second lock, live keys only. Stitch Express settles into FreshAF's own account and
+// cannot pay a pro, so taking a real card payment before the payout run is acknowledged
+// would book jobs FreshAF has no agreed way to pay out. PAYOUTS_READY is that
+// acknowledgement (the admin ledger + bank CSV in server/payouts.js). It is not inferred
+// from the code existing: a deploy must not start charging just because the ledger
+// shipped. Test keys do not need it — they never charge a real customer.
+const PAYOUTS_READY = process.env.PAYOUTS_READY === 'true';
+const STITCH_LIVE_KEYS = PROVIDER === 'stitch' && stitch.isConfigured() && !STITCH_TEST;
+const LIVE = ENABLED && (PROVIDER === 'stitch' ? STITCH_LIVE_KEYS && PAYOUTS_READY : PAYFAST_READY);
 const TEST_GATEWAY = ENABLED && STITCH_TEST;
 
 // Whether card is offered to this person. Real customers: only when real money can move.
@@ -84,14 +92,30 @@ async function createPayment(order, customer) {
 
 // What the admin readiness panel says about card payments.
 function statusDetail() {
-  if (LIVE) return `Card gateway is live (${PROVIDER}).`;
+  if (LIVE) {
+    return `Card gateway is live (${PROVIDER}). Pros are paid from the admin payout run, not by Stitch.`;
+  }
+  if (STITCH_LIVE_KEYS && ENABLED && !PAYOUTS_READY) {
+    return 'Stitch live keys are set and PAYMENTS_LIVE=true, but card stays off until PAYOUTS_READY=true. '
+      + 'That flag confirms pros will be paid from the admin payout run. Stitch Express cannot pay them. '
+      + 'Cash orders work fully.';
+  }
   if (TEST_GATEWAY) {
     return 'Stitch is connected with TEST keys, so card is hidden from real customers (cash only). '
-      + 'Demo accounts can rehearse the card checkout. Put the live Stitch keys on Render to switch card on.';
+      + 'Demo accounts can rehearse the card checkout. Put the live Stitch keys on Render to switch card on. '
+      + 'Live keys also need PAYOUTS_READY=true, and PAYMENTS_LIVE must be false while the keys are swapped.';
   }
-  if (!ENABLED) return 'Off until PAYMENTS_LIVE=true. Cash orders work fully.';
+  if (!ENABLED) {
+    const extra = STITCH_LIVE_KEYS
+      ? ' Live Stitch keys are already present: card stays off until PAYOUTS_READY=true as well.'
+      : '';
+    return `Off until PAYMENTS_LIVE=true. Cash orders work fully.${extra}`;
+  }
   if (PROVIDER === 'stitch') return `Stitch selected but not configured: ${stitch.missing().join(', ')}. Cash orders work fully.`;
   return 'PayFast selected but has no merchant keys. Cash orders work fully.';
 }
 
-module.exports = { createPayment, payfastSignature, statusDetail, cardAvailableFor, LIVE, TEST_GATEWAY, PROVIDER };
+module.exports = {
+  createPayment, payfastSignature, statusDetail, cardAvailableFor,
+  LIVE, TEST_GATEWAY, PROVIDER, PAYOUTS_READY,
+};

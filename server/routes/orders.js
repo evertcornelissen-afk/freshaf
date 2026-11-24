@@ -699,7 +699,16 @@ router.post('/payments/stitch/webhook', async (req, res) => {
   }
 
   // Svix retries until it gets a 2xx, so this has to be safe to run twice.
-  if (order.payment_status === 'paid') return res.send('ok');
+  // A retry of an already-paid job still tries to credit the payout ledger: the
+  // unique index makes the second write a no-op, and a job that was completed
+  // before the payment notification arrived gets its credit here.
+  if (order.payment_status === 'paid') {
+    try { require('../payouts').recordCardEarning(order.id); } catch (e) {
+      console.error(`[FreshAF] Payout ledger did not record order ${order.id}: ${e.message}`);
+      return res.status(500).send('retry');
+    }
+    return res.send('ok');
+  }
 
   // Money for an order that is already cancelled: the customer finished paying after the
   // checkout expired or after cancelling. It must go back, and someone must be told.
@@ -723,7 +732,14 @@ router.post('/payments/stitch/webhook', async (req, res) => {
     return res.send('ok');
   }
   db.prepare("UPDATE orders SET payment_status = 'paid' WHERE id = ?").run(order.id);
-  if (order.status === 'pending_payment') afterPayment(order.id);
+  if (order.status === 'completed') {
+    try { require('../payouts').recordCardEarning(order.id); } catch (e) {
+      console.error(`[FreshAF] Payout ledger did not record order ${order.id}: ${e.message}`);
+      return res.status(500).send('retry');
+    }
+  } else if (order.status === 'pending_payment') {
+    afterPayment(order.id);
+  }
   console.log(`[FreshAF] Stitch confirmed payment for order ${order.id}.`);
   res.send('ok');
 });

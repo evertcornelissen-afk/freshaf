@@ -55,6 +55,16 @@ function build(day) {
   if (stuckWorking.length) todo.push(`<strong>Marked in progress for over 8 h:</strong> ${stuckWorking.map((r) => `#${r.id}`).join(', ')}. Probably finished but not closed.`);
   if (blocked.length) todo.push(`<strong>${blocked.length} pro${blocked.length === 1 ? '' : 's'} blocked at the cash limit.</strong> Collect and press Settle cash.`);
   if (pendingPros) todo.push(`<strong>${pendingPros} pro application${pendingPros === 1 ? '' : 's'} waiting</strong> for review.`);
+  try {
+    const owed = require('./payouts').statements()
+      .reduce((sum, s) => sum + (s.net_cents || 0), 0);
+    if (owed > 0) {
+      todo.push(`<strong>${rand(owed)} ready to pay pros</strong> after cash set-off. `
+        + 'Open Payouts in the admin app, export the CSV, pay it at the bank, then mark the batch paid.');
+    }
+  } catch (e) {
+    console.warn(`[FreshAF] Daily summary could not read payouts: ${e.message}`);
+  }
 
   const cancelText = cancelled.length
     ? cancelled.map((r) => `${r.c} by ${r.who}`).join(', ')

@@ -3,6 +3,9 @@
 // FreshAF is the merchant of record, so this is an ordinary card acquirer integration:
 // the customer pays FreshAF, the money settles into FreshAF's own bank account, and we
 // pay pros separately as our suppliers. No marketplace or split-payment product needed.
+// Pros are paid from server/payouts.js (a ledger and a bank CSV). Do not add a call to
+// /api/v1/withdrawal for that: it only moves FreshAF's own balance to FreshAF's own
+// verified account.
 //
 // IMPORTANT: Stitch Express (https://express.stitch.money/api/v1) is a REST API and a
 // DIFFERENT PRODUCT from the Stitch Enterprise/Connect GraphQL API at api.stitch.money.

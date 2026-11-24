@@ -76,9 +76,11 @@ tested:
 Verified end to end: clean pro offered work → four cash jobs (R252, under) still offered → fifth
 job (R315, over) blocked and removed from dispatch → settled → offered work again.
 
-**Still to wire, once card is live:** automatic set-off against card payouts, so the balance
-clears itself instead of needing the admin. `balance.settle()` is the hook — the payout run calls
-it and deducts the returned amount. There is no payout run yet because there is no card revenue.
+**Wired, November 2026:** card earnings land on a ledger when a paid card job is completed
+(`server/payouts.js`). Creating a payout batch calls `balance.settleUpTo()` and deducts that
+amount, oldest cash job first, including a partial job. The admin exports a CSV, pays it at
+the bank, and marks the batch paid. Stitch Express cannot pay the pro itself — see
+`STITCH-SETUP.md`. Earnings wait `payout_hold_days` (default 7) before they can be included.
 
 ⚠️ The risk this closes: without a cap, a pro could take R63 of your money on twenty cash jobs,
 disappear owing R1,260, and you would have no realistic way to recover it. **R300 is now the most

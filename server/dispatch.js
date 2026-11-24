@@ -277,6 +277,11 @@ function cancelOrder(orderId, { by = 'customer', reason = null } = {}) {
   } catch (e) {
     console.warn(`[FreshAF] Cancellation emails for order ${order.id} failed: ${e.message}`);
   }
+  // A card job that was already credited (it shouldn't be: earnings wait for
+  // completion, and a completed job cannot be cancelled) is voided or clawed back.
+  try { require('./payouts').onRefund(order.id); } catch (e) {
+    console.warn(`[FreshAF] Payout was not adjusted for cancelled order ${order.id}: ${e.message}`);
+  }
   console.log(`[FreshAF] Order ${order.id} cancelled by ${by}${refundDue ? `; refund due R${(refundDue / 100).toFixed(2)}` : ''}`);
   return fresh;
 }

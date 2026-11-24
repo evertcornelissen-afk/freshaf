@@ -32,6 +32,11 @@ if (fs.existsSync(RESTORE_FILE)) {
 const db = new DatabaseSync(DB_FILE);
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
+// Tests open this file from the test process and from the server at the same time, and
+// a pro application writes its vetting result after the HTTP response has already
+// returned. Without a wait, that overlap is "database is locked" instead of a few
+// milliseconds. Five seconds is far longer than any of those writes.
+db.exec('PRAGMA busy_timeout = 5000');
 
 // Automatic snapshots, on the server's own disk.
 //
@@ -312,6 +317,9 @@ addColumn('orders', 'points_earned_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'supplier_price_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'platform_fee_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'fee_settled INTEGER NOT NULL DEFAULT 0');
+// Cents of a cash job's fee already set off against a card payout. fee_settled stays 0
+// until the whole fee is covered, so a partial set-off does not forgive the rest.
+addColumn('orders', 'fee_settled_cents INTEGER NOT NULL DEFAULT 0');
 addColumn('orders', 'requested_supplier_id INTEGER');
 addColumn('suppliers', 'radius_km REAL');
 // Scheduling. NULL means as soon as possible. Stored as local wall time
@@ -667,6 +675,70 @@ try {
 } catch (e) {
   console.error('[FreshAF] Could not encrypt existing supplier details:', e.message);
 }
+
+// What FreshAF owes each pro for card jobs, and the batches an admin pays by EFT.
+// Stitch Express cannot pay a pro (it only withdraws into FreshAF's own bank account),
+// so this ledger is the payout run. See server/payouts.js.
+db.exec(`
+CREATE TABLE IF NOT EXISTS payout_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supplier_id INTEGER NOT NULL REFERENCES users(id),
+  order_id INTEGER REFERENCES orders(id),
+  kind TEXT NOT NULL CHECK (kind IN ('earning','clawback')),
+  amount_cents INTEGER NOT NULL,
+  applied_cents INTEGER NOT NULL DEFAULT 0,
+  payout_id INTEGER,
+  voided_at TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payout_earning_once
+  ON payout_entries(order_id) WHERE kind = 'earning' AND order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payout_clawback_once
+  ON payout_entries(order_id) WHERE kind = 'clawback' AND order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payout_entries_supplier ON payout_entries(supplier_id, kind);
+
+CREATE TABLE IF NOT EXISTS payout_batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid','void')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_by TEXT,
+  paid_at TEXT,
+  reference TEXT,
+  earnings_cents INTEGER NOT NULL DEFAULT 0,
+  clawback_cents INTEGER NOT NULL DEFAULT 0,
+  setoff_cents INTEGER NOT NULL DEFAULT 0,
+  net_cents INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS payouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id INTEGER NOT NULL REFERENCES payout_batches(id),
+  supplier_id INTEGER NOT NULL REFERENCES users(id),
+  earnings_cents INTEGER NOT NULL DEFAULT 0,
+  clawback_cents INTEGER NOT NULL DEFAULT 0,
+  setoff_cents INTEGER NOT NULL DEFAULT 0,
+  net_cents INTEGER NOT NULL DEFAULT 0,
+  has_bank INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','void')),
+  reference TEXT,
+  paid_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_payouts_batch ON payouts(batch_id);
+CREATE TABLE IF NOT EXISTS payout_links (
+  payout_id INTEGER NOT NULL REFERENCES payouts(id),
+  entry_id INTEGER NOT NULL REFERENCES payout_entries(id),
+  amount_cents INTEGER NOT NULL,
+  PRIMARY KEY (payout_id, entry_id)
+);
+CREATE TABLE IF NOT EXISTS payout_setoffs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  payout_id INTEGER NOT NULL REFERENCES payouts(id),
+  order_id INTEGER NOT NULL REFERENCES orders(id),
+  amount_cents INTEGER NOT NULL
+);
+`);
+if (!getSetting('payout_hold_days')) setSetting('payout_hold_days', '7');
 
 module.exports = { db, getSetting, setSetting, checkpoint, DATA_DIR, DB_FILE, RESTORE_FILE, persistence, DEFAULT_ADMIN_PASSWORD,
   SNAPSHOT_DIR, takeSnapshot, lastSnapshotInfo: () => lastSnapshot };
