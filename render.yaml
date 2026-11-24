@@ -25,7 +25,10 @@ services:
         sync: false # set a strong one BEFORE first boot — the admin account is seeded once
       # Stitch Express. Card stays off until PAYMENTS_LIVE is literally "true" AND the
       # client id and secret are present, so these being set is not enough to charge
-      # anyone by accident.
+      # anyone by accident. Live keys (not the test- pair) also need PAYOUTS_READY=true:
+      # Stitch cannot pay pros, and live charges are refused until that flag confirms
+      # the admin payout run is how they get paid. Leave PAYOUTS_READY empty until then.
+      # Set PAYMENTS_LIVE false before replacing test keys with live keys.
       - key: PAYMENT_PROVIDER
         value: stitch
       - key: STITCH_CLIENT_ID
@@ -36,6 +39,8 @@ services:
         sync: false
       - key: PAYMENTS_LIVE
         sync: false
+      - key: PAYOUTS_READY
+        sync: false # true only once the admin payout run is the way pros are paid
       # Optional. Without it, address search falls back to OpenStreetMap and the callout
       # fee falls back to straight-line distance.
       - key: GOOGLE_MAPS_API_KEY

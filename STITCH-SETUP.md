@@ -211,7 +211,7 @@ regenerates it and would break the copy you already have.
 | `STITCH_CLIENT_ID` | copy from `.env` (starts `test-` while testing) |
 | `STITCH_CLIENT_SECRET` | copy from `.env` |
 | `STITCH_WEBHOOK_SECRET` | copy from `.env` (starts `whsec_`) |
-| `PAYMENTS_LIVE` | `true` — **safe while the credentials are the `test-` pair** |
+| `PAYMENTS_LIVE` | `true` — **safe only while the client id starts with `test-`** |
 
 Stitch Express settles into the bank account verified on the account, so there are **no
 beneficiary variables**. The older advice to set `STITCH_BENEFICIARY_*` or
@@ -222,12 +222,18 @@ beneficiary variables**. The older advice to set `STITCH_BENEFICIARY_*` or
 Card is off while that is unset, which means the live site cannot exercise the real
 payment path at all — and the webhook is registered against `https://freshaf.io`, so it
 can never be proven from a laptop. Turning it on with the **test** credentials runs the
-whole chain on the real domain while charging nobody. Swap in the live credentials only
-once an end-to-end test has passed.
+whole chain on the real domain while charging nobody.
+
+This is safe **only while `STITCH_CLIENT_ID` starts with `test-`**. Test keys move no
+money, and real customers still see cash. The moment the client id is a live one,
+`PAYMENTS_LIVE=true` is not safe on its own. Live card charges also require
+`PAYOUTS_READY=true`, and the go-live steps below turn `PAYMENTS_LIVE` **off before the
+keys are swapped**, so a deploy cannot charge anyone in the gap. Do not skip that step
+because the second flag exists.
 
 **While `PAYMENTS_LIVE` is unset, the app stays on cash and sandbox.** Nothing breaks, nothing
-charges anyone. Flipping it to `true` is the single switch that turns card on, and only once
-every value above is present.
+charges anyone. With test keys, flipping it to `true` turns the rehearsal on. With live
+keys it is one of two switches, and `PAYOUTS_READY` is the other.
 
 ### 7. Clear the dead PayFast variables
 
@@ -332,22 +338,78 @@ Note for step 4 of the runbook below: the public endpoint is **`/api/pricing`**,
 
 ## When Stitch approves — switching to live keys
 
-Live keys are a **separate Stitch client**: assume the test client's return URL and webhook
+Live keys are a **separate Stitch client**. Assume the test client's return URL and webhook
 do **not** carry over, and its webhook secret is different.
 
-1. Put the live client id + secret in local `.env` **and** set `BASE_URL=https://freshaf.io`
-   and remove `STITCH_WEBHOOK_SECRET` from `.env` for this one run.
-2. `npm run stitch:connect` — registers `https://freshaf.io/payment-complete` (exact, no
+**Turn card off before the keys change.** `PAYMENTS_LIVE=true` is in the test-key table
+above because test keys charge nobody. If it is still `true` when the live client id is
+saved, that deploy is the one that can charge a real card. The app also refuses live
+charges until `PAYOUTS_READY=true`. That is a second lock, not a reason to skip this step.
+
+1. Render → Environment. If `PAYMENTS_LIVE` is `true`, set it to `false` (or clear it)
+   and deploy. Wait until this shows `false` **before** you change `STITCH_CLIENT_ID`:
+
+   ```bash
+   curl -s https://freshaf.io/api/pricing | grep -o '"payments_live":[a-z]*'
+   ```
+
+   On the same day, `curl -s https://freshaf.io/api/health` must show `"data_persisted":true`.
+   Card money into a database that forgets the order is worse than no card money.
+2. Put the live client id + secret in local `.env` **and** set `BASE_URL=https://freshaf.io`
+   and remove `STITCH_WEBHOOK_SECRET` from `.env` for this one run. Leave `PAYMENTS_LIVE`
+   unset in `.env` too.
+3. `npm run stitch:connect` — registers `https://freshaf.io/payment-complete` (exact, no
    trailing slash) and the webhook, and prints the **new** `whsec_` secret once. Run it
    yourself; never paste the output into chat.
-3. Render → Environment: replace `STITCH_CLIENT_ID`, `STITCH_CLIENT_SECRET`,
-   `STITCH_WEBHOOK_SECRET` (use `scripts/copy-render-env.ps1`). Keep `PAYMENTS_LIVE=true`.
-   One deploy, outside busy hours (each deploy = ~1 min of 502).
-4. Check: `curl -s https://freshaf.io/api/pricing` shows `"payments_live":true` signed out.
-5. `npm run stitch:test` makes a live **R1.00** link. Pay it with your own card: R1 should
+4. Render → Environment: replace `STITCH_CLIENT_ID`, `STITCH_CLIENT_SECRET`,
+   `STITCH_WEBHOOK_SECRET` (use `scripts/copy-render-env.ps1`). **Leave `PAYMENTS_LIVE`
+   false. Leave `PAYOUTS_READY` unset.** One deploy, outside busy hours (each deploy =
+   ~1 min of 502).
+5. Check: the same `curl` still shows `"payments_live":false` signed out. The admin
+   readiness panel should say live keys are present and card is still off.
+6. Open **Payouts** in the admin app and confirm the balances screen loads. Stitch cannot
+   pay a pro. That screen is the payout run — how it works is below.
+7. Set `PAYOUTS_READY=true` and deploy. Then set `PAYMENTS_LIVE=true` and deploy again.
+   Two steps on purpose: the first arms the lock, the second opens card.
+8. Check: `curl -s https://freshaf.io/api/pricing` shows `"payments_live":true` signed out.
+9. `npm run stitch:test` makes a live **R1.00** link. Pay it with your own card: R1 should
    reach FNB and the Stitch webhooks page should show a 200 from freshaf.io.
-6. From then on demo accounts use FreshAF's internal test page, never Stitch — a reviewer's
-   card is never charged with live keys.
+   That R1 is not a pro job. Nothing is owed to a pro for it.
+10. From then on demo accounts use FreshAF's internal test page, never Stitch — a reviewer's
+    card is never charged with live keys.
+
+### How pros get paid
+
+Stitch Express has no payout to a third party. Checked against the live OpenAPI
+(`https://express.stitch.money/api/openapi.json`): the payment routes are payment links,
+refunds and `POST /api/v1/withdrawal`. Withdrawal moves FreshAF's own Stitch balance into
+the bank account verified on the Stitch account — FreshAF's FNB — either within the hour
+(`INSTANT`) or within three working days (`DEFAULT`). It does not take a beneficiary.
+The marketplace product that pays pros is a different API (`api.stitch.money`), and this
+account is not on it. Routing customer funds to pros inside Stitch would also cut against
+the acquiring terms (clause 7.7.5, and Capitec's "no payments to third-party accounts").
+
+So the payout is an EFT FreshAF sends itself, recorded in `server/payouts.js`:
+
+- A **paid card job**, once the pro marks it complete, credits the pro with their price
+  plus the callout plus any laundry return trip. FreshAF's margin stays with FreshAF.
+  The same figure the pro already sees as what they earned. A webhook retry cannot
+  credit it twice.
+- The credit sits for `payout_hold_days` (default **7**, changed on the Payouts screen,
+  0–30) so a refund can land before the money leaves.
+- **Cash commission is set off** when you create a batch. The pro's cash debt drops by
+  the same amount, oldest job first, and a job that is only partly covered stays open.
+  If the debt is larger than the card earnings, the batch pays R0 and the rest of the
+  debt stays. Creating the batch does not send money.
+- Download the CSV, pay it at the bank, then **Mark paid** with the bank reference.
+  Marking paid records that you did. It does not move money. Void an unpaid batch if
+  you have not sent it — the set-off is put back.
+- A refund recorded in the admin app (**Mark refunded**, including on a completed card
+  job) **voids** an earning that is not in a batch, and **deducts it from the next
+  payout** if the pro was already paid. An earning sitting in an open batch has to be
+  taken out by voiding that batch first.
+- `PAYOUTS_READY` is not a Stitch setting. It is the confirmation that this is how pros
+  will be paid. Without it, live keys cannot charge a real customer. Test keys ignore it.
 
 ## Ask them these before going live
 
@@ -363,11 +425,15 @@ From `STITCH-CONTRACT-REVIEW.md` — the acquiring terms leave all three open:
 
 ## Still open, and not Stitch's fault
 
-- **No persistent disk on Render.** Orders and customers are wiped on every restart. Taking real
-  card money into a database that forgets the order is worse than taking no card money. **Fix this
-  before `PAYMENTS_LIVE=true`.**
-- **Chargebacks are FreshAF's loss** now, and a pro may already have been paid. Set a payout delay.
+- **Persistent disk is on.** `GET /api/health` reports `data_persisted: true` — the data folder
+  has survived restarts. The older note that Render has no persistent disk is out of date.
+  Still read that field on the day you switch keys. If it is ever `false` again, do not take
+  card money.
+- **Chargebacks are FreshAF's loss** once a pro has been paid. The payout hold (default 7 days)
+  is the delay. A refund recorded after the pro was paid is deducted from their next payout.
+  A chargeback that arrives and is never recorded in the admin app is still FreshAF's loss.
 - **`SUPPLIER-AGREEMENT-DRAFT.md` is unsigned.** The deadline moved: it was "before the first pro
   is approved", and acquiring clause 13.2 makes it **also "before the first card payment"**.
-- **Set-off against card payouts** — the other half of the cash mechanic in `GETTING-PAID.md` —
-  can be wired as soon as card revenue exists. `balance.settle()` is the hook.
+- **Settlement timing and any reserve** are still unanswered by Stitch (the three questions
+  above). The payout run pays pros from FreshAF's own account, so a long hold is working
+  capital, not a software gap.

@@ -413,6 +413,14 @@ function completeOrder(order, extra = {}) {
   if (earned > 0) {
     db.prepare('UPDATE users SET points_cents = points_cents + ? WHERE id = ?').run(earned, order.customer_id);
   }
+  // Card jobs credit the pro's payout ledger once the work is done and the money is in.
+  // A failure here must not stop the pro closing the job; the admin payout screen
+  // backfills anything this insert missed.
+  try {
+    require('../payouts').recordCardEarning(order.id);
+  } catch (e) {
+    console.error(`[FreshAF] Payout ledger did not record order ${order.id}: ${e.message}`);
+  }
 }
 
 router.post('/jobs/:orderId/advance', requireApproved, (req, res) => {
@@ -729,10 +737,11 @@ router.post('/phone/verify/confirm', (req, res) => {
 });
 
 router.get('/earnings', (req, res) => {
-  // Pros keep 100% of their own price plus the callout. Our fee was charged on top,
-  // to the customer — it never comes out of their money.
+  // Pros keep 100% of their own price, the callout and any laundry return trip. Our fee
+  // was charged on top, to the customer — it never comes out of their money. Same total
+  // the payout ledger credits on a card job.
   const row = db.prepare(`SELECT COUNT(*) AS jobs,
-      COALESCE(SUM(supplier_price_cents + callout_fee_cents),0) AS earned,
+      COALESCE(SUM(supplier_price_cents + callout_fee_cents + COALESCE(return_leg_fee_cents, 0)),0) AS earned,
       COALESCE(SUM(platform_fee_cents),0) AS fees
     FROM orders WHERE supplier_id = ? AND status = 'completed'`).get(req.user.id);
   // Cash jobs: the pro collected our fee at the door, so it is owed back to us.
@@ -744,6 +753,7 @@ router.get('/earnings', (req, res) => {
     fee_owed_cents: owed,
     fee_pct: quotes.feePctFor('carwash'),
     ...balance.status(req.user.id),
+    ...require('../payouts').forSupplier(req.user.id),
   });
 });
 

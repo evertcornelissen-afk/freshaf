@@ -31,6 +31,7 @@ function decorate() {
   el('h-suppliers').insertAdjacentHTML('afterbegin', icon('briefcase'));
   el('h-import').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-orderlog').insertAdjacentHTML('afterbegin', icon('clock'));
+  el('h-payouts').insertAdjacentHTML('afterbegin', icon('wallet'));
   el('h-customers').insertAdjacentHTML('afterbegin', icon('user'));
   el('h-settings').insertAdjacentHTML('afterbegin', icon('shield'));
   el('h-reviewers').insertAdjacentHTML('afterbegin', icon('user'));
@@ -174,7 +175,7 @@ async function boot() {
 
 async function enterDash() {
   if (me && me.must_change_password) await forcePasswordChange();
-  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), loadSettings(), refreshReviewers(), refreshAdmins()]); // content first
+  await Promise.all([refreshStats(), refreshReadiness(), refreshSuppliers(), refreshCustomers(), refreshOrders(), refreshPayouts(), loadSettings(), refreshReviewers(), refreshAdmins()]); // content first
   show('view-dash');
   setInterval(() => { refreshStats(); refreshOrders(); }, 15000);
 }
@@ -317,7 +318,7 @@ window.markRefunded = async (id, cents) => {
   try {
     const ok = await modal({
       title: `Mark ${rand(cents)} as refunded?`,
-      body: 'Only after you have actually refunded it in the Stitch dashboard. The customer is emailed that the refund is on its way.',
+      body: 'Only after you have actually refunded it in the Stitch dashboard. The customer is emailed that the refund is on its way. If the pro was going to be paid for this job, that earning is cancelled; if they were already paid, it is deducted from their next payout.',
       confirmText: 'Mark refunded',
     });
     if (!ok) return;
@@ -342,6 +343,136 @@ window.setDemo = async (id, makeDemo) => {
     toast(makeDemo ? 'Marked as a demo account' : 'Marked as a real account', 'ok');
     await Promise.all([refreshSuppliers(), refreshCustomers(), refreshStats(), refreshReadiness()]);
   } catch (e) { showError('sup-error', e.message); }
+};
+
+/* ---------- pro payouts ---------- */
+function renderPayouts(data) {
+  el('payout-explainer').textContent = data.notice || '';
+  el('payout-hold').value = data.hold_days;
+  const t = data.totals || {};
+  const ready = data.payouts_ready ? 'PAYOUTS_READY is set.' : 'PAYOUTS_READY is not set — live card charges stay off until it is.';
+  el('payout-summary').innerHTML = `Hold <strong>${data.hold_days} days</strong>. `
+    + `Ready to include: ${rand(t.payable_cents || 0)}. `
+    + `Still in the hold: ${rand(t.held_cents || 0)}. `
+    + `Would pay now, after set-off: <strong>${rand(t.net_cents || 0)}</strong>. `
+    + `${ready}`;
+  const pros = data.pros || [];
+  el('payout-pros').innerHTML = pros.length ? `<table><thead><tr>
+      <th>Pro</th><th>Matured</th><th>Held</th><th>Clawback</th><th>Cash held</th><th>Set-off</th><th>Pay</th><th>Bank</th>
+    </tr></thead><tbody>` + pros.map((p) => `<tr>
+      <td>${escapeHtml(p.business_name || p.name || ('#' + p.supplier_id))}<div class="muted small-text">${escapeHtml(p.name || '')}</div></td>
+      <td>${rand(p.payable_cents)}</td>
+      <td>${p.held_cents ? rand(p.held_cents) : '—'}</td>
+      <td>${p.clawback_cents ? rand(p.clawback_cents) : '—'}</td>
+      <td>${p.cash_owed_cents ? rand(p.cash_owed_cents) : '—'}</td>
+      <td>${p.setoff_cents ? rand(p.setoff_cents) : '—'}</td>
+      <td><strong>${rand(p.net_cents)}</strong></td>
+      <td class="muted small-text">${p.has_bank ? `${escapeHtml(p.bank_name || '')} ${escapeHtml(p.bank_account_masked || '')}` : (p.bank_unreadable ? 'unreadable' : 'missing')}</td>
+    </tr>`).join('') + '</tbody></table>'
+    : '<p class="empty">No card earnings yet. Cash a pro is holding still shows on their supplier row.</p>';
+  const batches = data.batches || [];
+  el('payout-batches').innerHTML = batches.length ? batches.map((b) => {
+    const lines = (b.lines || []).map((l) => `<tr>
+        <td>${escapeHtml(l.business_name || l.name || ('#' + l.supplier_id))}</td>
+        <td>${rand(l.earnings_cents)}</td>
+        <td>${l.clawback_cents ? rand(l.clawback_cents) : '—'}</td>
+        <td>${l.setoff_cents ? rand(l.setoff_cents) : '—'}</td>
+        <td><strong>${rand(l.net_cents)}</strong></td>
+        <td>${l.has_bank ? escapeHtml(l.bank_account_masked || 'on file') : '<span class="pill bad">no bank details</span>'}</td>
+        <td>${escapeHtml(l.status)}${l.reference ? `<div class="muted small-text">${escapeHtml(l.reference)}</div>` : ''}</td>
+        <td>${b.status === 'open' && l.status === 'pending' && l.net_cents > 0
+          ? `<button class="secondary small" onclick="markPayoutLine(${l.id})">Mark paid</button>` : ''}</td>
+      </tr>`).join('');
+    return `<div style="margin:14px 0">
+      <div class="row spread" style="gap:8px;flex-wrap:wrap">
+        <strong>Batch #${b.id}</strong>
+        <span class="pill ${b.status === 'paid' ? 'ok' : b.status === 'void' ? 'bad' : 'warn'}">${escapeHtml(b.status)}</span>
+        <span class="muted small-text">earnings ${rand(b.earnings_cents)} · clawback ${rand(b.clawback_cents)} · set-off ${rand(b.setoff_cents)} · pay ${rand(b.net_cents)}${b.reference ? ` · ${escapeHtml(b.reference)}` : ''}</span>
+        <span class="row" style="gap:6px">
+          ${b.status !== 'void' ? `<a class="btn secondary small" href="/api/admin/payouts/batches/${b.id}/csv">Export CSV</a>` : ''}
+          ${b.status === 'open' ? `<button class="small" onclick="markPayoutBatch(${b.id}, ${b.net_cents})">Mark batch paid</button>
+            <button class="danger small" onclick="voidPayoutBatch(${b.id})">Void</button>` : ''}
+        </span>
+      </div>
+      <table><thead><tr><th>Pro</th><th>Earnings</th><th>Clawback</th><th>Set-off</th><th>Pay</th><th>Bank</th><th>Status</th><th></th></tr></thead>
+      <tbody>${lines}</tbody></table>
+    </div>`;
+  }).join('') : '<p class="empty">No batches yet.</p>';
+}
+
+async function refreshPayouts() {
+  try {
+    renderPayouts(await api('/api/admin/payouts'));
+  } catch (e) { showError('payout-error', e.message); }
+}
+
+el('btn-payout-refresh').onclick = () => refreshPayouts();
+el('btn-payout-hold').onclick = async () => {
+  try {
+    await api('/api/admin/payouts/hold', { method: 'POST', body: { days: Number(el('payout-hold').value) } });
+    toast('Payout hold saved', 'ok');
+    await refreshPayouts();
+  } catch (e) { showError('payout-error', e.message); }
+};
+el('btn-payout-batch').onclick = async () => {
+  try {
+    const ok = await modal({
+      title: 'Create a payout batch?',
+      body: 'This sets cash commissions off immediately and freezes the amounts. It does not send money. Download the CSV, pay it at the bank, then mark the batch paid with the bank reference. Void it if you have not paid.',
+      confirmText: 'Create batch',
+    });
+    if (!ok) return;
+    const r = await api('/api/admin/payouts/batches', { method: 'POST', body: {} });
+    toast(`Batch #${r.batch.id} created. Pay ${rand(r.batch.net_cents)}.`, 'ok');
+    await Promise.all([refreshPayouts(), refreshSuppliers()]);
+  } catch (e) { showError('payout-error', e.message); }
+};
+
+window.markPayoutBatch = async (id, net) => {
+  try {
+    const reference = await modal({
+      title: `Mark batch #${id} paid?`,
+      body: net > 0
+        ? `Only after ${rand(net)} has actually left the FreshAF account. The reference is what you will look up when a pro asks.`
+        : 'Nothing is transferred — the earnings were set off or clawed back. A reference still goes on the record.',
+      input: 'Bank reference',
+      confirmText: 'Mark paid',
+    });
+    if (reference === null) return;
+    await api(`/api/admin/payouts/batches/${id}/paid`, { method: 'POST', body: { reference } });
+    toast('Marked paid', 'ok');
+    await refreshPayouts();
+  } catch (e) { showError('payout-error', e.message); }
+};
+
+window.markPayoutLine = async (id) => {
+  try {
+    const reference = await modal({
+      title: 'Mark this pro paid?',
+      body: 'Only after their transfer has been sent. The rest of the batch stays open.',
+      input: 'Bank reference',
+      confirmText: 'Mark paid',
+    });
+    if (reference === null) return;
+    await api(`/api/admin/payouts/lines/${id}/paid`, { method: 'POST', body: { reference } });
+    toast('Marked paid', 'ok');
+    await refreshPayouts();
+  } catch (e) { showError('payout-error', e.message); }
+};
+
+window.voidPayoutBatch = async (id) => {
+  try {
+    const ok = await modal({
+      title: `Void batch #${id}?`,
+      body: 'The earnings go back to "owed" and any cash set-off is put back on the pro. Do this only if you have not paid the batch.',
+      confirmText: 'Void batch',
+      danger: true,
+    });
+    if (!ok) return;
+    await api(`/api/admin/payouts/batches/${id}/void`, { method: 'POST', body: {} });
+    toast('Batch voided', 'ok');
+    await Promise.all([refreshPayouts(), refreshSuppliers()]);
+  } catch (e) { showError('payout-error', e.message); }
 };
 
 window.settleCash = async (id, owed) => {
@@ -567,7 +698,8 @@ async function refreshOrders() {
         ${o.status === 'cancelled' && o.cancelled_by ? `<div class="muted small-text">by ${escapeHtml(o.cancelled_by)}${o.cancel_reason ? `: ${escapeHtml(o.cancel_reason)}` : ''}</div>` : ''}</td>
       <td><div class="row" style="flex-wrap:nowrap">
         ${!['completed', 'cancelled'].includes(o.status) ? `<button class="danger small" onclick="adminCancel(${o.id})">Cancel</button>` : ''}
-        ${o.refund_due_cents > 0 ? `<button class="small" onclick="markRefunded(${o.id}, ${o.refund_due_cents})">Mark refunded</button>` : ''}
+        ${(o.refund_due_cents > 0 || (o.payment_method === 'card' && o.payment_status === 'paid' && o.status === 'completed'))
+          ? `<button class="small" onclick="markRefunded(${o.id}, ${o.refund_due_cents || (o.price_cents - (o.points_used_cents || 0))})">Mark refunded</button>` : ''}
       </div></td>
     </tr>`).join('') + '</tbody></table>';
 }

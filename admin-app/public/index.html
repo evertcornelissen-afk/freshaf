@@ -184,6 +184,28 @@
       <div class="table-scroll" id="orders-box"></div>
     </div>
 
+    <div class="card" id="payout-card">
+      <div class="row spread">
+        <h2 id="h-payouts">Pro payouts</h2>
+        <button class="secondary small" id="btn-payout-refresh" type="button">Refresh</button>
+      </div>
+      <p class="muted small-text" id="payout-explainer">Loading…</p>
+      <div class="msg error" id="payout-error"></div>
+      <div id="payout-summary" class="small-text"></div>
+      <div class="row mt" style="align-items:flex-end;flex-wrap:wrap;gap:10px">
+        <div>
+          <label for="payout-hold">Hold before a card job can be paid (days)</label>
+          <input id="payout-hold" type="number" min="0" max="30" style="width:110px">
+        </div>
+        <button class="secondary small" id="btn-payout-hold" type="button">Save hold</button>
+        <button class="small" id="btn-payout-batch" type="button">Create payout batch</button>
+      </div>
+      <h3>What pros are owed</h3>
+      <div class="table-scroll" id="payout-pros"></div>
+      <h3>Batches</h3>
+      <div class="table-scroll" id="payout-batches"></div>
+    </div>
+
     <div class="card">
       <h2 id="h-settings">Marketplace settings</h2>
       <div class="msg ok" id="settings-ok" style="display:none"></div>

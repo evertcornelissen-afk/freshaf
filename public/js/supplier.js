@@ -1320,9 +1320,19 @@ async function refreshEarnings() {
   const blocked = e.cash_blocked
     ? `<div class="msg error" style="display:block;grid-column:1/-1">You are holding ${rand(e.fee_owed_cents)} of FreshAF's money from cash jobs, over the ${rand(e.cash_cap_cents)} limit. <strong>You will not be offered jobs until it is settled.</strong> Pay it in and we will clear it straight away.</div>`
     : '';
+  const due = e.payout_due_cents > 0
+    ? `<div class="stat"><div class="v">${rand(e.payout_due_cents)}</div><div class="l">Waiting to be paid, after cash set-off</div></div>`
+    : '';
+  const held = e.payout_held_cents > 0
+    ? `<div class="stat"><div class="v">${rand(e.payout_held_cents)}</div><div class="l">Card earnings held ${e.payout_hold_days} days</div></div>`
+    : '';
+  const cleared = !e.payout_due_cents && e.payout_setoff_cents > 0
+    ? `<p class="muted small-text" style="grid-column:1/-1">${rand(e.payout_setoff_cents)} of card earnings will set off cash you are holding, so nothing is paid out for that.</p>`
+    : '';
   el('earnings-box').innerHTML = `
     <div class="stat"><div class="v">${e.jobs}</div><div class="l">Jobs done</div></div>
-    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">You earned — your price in full</div></div>` + owed + blocked;
+    <div class="stat"><div class="v">${rand(e.earned_cents)}</div><div class="l">You earned — your price in full</div></div>`
+    + owed + due + held + cleared + blocked;
 }
 
 el('login-form').onsubmit = (e) => { e.preventDefault(); return withBusy(el('btn-login'), 'Signing in…', async () => {

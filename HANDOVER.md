@@ -48,8 +48,8 @@ registered). See `MERCHANT-OF-RECORD.md`.
 ✅ **Cash collection now works the Uber way** (28 Oct). A pro's unsettled cash margin accrues
 against their account; at **R300** (`cash_owed_cap_cents`) they cannot go online, cannot quote and
 are dropped from dispatch until an admin records the money as received. `server/balance.js`, with
-a **Settle cash** button on each pro's admin row. Automatic set-off against card payouts is the
-remaining piece and needs card to be live. See **`GETTING-PAID.md`**.
+a **Settle cash** button on each pro's admin row. Set-off against card payouts is the payout
+batch in `server/payouts.js` (Stitch cannot pay pros; the admin sends the EFT). See **`GETTING-PAID.md`**.
 
 ### Blocked on Evert
 1. **Clear the PayFast keys on Render.** Merchant credentials are still set there, and
@@ -143,7 +143,8 @@ remaining piece and needs card to be live. See **`GETTING-PAID.md`**.
   FreshAF the balance above their own price. Tracked on `orders.fee_settled`, shown in the pro's
   earnings as "Owed to FreshAF from cash jobs". **Capped at R300** — above it `server/balance.js`
   blocks going online, blocks quoting and removes them from `eligiblePros` until an admin hits
-  **Settle cash**. Set-off against card payouts still to wire when card goes live.
+  **Settle cash**. A payout batch sets the same balance off against card earnings
+  (`balance.settleUpTo`), including part of a job.
 - Dispatch offers **only to the chosen pro**. If they decline/time out the order goes to
   `no_providers` and the customer picks again. The T&C now also allows FreshAF to offer a
   replacement at the same price, or a full refund — but never a silent substitution.

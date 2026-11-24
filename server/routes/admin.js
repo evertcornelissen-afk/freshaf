@@ -641,17 +641,86 @@ router.post('/orders/:id/cancel', (req, res) => {
 });
 
 // Record that a refund owed has been paid back (in the Stitch dashboard). The customer
-// is told it is on its way.
+// is told it is on its way. A completed card job can be refunded after the fact too:
+// the pro's unpaid earning is voided, or clawed back off the next payout if it was
+// already included in a paid batch.
 router.post('/orders/:id/refunded', (req, res) => {
   const o = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!o) return res.status(404).json({ error: 'Order not found' });
-  if (!(o.refund_due_cents > 0)) return res.status(409).json({ error: 'No refund is owed on this order' });
-  db.prepare(`UPDATE orders SET payment_status = 'refunded', refunded_at = datetime('now'),
-    refund_due_cents = 0 WHERE id = ?`).run(o.id);
+  const completedCard = o.payment_method === 'card' && o.payment_status === 'paid' && o.status === 'completed';
+  if (!(o.refund_due_cents > 0) && !completedCard) {
+    return res.status(409).json({ error: 'No refund is owed on this order' });
+  }
+  const refundCents = o.refund_due_cents > 0 ? o.refund_due_cents : (o.price_cents - (o.points_used_cents || 0));
+  let effect;
+  try {
+    effect = require('../payouts').applyRefund(o);
+  } catch (e) {
+    const status = e.status || 500;
+    if (status >= 500) console.error('[FreshAF] Refund failed:', e);
+    return res.status(status).json({ error: status >= 500 ? 'Could not record the refund' : e.message });
+  }
   const c = db.prepare('SELECT name, email FROM users WHERE id = ?').get(o.customer_id);
-  if (c?.email) mailer.refundSent({ to: c.email, name: c.name, orderId: o.id, refundCents: o.refund_due_cents }).catch(() => {});
-  console.log(`[FreshAF] Refund of R${(o.refund_due_cents / 100).toFixed(2)} recorded for order ${o.id}`);
-  res.json({ ok: true });
+  if (c?.email) mailer.refundSent({ to: c.email, name: c.name, orderId: o.id, refundCents }).catch(() => {});
+  console.log(`[FreshAF] Refund of R${(refundCents / 100).toFixed(2)} recorded for order ${o.id} (${effect.action}).`);
+  res.json({ ok: true, payout: effect.action, refund_cents: refundCents });
+});
+
+/* ---------- pro payouts ---------- */
+// Stitch cannot pay a pro. These routes are the manual run: balances, a batch that
+// sets cash commission off, a CSV for the bank, and a reference once it is paid.
+
+function payoutFail(res, e) {
+  const status = e.status || 500;
+  if (status >= 500) console.error('[FreshAF] Payout error:', e);
+  res.status(status).json({ error: status >= 500 ? 'Could not update payouts' : e.message });
+}
+
+router.get('/payouts', (req, res) => {
+  try {
+    res.json(require('../payouts').overview());
+  } catch (e) { payoutFail(res, e); }
+});
+
+router.post('/payouts/hold', (req, res) => {
+  try {
+    const days = require('../payouts').setHoldDays(req.body?.days);
+    res.json({ ok: true, hold_days: days });
+  } catch (e) { payoutFail(res, e); }
+});
+
+router.post('/payouts/batches', (req, res) => {
+  try {
+    res.json({ batch: require('../payouts').createBatch({ by: req.user?.name }) });
+  } catch (e) { payoutFail(res, e); }
+});
+
+router.get('/payouts/batches/:id/csv', (req, res) => {
+  try {
+    const { filename, body } = require('../payouts').batchCsv(Number(req.params.id));
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    res.set('Cache-Control', 'no-store');
+    res.send(body);
+  } catch (e) { payoutFail(res, e); }
+});
+
+router.post('/payouts/batches/:id/paid', (req, res) => {
+  try {
+    res.json({ batch: require('../payouts').markBatchPaid(Number(req.params.id), { reference: req.body?.reference }) });
+  } catch (e) { payoutFail(res, e); }
+});
+
+router.post('/payouts/batches/:id/void', (req, res) => {
+  try {
+    res.json({ batch: require('../payouts').voidBatch(Number(req.params.id)) });
+  } catch (e) { payoutFail(res, e); }
+});
+
+router.post('/payouts/lines/:id/paid', (req, res) => {
+  try {
+    res.json({ batch: require('../payouts').markPayoutPaid(Number(req.params.id), { reference: req.body?.reference }) });
+  } catch (e) { payoutFail(res, e); }
 });
 
 router.get('/orders/:id/handover-photo', (req, res) => {
@@ -830,6 +899,24 @@ router.get('/readiness', (req, res) => {
           : 'JWT_SECRET is not set, so every deploy signs everyone out.' },
       { key: 'card_payments', label: 'Card payments live', ok: payments.LIVE,
         detail: payments.statusDetail() },
+      (() => {
+        const stitch = require('../stitch');
+        const liveKeys = stitch.isConfigured() && !stitch.isTestMode();
+        const ready = payments.PAYOUTS_READY;
+        if (liveKeys && !ready) {
+          return { key: 'pro_payouts', label: 'Pro payouts acknowledged', ok: false,
+            detail: 'Live Stitch keys are set, but PAYOUTS_READY is not, so real customers cannot pay by card. '
+              + 'Stitch Express only settles into FreshAF\'s own bank account — it cannot pay pros. '
+              + 'Confirm the Payouts section, set PAYOUTS_READY=true, and keep PAYMENTS_LIVE false while the keys are swapped.' };
+        }
+        if (ready) {
+          return { key: 'pro_payouts', label: 'Pro payouts acknowledged', ok: true,
+            detail: 'PAYOUTS_READY is set. Card earnings accrue on the payout ledger and are paid by EFT from the Payouts section, after cash set-off. Stitch does not pay pros.' };
+        }
+        return { key: 'pro_payouts', label: 'Pro payouts acknowledged', ok: true,
+          detail: 'Manual payouts are in place: ledger, cash set-off, bank CSV. Stitch Express cannot pay a pro. '
+            + 'Before live keys, set PAYMENTS_LIVE false, then set PAYOUTS_READY=true or live card charges stay off.' };
+      })(),
       { key: 'return_leg_price', label: 'Laundry return-trip price set',
         ok: getSetting('return_leg_price_set', '0') === '1',
         detail: getSetting('return_leg_price_set', '0') === '1'
